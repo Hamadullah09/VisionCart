@@ -1,0 +1,109 @@
+@model PromotionEditViewModel
+@{
+    var isNew = Model.Id is null;
+    ViewData["Title"] = isNew ? "New deal" : Model.Details.Name;
+    var d = Model.Details;
+}
+
+<p class="small"><a asp-action="Index">← Promotions</a></p>
+<h1>@(isNew ? "New deal" : d.Name)</h1>
+@if (!isNew)
+{
+    <p class="muted">Redeemed @Model.UsageCount time@(Model.UsageCount == 1 ? "" : "s")</p>
+}
+
+<form method="post" asp-action="Save" asp-route-id="@Model.Id">
+    <div class="admin-two-col">
+        <div class="panel">
+            <h2 style="margin-top:0;">The offer</h2>
+            <div class="form-grid">
+                <div class="full">
+                    <label for="Name">Deal name</label>
+                    <input class="field" id="Name" name="Name" value="@d.Name" required autofocus />
+                </div>
+                <div>
+                    <label for="Code">Code</label>
+                    <input class="field" id="Code" name="Code" value="@d.Code"
+                           placeholder="Leave blank to apply automatically" />
+                </div>
+                <div>
+                    <label for="Kind">Type</label>
+                    <select id="Kind" name="Kind">
+                        @foreach (var k in PromotionKinds.All)
+                        {
+                            <option value="@k" selected="@(d.Kind == k)">@PromotionKinds.Labels[k]</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="Value">Value</label>
+                    <input class="field" id="Value" name="Value" inputmode="decimal" value="@d.Value" />
+                    <p class="hint">A percentage for "percentage off", otherwise an amount.</p>
+                </div>
+                <div>
+                    <label for="MaxDiscount">Cap the discount at</label>
+                    <input class="field" id="MaxDiscount" name="MaxDiscount" inputmode="decimal" value="@d.MaxDiscount" />
+                </div>
+                <div class="full">
+                    <label for="Description">Description shown to customers</label>
+                    <input class="field" id="Description" name="Description" value="@d.Description" />
+                </div>
+                <div class="full">
+                    <label for="BannerText">Banner text</label>
+                    <input class="field" id="BannerText" name="BannerText" value="@d.BannerText"
+                           placeholder="Shown across the top of every page. Leave blank for no banner." />
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="panel">
+                <h2 style="margin-top:0;">Conditions</h2>
+                <div class="form-grid">
+                    <div>
+                        <label for="MinSubtotal">Minimum spend</label>
+                        <input class="field" id="MinSubtotal" name="MinSubtotal" inputmode="decimal" value="@d.MinSubtotal" />
+                    </div>
+                    <div>
+                        <label for="MinQty">Minimum items</label>
+                        <input class="field" id="MinQty" name="MinQty" type="number" value="@d.MinQty" />
+                    </div>
+                    <div>
+                        <label for="StartsAt">Starts</label>
+                        <input class="field" id="StartsAt" name="StartsAt" type="date" value="@d.StartsAt?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div>
+                        <label for="EndsAt">Ends</label>
+                        <input class="field" id="EndsAt" name="EndsAt" type="date" value="@d.EndsAt?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div>
+                        <label for="UsageLimit">Total uses</label>
+                        <input class="field" id="UsageLimit" name="UsageLimit" type="number" value="@d.UsageLimit" />
+                    </div>
+                    <div>
+                        <label for="UsageLimitPerUser">Uses per customer</label>
+                        <input class="field" id="UsageLimitPerUser" name="UsageLimitPerUser" type="number" value="@d.UsageLimitPerUser" />
+                    </div>
+                    <div>
+                        <label for="Priority">Priority</label>
+                        <input class="field" id="Priority" name="Priority" type="number" value="@d.Priority" />
+                        <p class="hint">Highest wins.</p>
+                    </div>
+                    <label class="checkline full">
+                        <input type="checkbox" name="FirstOrderOnly" value="true" checked="@d.FirstOrderOnly" />
+                        <span>First orders only</span>
+                    </label>
+                    <label class="checkline full">
+                        <input type="checkbox" name="Stackable" value="true" checked="@d.Stackable" />
+                        <span>May stack with other stackable deals</span>
+                    </label>
+                    <label class="checkline full">
+                        <input type="checkbox" name="IsActive" value="true" checked="@d.IsActive" />
+                        <span>Live</span>
+                    </label>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Save deal</button>
+        </div>
+    </div>
+</form>

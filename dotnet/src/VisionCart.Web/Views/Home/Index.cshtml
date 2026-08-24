@@ -1,0 +1,78 @@
+@using Microsoft.Extensions.Options
+@model HomeViewModel
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Prescription eyewear, fitted properly";
+    ViewData["Banner"] = Model.Banners.FirstOrDefault();
+    var store = Store.Value;
+}
+
+<div class="hero" style="margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding-left:20px;padding-right:20px;">
+    <div class="wrap">
+        <p class="eyebrow">Prescription eyewear, fitted properly.</p>
+        <h1>See how they look before you buy them.</h1>
+        <p>
+            Upload a photo or open your camera, and every frame in our range lands on your
+            face in the right size — with your pupillary distance measured while you browse.
+        </p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" href="/try-on">Start virtual try-on</a>
+            <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Browse all frames</a>
+        </div>
+        <p class="note">Your photo never leaves your device unless you choose to save it.</p>
+    </div>
+</div>
+
+@if (Model.Deals.Count > 0)
+{
+    <div class="section-head">
+        <h2>On offer right now</h2>
+        <a asp-controller="Home" asp-action="Deals">All deals →</a>
+    </div>
+    <div class="grid grid-3">
+        @foreach (var deal in Model.Deals.Take(3))
+        {
+            <div class="card" style="padding:18px;">
+                <h3 style="margin:0 0 6px;font-size:17px;">@deal.Name</h3>
+                <p class="muted small" style="margin:0 0 10px;">
+                    @(deal.Description ?? IPromotionService.Describe(deal))
+                </p>
+                @if (deal.Code is not null)
+                {
+                    <code class="chip">@deal.Code</code>
+                }
+                @if (deal.EndsAt is { } ends)
+                {
+                    <p class="small muted" style="margin:10px 0 0;">Ends @ends.ToString("d MMM")</p>
+                }
+            </div>
+        }
+    </div>
+}
+
+<h2>How it works</h2>
+<div class="grid grid-3">
+    <div class="card" style="padding:18px;">
+        <h3 style="margin:0 0 6px;font-size:16px;">1. Try them on</h3>
+        <p class="muted small" style="margin:0;">Upload a photo or use your camera. Frames are scaled to your face automatically.</p>
+    </div>
+    <div class="card" style="padding:18px;">
+        <h3 style="margin:0 0 6px;font-size:16px;">2. Add your prescription</h3>
+        <p class="muted small" style="margin:0;">Type it in, or upload a photo of the paper one and our optician will read it.</p>
+    </div>
+    <div class="card" style="padding:18px;">
+        <h3 style="margin:0 0 6px;font-size:16px;">3. We make and ship</h3>
+        <p class="muted small" style="margin:0;">Lenses cut in our lab and delivered, with 14 days to change your mind.</p>
+    </div>
+</div>
+
+<div class="section-head">
+    <h2>Popular this season</h2>
+    <a asp-controller="Frames" asp-action="Index">See all →</a>
+</div>
+<div class="grid grid-4">
+    @foreach (var frame in Model.Featured)
+    {
+        <partial name="_ProductCard" model="frame" />
+    }
+</div>

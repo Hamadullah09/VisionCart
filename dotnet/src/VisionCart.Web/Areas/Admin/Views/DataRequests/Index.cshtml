@@ -1,0 +1,94 @@
+@model DataRequestsViewModel
+@{
+    ViewData["Title"] = "Data requests";
+}
+
+<h1>Data requests</h1>
+<p class="muted">
+    Correction, export, restriction and erasure requests from customers. A
+    statutory clock runs on each one, so the oldest open request is listed first.
+</p>
+
+<form method="get" asp-action="Index" class="filter-bar">
+    <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">All</option>
+            @foreach (var status in DataSubjectRequestStatuses.All)
+            {
+                <option value="@status" selected="@(status == Model.Status)">@Humanise.Value(status)</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-outline" type="submit">Filter</button>
+    <a class="btn btn-outline" asp-action="Index">Clear</a>
+</form>
+
+@if (Model.Requests.Items.Count == 0)
+{
+    <p class="alert alert-info">No requests match.</p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+            <tr><th>Raised</th><th>Request</th><th>Contact</th><th>Linked file</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var request in Model.Requests.Items)
+            {
+                var age = (DateTime.UtcNow - request.CreatedAt).Days;
+                var open = DataSubjectRequestStatuses.Open.Contains(request.Status);
+                <tr>
+                    <td>
+                        @request.CreatedAt.ToString("dd/MM/yyyy")
+                        @if (open && age >= 21)
+                        {
+                            <br /><span class="chip chip-pending">@age days old</span>
+                        }
+                    </td>
+                    <td>
+                        @(DataSubjectRequestKinds.Labels.TryGetValue(request.Kind, out var label)
+                            ? label : request.Kind)
+                    </td>
+                    <td class="small">@request.Email</td>
+                    <td class="small">
+                        @if (request.PatientId is null)
+                        {
+                            <span class="muted">not linked</span>
+                        }
+                        else
+                        {
+                            <a asp-controller="Patients" asp-action="Detail" asp-route-id="@request.PatientId">open</a>
+                        }
+                    </td>
+                    <td>
+                        <span class="chip @(request.Status == DataSubjectRequestStatuses.Completed ? "chip-paid" : "chip-pending")">
+                            @Humanise.Value(request.Status)
+                        </span>
+                    </td>
+                    <td><a asp-action="Detail" asp-route-id="@request.Id">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Requests.Pages > 1)
+    {
+        <div class="pager">
+            @if (Model.Requests.HasPrevious)
+            {
+                <a class="btn btn-outline btn-small" asp-action="Index"
+                   asp-route-status="@Model.Status" asp-route-page="@(Model.Requests.Page - 1)">Previous</a>
+            }
+            <span class="muted small">Page @Model.Requests.Page of @Model.Requests.Pages</span>
+            @if (Model.Requests.HasNext)
+            {
+                <a class="btn btn-outline btn-small" asp-action="Index"
+                   asp-route-status="@Model.Status" asp-route-page="@(Model.Requests.Page + 1)">Next</a>
+            }
+        </div>
+    }
+}

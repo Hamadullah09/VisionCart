@@ -1,0 +1,190 @@
+@using Microsoft.Extensions.Options
+@model ProductViewModel
+@inject IOptions<StoreOptions> Store
+@{
+    var frame = Model.Frame;
+    ViewData["Title"] = $"{frame.Name} — {Humanise.Value(frame.Shape)} glasses";
+    var store = Store.Value;
+    var lead = frame.Variants.FirstOrDefault();
+    var leadImage = lead?.Images.FirstOrDefault()?.Url;
+}
+
+<p class="small muted" style="margin:20px 0 12px;">
+    <a asp-controller="Frames" asp-action="Index">Frames</a> / @frame.Name
+</p>
+
+<form method="post" asp-controller="Cart" asp-action="Add">
+    <input type="hidden" name="ReturnUrl" value="@Context.Request.Path" />
+
+    <div class="two-col">
+        <div>
+            <div class="card shot" style="background:var(--ink-50);display:flex;align-items:center;justify-content:center;padding:40px;">
+                @if (leadImage is not null)
+                {
+                    <img id="lead-image" src="@leadImage" alt="@frame.Name" style="width:80%;height:auto;" />
+                }
+            </div>
+
+            <div class="grid grid-4" style="margin-top:12px;">
+                @foreach (var v in frame.Variants)
+                {
+                    var img = v.Images.FirstOrDefault()?.Url;
+                    <label class="card" style="padding:8px;cursor:pointer;text-align:center;">
+                        <input type="radio" name="VariantId" value="@v.Id"
+                               checked="@(v.Id == lead?.Id)" style="display:none;" />
+                        @if (img is not null)
+                        {
+                            <img src="@img" alt="@v.ColorName" style="width:100%;height:auto;" />
+                        }
+                        <span class="small muted">@v.ColorName</span>
+                    </label>
+                }
+            </div>
+        </div>
+
+        <div>
+            @if (frame.Brand is not null)
+            {
+                <p class="brand-name">@frame.Brand.Name</p>
+            }
+            <h1 style="margin:4px 0 8px;">@frame.Name</h1>
+            <p style="font-size:22px;font-weight:700;margin:0 0 4px;">
+                @Money.Format(frame.BasePriceMinor, store.Currency, store.CurrencySymbol)
+                <span class="small muted" style="font-weight:400;">frame — lenses added below</span>
+            </p>
+
+            @if (frame.Description is not null)
+            {
+                <p class="muted">@frame.Description</p>
+            }
+
+            <table class="spec-table" style="margin:20px 0;">
+                <tr><td>Shape</td><td>@Humanise.Value(frame.Shape)</td></tr>
+                <tr><td>Material</td><td>@Humanise.Value(frame.Material)</td></tr>
+                <tr><td>Rim</td><td>@Humanise.Value(frame.RimType)</td></tr>
+                <tr><td>Size</td><td>@frame.LensWidthMm□@frame.BridgeWidthMm-@frame.TempleLengthMm</td></tr>
+                <tr><td>Total width</td><td>@frame.TotalWidthMm mm</td></tr>
+                <tr><td>Weight</td><td>@frame.WeightGrams g</td></tr>
+                <tr><td>SKU</td><td>@frame.Sku</td></tr>
+            </table>
+
+            <fieldset style="border:0;padding:0;margin:0 0 8px;">
+                <legend style="font-weight:600;margin-bottom:8px;">What do you need?</legend>
+                <div class="lens-options">
+                    <label class="lens-option">
+                        <input type="radio" name="LensMode" value="prescription" />
+                        <span><span class="name">Prescription lenses</span><br /><span class="desc">Made to your Rx.</span></span>
+                    </label>
+                    <label class="lens-option">
+                        <input type="radio" name="LensMode" value="plain" />
+                        <span><span class="name">Plain lenses</span><br /><span class="desc">No correction — style or screen use.</span></span>
+                    </label>
+                    <label class="lens-option">
+                        <input type="radio" name="LensMode" value="frame_only" checked />
+                        <span><span class="name">Frame only</span><br /><span class="desc">You'll fit your own lenses.</span></span>
+                    </label>
+                </div>
+            </fieldset>
+
+            @foreach (var group in Model.LensGroups)
+            {
+                <div class="lens-group">
+                    <h3>@LensGroups.Labels.GetValueOrDefault(group.Key, Humanise.Value(group.Key))</h3>
+                    <p class="small muted" style="margin:0;">@LensGroups.Help.GetValueOrDefault(group.Key)</p>
+                    <div class="lens-options">
+                        @foreach (var option in group.OrderBy(o => o.Position))
+                        {
+                            <label class="lens-option">
+                                <input type="checkbox" name="LensOptionCodes" value="@option.Code"
+                                       checked="@option.IsDefault" />
+                                <span>
+                                    <span class="name">@option.Name</span>
+                                    <span class="price">
+                                        @(option.PriceMinor == 0
+                                            ? " Included"
+                                            : $" +{Money.Format(option.PriceMinor, store.Currency, store.CurrencySymbol)}")
+                                    </span>
+                                    @if (option.Description is not null)
+                                    {
+                                        <br /><span class="desc">@option.Description</span>
+                                    }
+                                </span>
+                            </label>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="lens-group">
+                <h3>Your prescription</h3>
+                <p class="small muted" style="margin:0 0 12px;">
+                    Every value is chosen from a list, in steps of 0.25 D — a free-text box is
+                    how a lab ends up cutting the wrong lens.
+                </p>
+                <table>
+                    <thead>
+                        <tr><th>Eye</th><th>Sphere</th><th>Cylinder</th><th>Axis</th><th>Add</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var (side, label) in new[] { ("Od", "Right (OD)"), ("Os", "Left (OS)") })
+                        {
+                            <tr>
+                                <td>@label</td>
+                                <td>
+                                    <select name="@(side)Sphere">
+                                        <option value="">—</option>
+                                        @foreach (var v in Diopters.SphereValues)
+                                        {
+                                            <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="@(side)Cylinder">
+                                        <option value="">—</option>
+                                        @foreach (var v in Diopters.CylinderValues)
+                                        {
+                                            <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="@(side)Axis">
+                                        <option value="">—</option>
+                                        @foreach (var a in Diopters.AxisValues)
+                                        {
+                                            <option value="@a">@a°</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="@(side)Add">
+                                        <option value="">—</option>
+                                        @foreach (var v in Diopters.AddValues)
+                                        {
+                                            <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
+                                        }
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <label for="PdMm" style="display:block;margin-top:12px;font-size:13px;color:var(--ink-600);">
+                    Pupillary distance (mm)
+                </label>
+                <input class="field" type="text" inputmode="decimal" id="PdMm" name="PdMm"
+                       placeholder="e.g. 63" style="max-width:180px;" />
+            </div>
+
+            <div style="margin-top:24px;">
+                <button class="btn btn-primary btn-block" type="submit">Add to bag</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    @* External, not inline: the Content-Security-Policy forbids inline script. *@
+    <script src="~/js/product.js" asp-append-version="true" defer></script>
+}

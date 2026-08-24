@@ -1,0 +1,139 @@
+@using VisionCart.Application.Platform
+@model SettingsViewModel
+@{
+    ViewData["Title"] = "Settings";
+
+    // Unchecked checkboxes are absent from a form post, so the handler needs an
+    // explicit list of which booleans this page rendered.
+    var booleanKeys = string.Join(",", new[]
+    {
+        SettingKeys.CheckoutGuestAllowed,
+        SettingKeys.CheckoutRequirePrescription,
+        SettingKeys.TryOnEnabled,
+        SettingKeys.TryOnCameraEnabled,
+        SettingKeys.TryOnStoreCustomerPhotos,
+    });
+}
+
+<h1>Settings</h1>
+<p class="muted">
+    Everything a shop manager should be able to change. Secrets and API keys stay in the
+    server's configuration — they are shown below, read-only, so you can confirm what is live.
+</p>
+
+<form method="post">
+    <input type="hidden" name="__booleans" value="@booleanKeys" />
+
+    <div class="admin-two-col">
+        <div>
+            <div class="panel">
+                <h2 style="margin-top:0;">Store details</h2>
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="s-name">Store name</label>
+                        <input class="field" id="s-name" name="setting.@SettingKeys.StoreName" value="@Model.Get(SettingKeys.StoreName)" />
+                    </div>
+                    <div class="full">
+                        <label for="s-tagline">Tagline</label>
+                        <input class="field" id="s-tagline" name="setting.@SettingKeys.StoreTagline" value="@Model.Get(SettingKeys.StoreTagline)" />
+                    </div>
+                    <div>
+                        <label for="s-email">Contact email</label>
+                        <input class="field" id="s-email" type="email" name="setting.@SettingKeys.StoreEmail" value="@Model.Get(SettingKeys.StoreEmail)" />
+                    </div>
+                    <div>
+                        <label for="s-phone">Contact phone</label>
+                        <input class="field" id="s-phone" name="setting.@SettingKeys.StorePhone" value="@Model.Get(SettingKeys.StorePhone)" />
+                    </div>
+                    <div class="full">
+                        <label for="s-address">Address</label>
+                        <input class="field" id="s-address" name="setting.@SettingKeys.StoreAddress" value="@Model.Get(SettingKeys.StoreAddress)" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2 style="margin-top:0;">Selling rules</h2>
+                <div class="form-grid">
+                    <div>
+                        <label for="s-freeship">Free delivery over (minor units)</label>
+                        <input class="field" id="s-freeship" name="setting.@SettingKeys.FreeShippingOverMinor"
+                               value="@Model.Get(SettingKeys.FreeShippingOverMinor)" />
+                        <p class="hint">
+                            In minor units — currently
+                            @(int.TryParse(Model.Get(SettingKeys.FreeShippingOverMinor), out var over)
+                                ? Money.Format(over, Model.Currency, "")
+                                : "—")
+                            @Model.Currency. Set 0 to switch it off.
+                        </p>
+                    </div>
+                    <div>
+                        <label for="s-returns">Return window (days)</label>
+                        <input class="field" id="s-returns" type="number" name="setting.@SettingKeys.ReturnDays"
+                               value="@Model.Get(SettingKeys.ReturnDays)" />
+                    </div>
+                    <label class="checkline full">
+                        <input type="checkbox" name="setting.@SettingKeys.CheckoutGuestAllowed"
+                               checked="@Model.Bool(SettingKeys.CheckoutGuestAllowed)" />
+                        <span>Allow checkout without an account</span>
+                    </label>
+                    <label class="checkline full">
+                        <input type="checkbox" name="setting.@SettingKeys.CheckoutRequirePrescription"
+                               checked="@Model.Bool(SettingKeys.CheckoutRequirePrescription)" />
+                        <span>Require a prescription before checkout completes</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2 style="margin-top:0;">Virtual try-on</h2>
+                <label class="checkline" style="margin-bottom:8px;">
+                    <input type="checkbox" name="setting.@SettingKeys.TryOnEnabled"
+                           checked="@Model.Bool(SettingKeys.TryOnEnabled)" />
+                    <span>Virtual try-on is available</span>
+                </label>
+                <label class="checkline" style="margin-bottom:8px;">
+                    <input type="checkbox" name="setting.@SettingKeys.TryOnCameraEnabled"
+                           checked="@Model.Bool(SettingKeys.TryOnCameraEnabled)" />
+                    <span>Offer the live camera as well as photo upload</span>
+                </label>
+                <label class="checkline">
+                    <input type="checkbox" name="setting.@SettingKeys.TryOnStoreCustomerPhotos"
+                           checked="@Model.Bool(SettingKeys.TryOnStoreCustomerPhotos)" />
+                    <span>Let customers save try-on snapshots to their file</span>
+                </label>
+                <p class="hint">
+                    Photos and camera frames are processed in the customer's browser either way,
+                    and only ever reach this server if the customer presses Save. Turn the last
+                    option off and no image is stored at all — the save route refuses uploads
+                    outright rather than just hiding the button. Customers can still download
+                    their own image.
+                </p>
+            </div>
+
+            <button class="btn btn-primary" type="submit">Save settings</button>
+        </div>
+
+        <div class="panel">
+            <h2 style="margin-top:0;">Integrations</h2>
+            <p class="hint" style="margin-top:0;">
+                Configured in the server's environment, shown here so you can confirm what is live.
+            </p>
+            <table>
+                <tr><td>Payment methods</td><td class="small">@Model.PaymentProviders</td></tr>
+                <tr><td>Card payments</td><td class="small">@(Model.StripeConfigured ? "Configured" : "Not configured")</td></tr>
+                <tr><td>Shipping</td><td class="small">@Model.ShippingProvider</td></tr>
+                <tr><td>Email</td><td class="small">@Model.EmailDriver</td></tr>
+                <tr><td>Currency</td><td class="small">@Model.Currency</td></tr>
+                <tr>
+                    <td>Tax</td>
+                    <td class="small">
+                        @(Model.TaxRateBps > 0
+                            ? $"{Model.TaxRateBps / 100.0:0.##}%{(Model.TaxInclusive ? " (included in prices)" : "")}"
+                            : "Not charged")
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</form>

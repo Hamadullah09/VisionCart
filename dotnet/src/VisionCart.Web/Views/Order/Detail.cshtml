@@ -1,0 +1,127 @@
+@using Microsoft.Extensions.Options
+@model Order
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = $"Order {Model.OrderNo}";
+    var store = Store.Value;
+    string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+    var statusChip = Model.PaymentStatus == PaymentStatuses.Paid ? "chip-paid" : "chip-pending";
+}
+
+<h1 style="margin-bottom:4px;">Thank you — order @Model.OrderNo</h1>
+<p class="muted">Placed @Model.PlacedAt.ToString("d MMMM yyyy 'at' HH:mm")</p>
+
+<p style="margin:16px 0;">
+    <span class="chip">@Humanise.Value(Model.Status)</span>
+    <span class="chip @statusChip">@Humanise.Value(Model.PaymentStatus)</span>
+    <span class="chip">@Humanise.Value(Model.FulfilmentStatus)</span>
+</p>
+
+@if (Model.PaymentStatus == PaymentStatuses.Unpaid
+     && Model.Payments.Any(p => p.Provider == PaymentProviders.BankTransfer))
+{
+    <p class="alert alert-info">
+        We're waiting for your bank transfer. Quote <strong>@Model.OrderNo</strong> as the reference
+        and email us the receipt — we'll start the lab work as soon as it clears.
+    </p>
+}
+
+<div class="two-col" style="margin-top:24px;">
+    <div>
+        <h2 style="margin-top:0;">What you ordered</h2>
+        @foreach (var item in Model.Items)
+        {
+            <div class="card" style="display:flex;gap:14px;padding:14px;margin-bottom:12px;">
+                <div style="width:100px;background:var(--ink-50);border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;padding:6px;">
+                    @if (item.ImageSnapshot is not null)
+                    {
+                        <img src="@item.ImageSnapshot" alt="@item.TitleSnapshot" style="width:100%;height:auto;" />
+                    }
+                </div>
+                <div style="flex:1;">
+                    <h3 style="margin:0 0 2px;font-size:16px;">@item.TitleSnapshot</h3>
+                    <p class="small muted" style="margin:0;">@item.SkuSnapshot</p>
+                    @if (item.LensSummary is not null)
+                    {
+                        <p class="small muted" style="margin:4px 0 0;">@item.LensSummary</p>
+                    }
+                    <p class="small muted" style="margin:4px 0 0;">Qty @item.Qty</p>
+                    @if (item.PrescriptionId is not null)
+                    {
+                        <p class="small" style="margin:8px 0 0;">
+                            <span class="chip chip-pending">Prescription awaiting verification</span>
+                        </p>
+                        <p class="small muted" style="margin:4px 0 0;">
+                            One of our opticians checks every prescription before the lenses are cut.
+                        </p>
+                    }
+                </div>
+                <div style="font-weight:700;">@M(item.TotalMinor)</div>
+            </div>
+        }
+    </div>
+
+    <div>
+        <div class="totals">
+            <h3 style="margin:0 0 10px;font-size:16px;">Totals</h3>
+            <div class="totals-row"><span>Frames</span><span>@M(Model.SubtotalMinor)</span></div>
+            @if (Model.LensTotalMinor > 0)
+            {
+                <div class="totals-row"><span>Lenses</span><span>@M(Model.LensTotalMinor)</span></div>
+            }
+            @if (Model.DiscountMinor > 0)
+            {
+                <div class="totals-row discount">
+                    <span>Discount@(Model.PromoCode is not null ? $" ({Model.PromoCode})" : "")</span>
+                    <span>− @M(Model.DiscountMinor)</span>
+                </div>
+            }
+            <div class="totals-row">
+                <span>Delivery</span>
+                <span>@(Model.ShippingMinor == 0 ? "Free" : M(Model.ShippingMinor))</span>
+            </div>
+            @if (Model.TaxMinor > 0)
+            {
+                <div class="totals-row"><span>Tax</span><span>@M(Model.TaxMinor)</span></div>
+            }
+            <div class="totals-row grand"><span>Total</span><span>@M(Model.TotalMinor)</span></div>
+        </div>
+
+        @if (Model.ShippingAddress is { } address)
+        {
+            <div class="card" style="padding:16px;margin-top:16px;">
+                <h3 style="margin:0 0 8px;font-size:15px;">Delivery address</h3>
+                <p class="small muted" style="margin:0;">
+                    @address.FullName<br />
+                    @address.Line1<br />
+                    @if (!string.IsNullOrWhiteSpace(address.Line2))
+                    {
+                        @address.Line2<br />
+                    }
+                    @address.City@(string.IsNullOrWhiteSpace(address.State) ? "" : ", " + address.State)
+                    @address.PostalCode<br />
+                    @address.Country
+                </p>
+            </div>
+        }
+
+        @foreach (var shipment in Model.Shipments.Where(s => s.TrackingNumber is not null))
+        {
+            <div class="card" style="padding:16px;margin-top:16px;">
+                <h3 style="margin:0 0 8px;font-size:15px;">Tracking</h3>
+                <p class="small" style="margin:0;">
+                    @shipment.Carrier.ToUpperInvariant() — @shipment.TrackingNumber
+                    @if (shipment.TrackingUrl is not null)
+                    {
+                        <br />
+                        <a href="@shipment.TrackingUrl" target="_blank" rel="noreferrer noopener">Track this parcel</a>
+                    }
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+<p style="margin-top:32px;">
+    <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Keep shopping</a>
+</p>

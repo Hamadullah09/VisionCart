@@ -1,0 +1,332 @@
+@using Microsoft.Extensions.Options
+@using VisionCart.Application.Prescriptions
+@model Patient
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = $"{Model.FirstName} {Model.LastName}";
+    var store = Store.Value;
+    var canVerify = User.IsInRole(Roles.Optician) || User.IsInRole(Roles.Admin);
+    var current = Model.Prescriptions.FirstOrDefault(p => p.Status == RxStatuses.Verified);
+    var snapshots = Model.TryOnSessions.SelectMany(s => s.Snapshots).Take(9).ToList();
+}
+
+<p class="small"><a asp-action="Index">← Patients</a></p>
+<h1>@Model.FirstName @Model.LastName</h1>
+<p class="muted">
+    File <code>@Model.FileNo</code> ·
+    @Model.Orders.Count order@(Model.Orders.Count == 1 ? "" : "s")
+    @if (Model.PdMm is { } pd) { <text> · PD @pd.ToString("0.#") mm</text> }
+</p>
+
+@if (current is not null)
+{
+    <div class="panel" style="background:var(--ink-50);">
+        <h2 style="margin-top:0;">Current prescription</h2>
+        <p style="font-family:ui-monospace,monospace;margin:0 0 4px;">
+            @Rx.Summarise(Rx.FromEntity(current))
+        </p>
+        <p class="small muted" style="margin:0;">
+            Issued @current.IssuedAt.ToString("d MMM yyyy") ·
+            Suggested lens index: @Rx.RecommendedIndex(Rx.FromEntity(current))
+        </p>
+    </div>
+}
+
+<div class="admin-two-col">
+    <div>
+        <div class="panel">
+            <h2>Prescriptions</h2>
+            @if (Model.Prescriptions.Count == 0)
+            {
+                <p class="muted small">Nothing on file yet.</p>
+            }
+            else
+            {
+                <div class="admin-table">
+                    <table>
+                        <thead><tr><th>Issued</th><th>Prescription</th><th>Source</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var rx in Model.Prescriptions)
+                        {
+                            <tr>
+                                <td class="small">@rx.IssuedAt.ToString("dd/MM/yyyy")</td>
+                                <td class="small" style="font-family:ui-monospace,monospace;">
+                                    @Rx.Summarise(Rx.FromEntity(rx))
+                                </td>
+                                <td class="small muted">@Humanise.Value(rx.Source)</td>
+                                <td>
+                                    <span class="chip @(rx.Status == RxStatuses.Verified ? "chip-paid"
+                                                      : rx.Status == RxStatuses.PendingVerification ? "chip-pending" : "")">
+                                        @Humanise.Value(rx.Status)
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (rx.Status == RxStatuses.PendingVerification && canVerify)
+                                    {
+                                        <form method="post" asp-action="Verify" asp-route-id="@Model.Id"
+                                              asp-route-prescriptionId="@rx.Id" style="display:inline;">
+                                            <button class="btn btn-primary btn-small" type="submit">Verify</button>
+                                        </form>
+                                        <button class="btn btn-outline btn-small" type="button"
+                                                data-reject-toggle="@rx.Id">Reject</button>
+                                    }
+                                    else if (rx.Status == RxStatuses.PendingVerification)
+                                    {
+                                        <span class="small muted">Optician only</span>
+                                    }
+                                </td>
+                            </tr>
+                            @if (rx.Status == RxStatuses.PendingVerification && canVerify)
+                            {
+                                <tr data-reject-form="@rx.Id" hidden>
+                                    <td colspan="5">
+                                        <form method="post" asp-action="Reject" asp-route-id="@Model.Id"
+                                              asp-route-prescriptionId="@rx.Id"
+                                              style="display:flex;gap:8px;align-items:flex-end;">
+                                            <div style="flex:1;">
+                                                <label class="field-label" for="reason-@rx.Id">
+                                                    What needs checking? (the customer is emailed this)
+                                                </label>
+                                                <input class="field" id="reason-@rx.Id" name="reason"
+                                                       placeholder="e.g. the cylinder has no axis — please confirm" />
+                                            </div>
+                                            <button class="btn btn-outline btn-small" type="submit">Send &amp; reject</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <div class="panel">
+            <h2>Add a prescription</h2>
+            <p class="hint" style="margin-top:0;">
+                A new version — the old one stays on file, and any order dispensed against
+                it still reads correctly. Every value is a drop-down in 0.25 D steps.
+            </p>
+            <form method="post" asp-action="AddPrescription" asp-route-id="@Model.Id">
+                <div class="admin-table" style="margin-bottom:12px;">
+                    <table>
+                        <thead>
+                            <tr><th>Eye</th><th>SPH</th><th>CYL</th><th>Axis</th><th>Add</th><th>Mono PD</th><th>Seg ht</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var (side, label) in new[] { ("Od", "Right (OD)"), ("Os", "Left (OS)") })
+                        {
+                            <tr>
+                                <td class="small">@label</td>
+                                <td>
+                                    <select name="@(side)Sphere">
+                                        <option value="">—</option>
+                                        @foreach (var v in Diopters.SphereValues)
+                                        {
+                                            <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="@(side)Cylinder">
+                                        <option value="">—</option>
+                                        @foreach (var v in Diopters.CylinderValues)
+                                        {
+                                            <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="@(side)Axis">
+                                        <option value="">—</option>
+                                        @foreach (var a in Diopters.AxisValues)
+                                        {
+                                            <option value="@a">@a°</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="@(side)Add">
+                                        <option value="">—</option>
+                                        @foreach (var v in Diopters.AddValues)
+                                        {
+                                            <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input class="field" name="@(side)PdMm" inputmode="decimal" style="width:80px;" /></td>
+                                <td><input class="field" name="@(side)SegHeightMm" inputmode="decimal" style="width:80px;" /></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="form-grid three">
+                    <div>
+                        <label for="PdMm">Binocular PD (mm)</label>
+                        <input class="field" id="PdMm" name="PdMm" inputmode="decimal" value="@Model.PdMm" />
+                    </div>
+                    <div>
+                        <label for="Prescriber">Prescriber</label>
+                        <input class="field" id="Prescriber" name="Prescriber" />
+                    </div>
+                    <div>
+                        <label for="Source">Source</label>
+                        <select id="Source" name="Source">
+                            @foreach (var src in RxSources.All)
+                            {
+                                <option value="@src" selected="@(src == RxSources.InStoreExam)">@Humanise.Value(src)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="full">
+                        <label for="Notes">Notes</label>
+                        <input class="field" id="Notes" name="Notes" />
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" style="margin-top:12px;" type="submit">Add prescription</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2>Order history</h2>
+            @if (Model.Orders.Count == 0)
+            {
+                <p class="muted small">No orders on this file.</p>
+            }
+            else
+            {
+                <div class="admin-table">
+                    <table>
+                        <thead><tr><th>Order</th><th>Placed</th><th>Status</th><th class="num">Total</th></tr></thead>
+                        <tbody>
+                        @foreach (var order in Model.Orders)
+                        {
+                            <tr>
+                                <td><a asp-controller="Orders" asp-action="Detail" asp-route-id="@order.Id"><code>@order.OrderNo</code></a></td>
+                                <td class="small">@order.PlacedAt.ToString("dd/MM/yyyy")</td>
+                                <td><span class="chip">@Humanise.Value(order.Status)</span></td>
+                                <td class="num">@Money.Format(order.TotalMinor, store.Currency, store.CurrencySymbol)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div>
+        <div class="panel">
+            <h2>Patient details</h2>
+            <form method="post" asp-action="Update" asp-route-id="@Model.Id">
+                <div class="form-grid">
+                    <div>
+                        <label for="FirstName">First name</label>
+                        <input class="field" id="FirstName" name="FirstName" value="@Model.FirstName" required />
+                    </div>
+                    <div>
+                        <label for="LastName">Last name</label>
+                        <input class="field" id="LastName" name="LastName" value="@Model.LastName" />
+                    </div>
+                    <div>
+                        <label for="Email">Email</label>
+                        <input class="field" id="Email" name="Email" type="email" value="@Model.Email" />
+                    </div>
+                    <div>
+                        <label for="Phone">Phone</label>
+                        <input class="field" id="Phone" name="Phone" value="@Model.Phone" />
+                    </div>
+                    <div>
+                        <label for="DateOfBirth">Date of birth</label>
+                        <input class="field" id="DateOfBirth" name="DateOfBirth" type="date"
+                               value="@Model.DateOfBirth?.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <div>
+                        <label for="Gender">Gender</label>
+                        <select id="Gender" name="Gender">
+                            <option value="">Prefer not to say</option>
+                            <option value="female" selected="@(Model.Gender == "female")">Female</option>
+                            <option value="male" selected="@(Model.Gender == "male")">Male</option>
+                            <option value="other" selected="@(Model.Gender == "other")">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="PdMmField">Distance PD (mm)</label>
+                        <input class="field" id="PdMmField" name="PdMm" inputmode="decimal" value="@Model.PdMm" />
+                    </div>
+                    <div>
+                        <label for="PdNearMm">Near PD (mm)</label>
+                        <input class="field" id="PdNearMm" name="PdNearMm" inputmode="decimal" value="@Model.PdNearMm" />
+                    </div>
+                    <div class="full">
+                        <label for="Tags">Tags</label>
+                        <input class="field" id="Tags" name="Tags" value="@Model.Tags"
+                               placeholder="Comma separated, e.g. varifocal, dry-eye" />
+                    </div>
+                    <div class="full">
+                        <label for="Notes">Clinical notes</label>
+                        <textarea class="field" id="Notes" name="Notes" rows="3"
+                                  placeholder="Anything the dispenser should know before making the next pair.">@Model.Notes</textarea>
+                    </div>
+                    <label class="checkline full">
+                        <input type="checkbox" name="ConsentMarketing" value="true" checked="@Model.ConsentMarketing" />
+                        <span>Consented to marketing contact</span>
+                    </label>
+                </div>
+                <button class="btn btn-primary" style="margin-top:12px;" type="submit">Save file</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2>Documents</h2>
+            @if (Model.Documents.Count == 0)
+            {
+                <p class="muted small">Nothing uploaded.</p>
+            }
+            else
+            {
+                <div class="grid grid-3">
+                    @foreach (var doc in Model.Documents)
+                    {
+                        <a class="card" style="padding:6px;" href="@doc.Url" target="_blank" rel="noreferrer noopener">
+                            <img src="@doc.Url" alt="@(doc.Label ?? doc.Kind)" style="width:100%;height:auto;" />
+                            <span class="small muted">@Humanise.Value(doc.Kind)</span>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="panel">
+            <h2>Try-on snapshots</h2>
+            @if (snapshots.Count == 0)
+            {
+                <p class="muted small">None saved.</p>
+            }
+            else
+            {
+                <div class="grid grid-3">
+                    @foreach (var snap in snapshots)
+                    {
+                        <a class="card" style="padding:6px;" href="@snap.ImageUrl" target="_blank" rel="noreferrer noopener">
+                            <img src="@snap.ImageUrl" alt="@snap.Variant.Frame.Name" style="width:100%;height:auto;" />
+                            <span class="small muted">@snap.Variant.Frame.Name</span>
+                        </a>
+                    }
+                </div>
+                @if (Model.FaceMetrics is not null)
+                {
+                    <p class="hint">Measured from a try-on photo. Confirm before ordering lenses.</p>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin.js" asp-append-version="true" defer></script>
+}

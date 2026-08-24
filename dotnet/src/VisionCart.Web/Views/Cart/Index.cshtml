@@ -1,0 +1,119 @@
+@using Microsoft.Extensions.Options
+@model CartView
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Your bag";
+    var store = Store.Value;
+    string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+}
+
+<h1>Your bag</h1>
+
+@if (Model.IsEmpty)
+{
+    <p class="alert alert-info">Your bag is empty.</p>
+    <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse frames</a>
+}
+else
+{
+    @foreach (var warning in Model.Warnings.Distinct())
+    {
+        <p class="alert alert-warn">@warning</p>
+    }
+
+    @if (Model.PromoError is { } promoError)
+    {
+        <p class="alert alert-error">@promoError</p>
+    }
+
+    <div class="two-col" style="margin-top:20px;">
+        <div>
+            @foreach (var line in Model.Lines)
+            {
+                <div class="card" style="display:flex;gap:16px;padding:14px;margin-bottom:12px;align-items:flex-start;">
+                    <div style="width:120px;background:var(--ink-50);border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;padding:8px;">
+                        @if (line.ImageUrl is not null)
+                        {
+                            <img src="@line.ImageUrl" alt="@line.Title" style="width:100%;height:auto;" />
+                        }
+                    </div>
+                    <div style="flex:1;">
+                        <h3 style="margin:0 0 2px;font-size:16px;">@line.Title</h3>
+                        <p class="small muted" style="margin:0 0 2px;">@line.LensSummary</p>
+                        <p class="small muted" style="margin:0 0 10px;">@line.Sku</p>
+
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <form method="post" asp-controller="Cart" asp-action="Update" style="display:flex;gap:6px;align-items:center;">
+                                <input type="hidden" name="itemId" value="@line.ItemId" />
+                                <button class="btn btn-outline btn-small" type="submit" name="qty" value="@(line.Qty - 1)"
+                                        aria-label="Decrease quantity">−</button>
+                                <span style="min-width:2ch;text-align:center;">@line.Qty</span>
+                                <button class="btn btn-outline btn-small" type="submit" name="qty" value="@(line.Qty + 1)"
+                                        aria-label="Increase quantity">+</button>
+                            </form>
+                            <form method="post" asp-controller="Cart" asp-action="Remove">
+                                <input type="hidden" name="itemId" value="@line.ItemId" />
+                                <button class="btn btn-outline btn-small" type="submit">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div style="font-weight:700;">@M(line.TotalMinor)</div>
+                </div>
+            }
+        </div>
+
+        <div>
+            <div class="totals">
+                <h3 style="margin:0 0 10px;font-size:16px;">Summary</h3>
+
+                <div class="totals-row">
+                    <span>Frames</span><span>@M(Model.Totals.SubtotalMinor)</span>
+                </div>
+                @if (Model.Totals.LensTotalMinor > 0)
+                {
+                    <div class="totals-row"><span>Lenses</span><span>@M(Model.Totals.LensTotalMinor)</span></div>
+                }
+                @foreach (var promo in Model.Promotions)
+                {
+                    <div class="totals-row discount">
+                        <span>@promo.Name</span>
+                        <span>− @M(promo.DiscountMinor)</span>
+                    </div>
+                }
+                <div class="totals-row">
+                    <span>Delivery</span>
+                    <span>@(Model.Totals.ShippingMinor == 0 ? "Free" : M(Model.Totals.ShippingMinor))</span>
+                </div>
+                @if (Model.Totals.TaxMinor > 0)
+                {
+                    <div class="totals-row"><span>Tax</span><span>@M(Model.Totals.TaxMinor)</span></div>
+                }
+                <div class="totals-row grand">
+                    <span>Total</span><span>@M(Model.Totals.TotalMinor)</span>
+                </div>
+
+                <a class="btn btn-primary btn-block" style="margin-top:16px;"
+                   asp-controller="Checkout" asp-action="Index">Checkout</a>
+                <a class="btn btn-outline btn-block" style="margin-top:8px;"
+                   asp-controller="Frames" asp-action="Index">Keep shopping</a>
+            </div>
+
+            <form method="post" asp-controller="Cart" asp-action="Promo" style="margin-top:16px;">
+                <label for="code" class="small muted">Have a code?</label>
+                <div style="display:flex;gap:8px;margin-top:6px;">
+                    <input class="field" type="text" id="code" name="code" value="@Model.PromoCode"
+                           placeholder="Promo code" />
+                    <button class="btn btn-outline" type="submit">Apply</button>
+                </div>
+            </form>
+
+            @if (Model.PromoCode is not null)
+            {
+                <form method="post" asp-controller="Cart" asp-action="Promo" style="margin-top:8px;">
+                    <input type="hidden" name="code" value="" />
+                    <button class="btn btn-outline btn-small" type="submit">Remove code</button>
+                </form>
+            }
+        </div>
+    </div>
+}

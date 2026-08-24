@@ -1,0 +1,37 @@
+@model VisionCart.Application.Privacy.DataRequestInput
+@{
+    ViewData["Title"] = "Make a data request";
+}
+
+<h1>Make a request about your data</h1>
+
+<form method="post" class="narrow-form">
+    <div asp-validation-summary="All" class="alert alert-error" role="alert"></div>
+
+    <label asp-for="Kind">What would you like us to do?</label>
+    <select class="field" asp-for="Kind">
+        @foreach (var kind in DataSubjectRequestKinds.All)
+        {
+            <option value="@kind" selected="@(kind == Model.Kind)">
+                @DataSubjectRequestKinds.Labels[kind]
+            </option>
+        }
+    </select>
+
+    <label asp-for="Email" style="margin-top:12px;">The email address on your account</label>
+    <input class="field" asp-for="Email" type="email" required />
+    <p class="hint">We use this to find your records and to reply to you.</p>
+
+    <label asp-for="Message" style="margin-top:12px;">Anything you'd like to add (optional)</label>
+    <textarea class="field" asp-for="Message" rows="4"
+              placeholder="For a correction, tell us what should change."></textarea>
+
+    <p class="alert alert-warn" style="margin-top:14px;">
+        We respond within 30 days. We may need to confirm who you are first.
+        Prescriptions and completed orders are kept for the period the law
+        requires, even after an erasure request — your identifying details are
+        removed from them.
+    </p>
+
+    <button class="btn btn-primary" type="submit">Send request</button>
+</form>

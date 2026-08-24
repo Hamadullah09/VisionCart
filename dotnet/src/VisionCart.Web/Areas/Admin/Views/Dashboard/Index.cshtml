@@ -1,0 +1,118 @@
+@using Microsoft.Extensions.Options
+@model DashboardView
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Dashboard";
+    var store = Store.Value;
+    string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+    var s = Model.Stats;
+}
+
+<h1>Dashboard</h1>
+<p class="muted">@DateTime.UtcNow.ToString("dddd, d MMMM yyyy")</p>
+
+<div class="stats" style="margin-top:20px;">
+    <dl class="stat"><dt>Orders today</dt><dd>@s.OrdersToday</dd></dl>
+    <dl class="stat"><dt>Paid, last 30 days</dt><dd>@M(s.PaidLast30DaysMinor)</dd></dl>
+    <dl class="stat @(s.AwaitingPayment > 0 ? "attention" : "")"><dt>Awaiting payment</dt><dd>@s.AwaitingPayment</dd></dl>
+    <dl class="stat"><dt>In the lab</dt><dd>@s.InTheLab</dd></dl>
+    <dl class="stat"><dt>Patient files</dt><dd>@s.PatientFiles</dd></dl>
+    <dl class="stat"><dt>Live frames</dt><dd>@s.LiveFrames</dd></dl>
+    <dl class="stat @(s.PrescriptionsToCheck > 0 ? "attention" : "")"><dt>Prescriptions to check</dt><dd>@s.PrescriptionsToCheck</dd></dl>
+    <dl class="stat @(s.LowStockLines > 0 ? "attention" : "")"><dt>Low stock lines</dt><dd>@s.LowStockLines</dd></dl>
+</div>
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Prescriptions waiting for an optician</h2>
+        <a asp-controller="Patients" asp-action="Index" asp-route-pending="true">All patients →</a>
+    </div>
+    @if (Model.PrescriptionQueue.Count == 0)
+    {
+        <p class="muted small">Nothing waiting. The lab queue is clear to proceed.</p>
+    }
+    else
+    {
+        <div class="admin-table">
+            <table>
+                <thead><tr><th>Patient</th><th>File</th><th>Waiting since</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var rx in Model.PrescriptionQueue)
+                {
+                    <tr>
+                        <td>@rx.PatientName</td>
+                        <td><code>@rx.FileNo</code></td>
+                        <td>@rx.IssuedAt.ToString("d MMM yyyy")</td>
+                        <td><a asp-controller="Patients" asp-action="Detail" asp-route-id="@rx.PatientId">Open file</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <p class="hint">
+            Clinical values are deliberately not shown here — open the file to read the prescription.
+        </p>
+    }
+</div>
+
+<div class="admin-two-col">
+    <div class="panel">
+        <div class="panel-head">
+            <h2>Recent orders</h2>
+            <a asp-controller="Orders" asp-action="Index">All orders →</a>
+        </div>
+        @if (Model.RecentOrders.Count == 0)
+        {
+            <p class="muted small">No orders yet.</p>
+        }
+        else
+        {
+            <div class="admin-table">
+                <table>
+                    <thead><tr><th>Order</th><th>Item</th><th>Status</th><th class="num">Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var o in Model.RecentOrders)
+                    {
+                        <tr>
+                            <td><a asp-controller="Orders" asp-action="Detail" asp-route-id="@o.Id"><code>@o.OrderNo</code></a></td>
+                            <td class="small muted">@o.FirstLine</td>
+                            <td><span class="chip @(o.Status == OrderStatuses.Pending ? "chip-pending" : "")">@Humanise.Value(o.Status)</span></td>
+                            <td class="num">@M(o.TotalMinor)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <h2>Running low</h2>
+            <a asp-controller="Frames" asp-action="Index">All frames →</a>
+        </div>
+        @if (Model.LowStock.Count == 0)
+        {
+            <p class="muted small">Every colourway is above its restock level.</p>
+        }
+        else
+        {
+            <div class="admin-table">
+                <table>
+                    <thead><tr><th>Frame</th><th>Colour</th><th class="num">In stock</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var v in Model.LowStock)
+                    {
+                        <tr>
+                            <td>@v.FrameName</td>
+                            <td class="small muted">@v.ColorName</td>
+                            <td class="num">@v.StockQty</td>
+                            <td><a asp-controller="Frames" asp-action="Edit" asp-route-id="@v.FrameId">Restock</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

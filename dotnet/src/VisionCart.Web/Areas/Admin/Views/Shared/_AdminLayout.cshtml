@@ -1,0 +1,69 @@
+@using Microsoft.Extensions.Options
+@inject IOptions<StoreOptions> Store
+@{
+    var storeName = Store.Value.Name;
+    var isAdmin = User.IsInRole(Roles.Admin);
+    var role = User.IsInRole(Roles.Admin) ? "Administrator"
+             : User.IsInRole(Roles.Optician) ? "Optician"
+             : "Staff";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] ?? "Back office") · @storeName</title>
+    <link rel="stylesheet" href="~/css/visioncart.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    @* The back office must never be indexed. *@
+    <meta name="robots" content="noindex, nofollow" />
+</head>
+<body class="admin">
+    <header class="admin-header">
+        <div class="admin-header-inner">
+            <div>
+                <a class="admin-brand" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Back office</a>
+                <p class="admin-role">@User.Identity?.Name · @role</p>
+            </div>
+            <nav class="admin-nav">
+                <a asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                <a asp-area="Admin" asp-controller="Orders" asp-action="Index">Orders</a>
+                <a asp-area="Admin" asp-controller="Patients" asp-action="Index">Patients</a>
+                <a asp-area="Admin" asp-controller="Diary" asp-action="Index">Diary</a>
+                <a asp-area="Admin" asp-controller="Frames" asp-action="Index">Frames</a>
+                <a asp-area="Admin" asp-controller="Lenses" asp-action="Index">Lenses</a>
+                <a asp-area="Admin" asp-controller="Media" asp-action="Index">Media</a>
+                <a asp-area="Admin" asp-controller="Promotions" asp-action="Index">Promotions</a>
+                <a asp-area="Admin" asp-controller="ShippingRates" asp-action="Index">Delivery</a>
+                <a asp-area="Admin" asp-controller="Import" asp-action="Index">Import</a>
+                <a asp-area="Admin" asp-controller="DataRequests" asp-action="Index">Data requests</a>
+                @if (isAdmin)
+                {
+                    <a asp-area="Admin" asp-controller="Audit" asp-action="Index">Audit</a>
+                }
+                <a asp-area="Admin" asp-controller="Settings" asp-action="Index">Settings</a>
+            </nav>
+            <div class="admin-actions">
+                <a href="/" target="_blank" rel="noopener">View shop ↗</a>
+                <form method="post" action="/logout" style="display:inline;">
+                    <button class="btn btn-outline btn-small" type="submit">Sign out</button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <main class="admin-main">
+        @if (TempData["AdminOk"] is string ok)
+        {
+            <p class="alert alert-ok">@ok</p>
+        }
+        @if (TempData["AdminError"] is string error)
+        {
+            <p class="alert alert-error" role="alert">@error</p>
+        }
+        @RenderBody()
+    </main>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "visioncart-client",
+  "private": true,
+  "type": "module",
+  "description": "Build-time only. The published application contains compiled JavaScript; Node is never required at runtime or on the host.",
+  "scripts": {
+    "build:client": "esbuild ClientApp/tryon/entry.ts --bundle --format=esm --target=es2022 --minify --sourcemap --outfile=wwwroot/js/tryon.js --external:./vendor/mediapipe-vision.mjs",
+    "test:client": "node --test ClientApp/tryon/geometry.test.ts"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

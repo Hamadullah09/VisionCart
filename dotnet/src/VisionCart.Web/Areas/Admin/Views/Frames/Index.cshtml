@@ -1,0 +1,98 @@
+@using Microsoft.Extensions.Options
+@model FrameListViewModel
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Frames";
+    var store = Store.Value;
+}
+
+<div class="panel-head">
+    <div>
+        <h1>Frames</h1>
+        <p class="muted">@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s")</p>
+    </div>
+    <a class="btn btn-primary" asp-action="New">New frame</a>
+</div>
+
+<form method="get" class="filter-bar">
+    <div>
+        <label for="q">Search</label>
+        <input class="field" type="text" id="q" name="q" value="@Model.Q" placeholder="Name or SKU" />
+    </div>
+    <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">Any status</option>
+            @foreach (var s in ProductStatuses.All)
+            {
+                <option value="@s" selected="@(Model.Status == s)">@Humanise.Value(s)</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+    <a class="btn btn-outline" asp-action="Index">Clear</a>
+</form>
+
+@if (Model.Results.Items.Count == 0)
+{
+    <p class="alert alert-info">No frames match that search.</p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Frame</th><th>Brand</th><th>SKU</th><th class="num">Price</th>
+                    <th class="num">Colourways</th><th class="num">Stock</th><th>Try-on</th><th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var frame in Model.Results.Items)
+            {
+                var stock = frame.Variants.Sum(v => v.StockQty);
+                var calibrated = frame.Variants.Count(v => v.TryOnImageUrl != null);
+                <tr>
+                    <td>@frame.Name</td>
+                    <td class="small muted">@frame.Brand?.Name</td>
+                    <td><code>@frame.Sku</code></td>
+                    <td class="num">@Money.Format(frame.BasePriceMinor, store.Currency, store.CurrencySymbol)</td>
+                    <td class="num">@frame.Variants.Count</td>
+                    <td class="num">@stock</td>
+                    <td class="small">
+                        @if (calibrated == frame.Variants.Count && calibrated > 0)
+                        {
+                            <span class="chip chip-paid">All ready</span>
+                        }
+                        else if (calibrated > 0)
+                        {
+                            <span class="chip chip-pending">@calibrated of @frame.Variants.Count</span>
+                        }
+                        else
+                        {
+                            <span class="chip">None</span>
+                        }
+                    </td>
+                    <td><span class="chip">@Humanise.Value(frame.Status)</span></td>
+                    <td><a asp-action="Edit" asp-route-id="@frame.Id">Edit</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Results.Pages > 1)
+    {
+        <nav class="pager">
+            @if (Model.Results.HasPrevious)
+            {
+                <a class="btn btn-outline btn-small" href="@Url.Action("Index", new { q = Model.Q, status = Model.Status, page = Model.Results.Page - 1 })">← Previous</a>
+            }
+            <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
+            @if (Model.Results.HasNext)
+            {
+                <a class="btn btn-outline btn-small" href="@Url.Action("Index", new { q = Model.Q, status = Model.Status, page = Model.Results.Page + 1 })">Next →</a>
+            }
+        </nav>
+    }
+}

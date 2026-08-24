@@ -1,0 +1,170 @@
+@using System.Text.Json
+@using Microsoft.Extensions.Options
+@model TryOnViewModel
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Virtual try-on";
+    var store = Store.Value;
+
+    // Everything the canvas needs, in the shape the client module expects.
+    // Serialised once here rather than fetched, so the studio can start drawing
+    // without a round trip.
+    var clientConfig = new
+    {
+        frames = Model.Frames.Select(f => new
+        {
+            variantId = f.VariantId,
+            frameId = f.FrameId,
+            slug = f.Slug,
+            name = f.FrameName,
+            brand = f.BrandName,
+            colorName = f.ColorName,
+            colorHex = f.ColorHex,
+            overlayUrl = f.TryOnImageUrl,
+            thumbUrl = f.ThumbUrl,
+            priceText = Money.Format(f.PriceMinor, store.Currency, store.CurrencySymbol),
+            anchors = new
+            {
+                leftX = f.AnchorLeftX,
+                leftY = f.AnchorLeftY,
+                rightX = f.AnchorRightX,
+                rightY = f.AnchorRightY,
+                scaleAdj = f.TryOnScaleAdj,
+            },
+            opacity = f.TryOnOpacity,
+        }),
+        initialVariantId = Model.InitialVariantId,
+        canSave = Model.CanSave,
+        cameraEnabled = Model.CameraEnabled,
+        // Served from this application, never a CDN. That is the whole privacy
+        // architecture: no third party learns who is using the try-on.
+        modelUrl = "/models/face_landmarker.task",
+        wasmDir = "/wasm",
+        vendorUrl = "/js/vendor/mediapipe-vision.mjs",
+        snapshotUrl = "/api/tryon/snapshot",
+        antiforgeryToken = Model.AntiforgeryToken,
+    };
+}
+
+<header style="max-width:70ch;margin-bottom:24px;">
+    <h1>Virtual try-on</h1>
+    <p class="muted">
+        Upload a straight-on photo or open your camera. We find your pupils, scale each frame to
+        your face and measure your pupillary distance while you browse @Model.Frames.Count styles.
+    </p>
+</header>
+
+@if (Model.Frames.Count == 0)
+{
+    <p class="alert alert-info">
+        None of our frames have try-on artwork yet. Staff can add it from a frame's colourway page.
+    </p>
+    <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse the frames</a>
+}
+else
+{
+    <div class="tryon" data-tryon-root>
+        <div>
+            <div class="tryon-stage">
+                <canvas data-tryon-canvas width="900" height="675" aria-label="Virtual try-on preview"></canvas>
+                <video data-tryon-video playsinline muted hidden></video>
+
+                <div class="tryon-busy" data-tryon-busy hidden></div>
+                <p class="tryon-drag-hint" data-tryon-drag-hint hidden>
+                    Drag the two blue circles onto the centre of each pupil.
+                </p>
+            </div>
+
+            <div class="tryon-controls">
+                <label class="btn btn-primary">
+                    Upload a photo
+                    <input type="file" accept="image/*" data-tryon-file hidden />
+                </label>
+                <button type="button" class="btn btn-outline" data-tryon-camera hidden>Use my camera</button>
+                <button type="button" class="btn btn-outline" data-tryon-manual hidden>Adjust eye points</button>
+                <button type="button" class="btn btn-outline" data-tryon-guides hidden>Show guides</button>
+            </div>
+
+            <p class="alert alert-error" data-tryon-notice="error" role="alert" hidden></p>
+            <p class="alert alert-info" data-tryon-notice="saved" hidden></p>
+            <p class="alert alert-warn" data-tryon-notice="fallback" hidden></p>
+            <p class="alert alert-info" data-tryon-notice="advice" hidden></p>
+
+            <p class="small muted">
+                Your photo and camera feed stay on this device. Nothing is uploaded unless you
+                press &ldquo;Save to my file&rdquo;.
+            </p>
+        </div>
+
+        <aside class="tryon-panel">
+            <div class="card" style="padding:16px;">
+                <p class="brand-name" data-tryon-selected="brand"></p>
+                <h3 style="margin:2px 0 2px;font-size:18px;" data-tryon-selected="name"></h3>
+                <p class="small muted" style="margin:0;" data-tryon-selected="colour"></p>
+                <p style="font-weight:700;font-size:17px;margin:6px 0 12px;" data-tryon-selected="price"></p>
+                <a class="btn btn-primary" data-tryon-choose href="#">Choose lenses</a>
+            </div>
+
+            <div>
+                <h4 class="tryon-heading">Try another frame (@Model.Frames.Count)</h4>
+                <div class="tryon-thumbs" data-tryon-frames></div>
+            </div>
+
+            <div class="card" style="padding:16px;" data-tryon-adjust hidden>
+                <h4 class="tryon-heading" style="margin-top:0;">Fine-tune the fit</h4>
+
+                <label class="tryon-slider">
+                    <span>Size</span>
+                    <input type="range" min="0.75" max="1.35" step="0.01" value="1"
+                           data-tryon-slider="scale" />
+                </label>
+                <label class="tryon-slider">
+                    <span>Height</span>
+                    <input type="range" min="-60" max="60" step="1" value="0"
+                           data-tryon-slider="offsetY" />
+                </label>
+                <label class="tryon-slider">
+                    <span>Tilt</span>
+                    <input type="range" min="-0.25" max="0.25" step="0.005" value="0"
+                           data-tryon-slider="rotate" />
+                </label>
+
+                <button type="button" class="tryon-reset" data-tryon-reset>Reset to automatic fit</button>
+            </div>
+
+            <div class="card" style="padding:16px;" data-tryon-measurements hidden>
+                <h4 class="tryon-heading" style="margin-top:0;">Your measurements</h4>
+                <dl class="tryon-measures">
+                    <div data-tryon-measure-row>
+                        <dt>Pupillary distance</dt><dd data-tryon-measure="pd"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Face width</dt><dd data-tryon-measure="faceWidth"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Face shape</dt><dd data-tryon-measure="faceShape" style="text-transform:capitalize;"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Suggested size</dt><dd data-tryon-measure="sizeBand" style="text-transform:capitalize;"></dd>
+                    </div>
+                </dl>
+                <p class="small muted" style="margin:10px 0 0;">
+                    An estimate from your photo, accurate to about &plusmn;2&nbsp;mm. Our optician
+                    confirms it before your lenses are cut.
+                </p>
+            </div>
+
+            <div class="tryon-controls" data-tryon-actions hidden>
+                <button type="button" class="btn btn-outline" data-tryon-download>Download photo</button>
+                <button type="button" class="btn btn-primary" data-tryon-save hidden>Save to my file</button>
+            </div>
+        </aside>
+    </div>
+
+    @* Configuration as data, not as generated script — nothing here is executed. *@
+    <script type="application/json" id="tryon-config">@Html.Raw(JsonSerializer.Serialize(clientConfig))</script>
+
+    @section Scripts {
+        <script type="module" src="~/js/tryon.js" asp-append-version="true"></script>
+    }
+}

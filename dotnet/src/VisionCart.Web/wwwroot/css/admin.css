@@ -1,0 +1,125 @@
+/* Back office. Denser than the storefront: staff work here all day and need
+   more on screen at once. Reuses the storefront's design tokens. */
+
+body.admin { background: var(--ink-50); }
+
+.admin-header { background: #121a26; color: #e9eef6; }
+.admin-header-inner {
+    max-width: 1400px; margin: 0 auto; padding: 12px 24px;
+    display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+}
+.admin-brand { color: #fff; font-size: 17px; font-weight: 700; }
+.admin-brand:hover { text-decoration: none; }
+.admin-role { margin: 2px 0 0; font-size: 11px; color: #93a3b8; }
+.admin-nav { display: flex; gap: 16px; flex: 1; font-size: 14px; flex-wrap: wrap; }
+.admin-nav a { color: #c8d4e4; }
+.admin-nav a:hover { color: #fff; }
+.admin-actions { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.admin-actions a { color: #c8d4e4; }
+.admin-actions .btn-outline { border-color: #3a4658; color: #e9eef6; background: transparent; }
+
+.admin-main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.admin-main h1 { font-size: 26px; margin: 0 0 4px; }
+.admin-main h2 { font-size: 18px; margin: 28px 0 12px; }
+
+.alert-ok { background: #e5f4ec; color: var(--green); border: 1px solid #bfe3ce; }
+
+/* --- panels --------------------------------------------------------------- */
+.panel {
+    background: var(--white); border: 1px solid var(--ink-100);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 18px;
+}
+.panel > h2, .panel > h3 { margin-top: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+
+/* --- stat tiles ----------------------------------------------------------- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat {
+    background: var(--white); border: 1px solid var(--ink-100);
+    border-radius: var(--radius); padding: 14px 16px;
+}
+.stat.attention { background: var(--amber-bg); border-color: #ecdcb0; }
+.stat dt { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-600); margin: 0; }
+.stat dd { margin: 4px 0 0; font-size: 26px; font-weight: 700; }
+
+/* --- tables --------------------------------------------------------------- */
+.admin-table { background: var(--white); border: 1px solid var(--ink-100); border-radius: var(--radius); overflow: hidden; }
+.admin-table table { font-size: 14px; }
+.admin-table th { background: var(--ink-50); white-space: nowrap; }
+.admin-table td, .admin-table th { padding: 9px 12px; }
+.admin-table tr:last-child td { border-bottom: 0; }
+.admin-table tbody tr:hover { background: #fbfcfe; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+
+/* --- filter bars ---------------------------------------------------------- */
+.filter-bar {
+    display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+    background: var(--white); border: 1px solid var(--ink-100);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 16px;
+}
+.filter-bar label { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-600); margin-bottom: 3px; }
+.filter-bar .field, .filter-bar select { width: auto; min-width: 150px; }
+
+/* --- forms ---------------------------------------------------------------- */
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; }
+.form-grid.three { grid-template-columns: repeat(3, 1fr); }
+.form-grid .full { grid-column: 1 / -1; }
+@media (max-width: 800px) { .form-grid, .form-grid.three { grid-template-columns: 1fr; } }
+.form-grid label, .field-label {
+    display: block; font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-600); margin-bottom: 3px;
+}
+.checkline { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.hint { font-size: 12px; color: var(--ink-600); margin: 3px 0 0; }
+
+.admin-two-col { display: grid; grid-template-columns: 1.7fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .admin-two-col { grid-template-columns: 1fr; } }
+
+/* --- audit ---------------------------------------------------------------- */
+.audit-detail {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    color: var(--ink-600); max-width: 46ch; overflow-wrap: anywhere;
+}
+
+/* --- pagination ----------------------------------------------------------- */
+.pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 18px; }
+
+/* --- media library -------------------------------------------------------- */
+.dropzone {
+    border: 2px dashed var(--ink-200); border-radius: var(--radius);
+    padding: 32px 20px; text-align: center; cursor: pointer;
+    background: var(--ink-50); transition: border-color .15s, background .15s;
+}
+.dropzone:hover, .dropzone:focus-visible { border-color: var(--blue); }
+.dropzone.is-over { border-color: var(--blue); background: #eef5fb; }
+
+.upload-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.upload-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 6px 0; border-bottom: 1px solid var(--ink-100); font-size: 13px;
+}
+.upload-name { overflow-wrap: anywhere; }
+.upload-state { color: var(--ink-600); white-space: nowrap; }
+.upload-state.is-ok { color: var(--green); font-weight: 600; }
+.upload-state.is-error { color: var(--red); }
+
+.media-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px;
+}
+.media-tile {
+    margin: 0; border: 1px solid var(--ink-100); border-radius: var(--radius);
+    background: var(--white); overflow: hidden;
+}
+.media-tile img {
+    width: 100%; aspect-ratio: 4 / 3; object-fit: contain;
+    background: var(--ink-50); display: block;
+}
+.media-tile figcaption { padding: 8px 10px 10px; display: grid; gap: 3px; }
+.media-name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+
+/* --- import column reference ---------------------------------------------- */
+.column-help { margin: 0 0 16px; font-size: 13px; }
+.column-help dt { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 8px; }
+.column-help dd { margin: 0 0 0 14px; color: var(--ink-600); }

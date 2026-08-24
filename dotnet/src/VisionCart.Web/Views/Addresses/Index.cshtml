@@ -1,0 +1,72 @@
+@model IReadOnlyList<Address>
+@{
+    ViewData["Title"] = "Your addresses";
+}
+
+<h1>Your addresses</h1>
+<p class="muted">Where we deliver. The default is selected for you at checkout.</p>
+
+@if (TempData["AccountOk"] is string ok)
+{
+    <p class="alert alert-ok">@ok</p>
+}
+@if (TempData["AccountError"] is string error)
+{
+    <p class="alert alert-error" role="alert">@error</p>
+}
+
+@if (Model.Count == 0)
+{
+    <p class="alert alert-info">You haven't saved an address yet.</p>
+}
+else
+{
+    <div class="address-grid">
+        @foreach (var address in Model)
+        {
+            <div class="address-card @(address.IsDefault ? "is-default" : "")">
+                @if (address.IsDefault)
+                {
+                    <span class="chip chip-paid">Default</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(address.Label))
+                {
+                    <p class="address-label">@address.Label</p>
+                }
+                <p class="address-lines">
+                    <strong>@address.FullName</strong><br />
+                    @address.Line1<br />
+                    @if (!string.IsNullOrWhiteSpace(address.Line2))
+                    {
+                        @address.Line2<br />
+                    }
+                    @address.City@(string.IsNullOrWhiteSpace(address.State) ? "" : ", " + address.State)
+                    @address.PostalCode<br />
+                    @address.Country
+                    @if (!string.IsNullOrWhiteSpace(address.Phone))
+                    {
+                        <br />
+                        <span class="muted">@address.Phone</span>
+                    }
+                </p>
+                <div class="address-actions">
+                    <a class="btn btn-outline btn-small" asp-action="Edit" asp-route-id="@address.Id">Edit</a>
+                    @if (!address.IsDefault)
+                    {
+                        <form method="post" asp-action="MakeDefault" asp-route-id="@address.Id">
+                            <button class="btn btn-outline btn-small" type="submit">Make default</button>
+                        </form>
+                    }
+                    <form method="post" asp-action="Delete" asp-route-id="@address.Id">
+                        <button class="btn btn-outline btn-small btn-danger" type="submit">Remove</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<p style="margin-top:20px;">
+    <a class="btn btn-primary" asp-action="New">Add an address</a>
+    <a class="btn btn-outline" asp-controller="Account" asp-action="Index">Back to your account</a>
+</p>

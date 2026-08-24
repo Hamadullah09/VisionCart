@@ -1,0 +1,68 @@
+@model BookAppointmentViewModel
+@{
+    ViewData["Title"] = "Book an appointment";
+    var available = Model.Slots.Where(s => s.Available).ToList();
+}
+
+<h1>Book an appointment</h1>
+<p class="muted">We are open 10:00–18:00, Monday to Saturday.</p>
+
+@if (TempData["AccountError"] is string error)
+{
+    <p class="alert alert-error" role="alert">@error</p>
+}
+
+<form method="get" asp-action="Book" class="filter-bar">
+    <div>
+        <label for="date">Date</label>
+        <input class="field" id="date" name="date" type="date"
+               value="@Model.Date.ToString("yyyy-MM-dd")"
+               min="@DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd")"
+               max="@Model.LastBookableDate.ToString("yyyy-MM-dd")" />
+    </div>
+    <div>
+        <label for="kind">Type</label>
+        <select id="kind" name="kind">
+            @foreach (var kind in AppointmentKinds.All)
+            {
+                <option value="@kind" selected="@(kind == Model.Kind)">@Humanise.Value(kind)</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-outline" type="submit">Show times</button>
+</form>
+
+<h2>@Model.Date.ToString("dddd d MMMM yyyy")</h2>
+
+@if (Model.Slots.Count == 0)
+{
+    <p class="alert alert-info">We are closed on this day. Please choose another date.</p>
+}
+else if (available.Count == 0)
+{
+    <p class="alert alert-info">Every slot on this day is taken. Please try another date.</p>
+}
+else
+{
+    <div class="slot-grid">
+        @foreach (var slot in Model.Slots)
+        {
+            if (slot.Available)
+            {
+                <form method="post" asp-action="Book">
+                    <input type="hidden" name="startsAt" value="@slot.StartsAt.ToString("O")" />
+                    <input type="hidden" name="kind" value="@Model.Kind" />
+                    <button class="btn btn-outline slot" type="submit">@slot.StartsAt.ToString("HH:mm")</button>
+                </form>
+            }
+            else
+            {
+                <span class="slot slot-taken" aria-disabled="true">@slot.StartsAt.ToString("HH:mm")</span>
+            }
+        }
+    </div>
+}
+
+<p style="margin-top:20px;">
+    <a class="btn btn-outline" asp-action="Index">Back to your appointments</a>
+</p>

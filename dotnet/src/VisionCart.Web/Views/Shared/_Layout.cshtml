@@ -1,0 +1,96 @@
+@using Microsoft.Extensions.Options
+@inject IOptions<StoreOptions> Store
+@inject ICartService Carts
+@{
+    var storeName = Store.Value.Name;
+    var cartCount = await Carts.CountAsync();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] is null ? storeName : $"{ViewData["Title"]} · {storeName}")</title>
+    <link rel="stylesheet" href="~/css/visioncart.css" asp-append-version="true" />
+</head>
+<body>
+    @if (ViewData["Banner"] is Promotion banner && banner.BannerText is not null)
+    {
+        <div class="banner">
+            <span>@banner.BannerText</span>
+            @if (banner.Code is not null)
+            {
+                <code class="banner-code">@banner.Code</code>
+            }
+        </div>
+    }
+
+    <header class="site-header">
+        <div class="wrap header-inner">
+            <a class="brand" asp-controller="Home" asp-action="Index">@storeName</a>
+            <nav class="nav">
+                <a asp-controller="Frames" asp-action="Index">All frames</a>
+                <a href="/frames?gender=men">Men</a>
+                <a href="/frames?gender=women">Women</a>
+                <a href="/frames?gender=kids">Kids</a>
+                <a href="/try-on" class="nav-accent">Virtual try-on</a>
+                <a asp-controller="Home" asp-action="Deals">Deals</a>
+            </nav>
+            <div class="header-actions">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a href="/account">Account</a>
+                }
+                else
+                {
+                    <a href="/login">Sign in</a>
+                }
+                <a class="btn btn-outline" asp-controller="Cart" asp-action="Index">
+                    Bag@(cartCount > 0 ? $" ({cartCount})" : "")
+                </a>
+            </div>
+        </div>
+    </header>
+
+    @if (TempData["CartError"] is string cartError)
+    {
+        <div class="wrap"><p class="alert alert-error">@cartError</p></div>
+    }
+
+    <main class="wrap">
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap footer-grid">
+            <div>
+                <h4>Shop</h4>
+                <a asp-controller="Frames" asp-action="Index">All frames</a>
+                <a href="/try-on">Virtual try-on</a>
+                <a asp-controller="Home" asp-action="Deals">Deals</a>
+                <a href="/frames?category=sunglasses">Sunglasses</a>
+            </div>
+            <div>
+                <h4>Your account</h4>
+                <a href="/account">Your account</a>
+                <a href="/account/prescriptions">Your prescriptions</a>
+                <a href="/account/orders">Your orders</a>
+            </div>
+            <div>
+                <h4>Guides</h4>
+                @* These four pages 404'd in the legacy application. They are
+                   implemented here, so the links now resolve. *@
+                <a href="/guides/prescription">How to read a prescription</a>
+                <a href="/guides/pd">Measuring your PD</a>
+                <a href="/guides/returns">Returns</a>
+                <a href="/guides/privacy">Privacy &amp; your data</a>
+            </div>
+        </div>
+        <div class="wrap footer-legal">
+            <p>&copy; @DateTime.UtcNow.Year @storeName. Prescription eyewear, fitted properly.</p>
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

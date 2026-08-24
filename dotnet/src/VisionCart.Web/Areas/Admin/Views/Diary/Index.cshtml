@@ -1,0 +1,113 @@
+@model DiaryViewModel
+@{
+    ViewData["Title"] = "Diary";
+}
+
+<div class="panel-head">
+    <h1>Diary</h1>
+    <div>
+        <a class="btn btn-outline btn-small"
+           asp-action="Index" asp-route-from="@Model.From.AddDays(-Model.DayCount).ToString("yyyy-MM-dd")"
+           asp-route-days="@Model.DayCount">← Earlier</a>
+        <a class="btn btn-outline btn-small"
+           asp-action="Index" asp-route-from="@DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd")"
+           asp-route-days="@Model.DayCount">Today</a>
+        <a class="btn btn-outline btn-small"
+           asp-action="Index" asp-route-from="@Model.From.AddDays(Model.DayCount).ToString("yyyy-MM-dd")"
+           asp-route-days="@Model.DayCount">Later →</a>
+    </div>
+</div>
+
+<form method="get" asp-action="Index" class="filter-bar">
+    <div>
+        <label for="from">From</label>
+        <input class="field" id="from" name="from" type="date" value="@Model.From.ToString("yyyy-MM-dd")" />
+    </div>
+    <div>
+        <label for="days">Days</label>
+        <select id="days" name="days">
+            @foreach (var option in new[] { 1, 3, 7, 14, 31 })
+            {
+                <option value="@option" selected="@(option == Model.DayCount)">@option</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-outline" type="submit">Show</button>
+</form>
+
+@foreach (var day in Model.Days)
+{
+    <div class="panel">
+        <div class="panel-head">
+            <h2 style="margin:0;">@day.Date.ToString("dddd d MMMM yyyy")</h2>
+            <span class="muted small">
+                @day.Appointments.Count(a => a.Status == AppointmentStatuses.Scheduled) booked
+            </span>
+        </div>
+
+        @if (day.Appointments.Count == 0)
+        {
+            <p class="muted small" style="margin:0;">
+                @(day.Date.DayOfWeek == DayOfWeek.Sunday ? "Closed." : "Nothing booked.")
+            </p>
+        }
+        else
+        {
+            <div class="admin-table">
+                <table>
+                    <thead>
+                    <tr><th style="width:90px;">Time</th><th>Patient</th><th>Type</th>
+                        <th>Status</th><th style="width:230px;">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var appointment in day.Appointments)
+                    {
+                        <tr>
+                            <td><strong>@appointment.StartsAt.ToString("HH:mm")</strong>
+                                <br /><span class="muted small">@appointment.Minutes min</span></td>
+                            <td>
+                                @* File number, not a clinical value — §10. *@
+                                <a asp-controller="Patients" asp-action="Detail" asp-route-id="@appointment.PatientId">
+                                    @appointment.Patient.FirstName @appointment.Patient.LastName
+                                </a>
+                                <br /><code class="small">@appointment.Patient.FileNo</code>
+                            </td>
+                            <td>@Humanise.Value(appointment.Kind)</td>
+                            <td>
+                                <span class="chip @(appointment.Status == AppointmentStatuses.Scheduled ? "chip-pending" : "")">
+                                    @Humanise.Value(appointment.Status)
+                                </span>
+                            </td>
+                            <td>
+                                @if (appointment.Status == AppointmentStatuses.Scheduled)
+                                {
+                                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                                        <form method="post" asp-action="SetStatus" asp-route-id="@appointment.Id"
+                                              asp-route-from="@Model.From.ToString("yyyy-MM-dd")">
+                                            <input type="hidden" name="status" value="@AppointmentStatuses.Completed" />
+                                            <button class="btn btn-outline btn-small" type="submit">Seen</button>
+                                        </form>
+                                        <form method="post" asp-action="SetStatus" asp-route-id="@appointment.Id"
+                                              asp-route-from="@Model.From.ToString("yyyy-MM-dd")">
+                                            <input type="hidden" name="status" value="@AppointmentStatuses.NoShow" />
+                                            <button class="btn btn-outline btn-small" type="submit">No show</button>
+                                        </form>
+                                        <form method="post" asp-action="Cancel" asp-route-id="@appointment.Id"
+                                              asp-route-from="@Model.From.ToString("yyyy-MM-dd")">
+                                            <button class="btn btn-outline btn-small btn-danger" type="submit">Cancel</button>
+                                        </form>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="muted small">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}

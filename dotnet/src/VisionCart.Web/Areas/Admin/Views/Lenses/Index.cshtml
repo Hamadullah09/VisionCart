@@ -1,0 +1,93 @@
+@using Microsoft.Extensions.Options
+@model IReadOnlyList<LensOption>
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Lens options";
+    var store = Store.Value;
+    string M(int minor) => minor == 0 ? "Included" : Money.Format(minor, store.Currency, store.CurrencySymbol);
+}
+
+<h1>Lens options &amp; pricing</h1>
+<p class="muted">
+    These are the steps a customer walks through when choosing lenses. Change a price
+    here and the storefront follows immediately.
+</p>
+
+@foreach (var group in LensGroups.All)
+{
+    var options = Model.Where(o => o.Group == group).OrderBy(o => o.Position).ToList();
+    <div class="panel">
+        <h2 style="margin-top:0;">@LensGroups.Labels.GetValueOrDefault(group, Humanise.Value(group))</h2>
+        <div class="admin-table">
+            <table>
+                <thead>
+                    <tr><th>Name</th><th>Code</th><th class="num">Price</th><th>Rx limits</th><th>Default</th><th>Live</th><th></th></tr>
+                </thead>
+                <tbody>
+                @foreach (var option in options)
+                {
+                    <tr>
+                        <td>@option.Name<br /><span class="small muted">@option.Description</span></td>
+                        <td><code>@option.Code</code></td>
+                        <td class="num">@M(option.PriceMinor)</td>
+                        <td class="small muted">
+                            @(option.MaxSphere is { } max ? $"≤ {Math.Abs(max):F2} D sph" : "—")
+                        </td>
+                        <td>@(option.IsDefault ? "✓" : "")</td>
+                        <td>@(option.IsActive ? "✓" : "")</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn btn-outline btn-small" type="button" data-edit-toggle="l-@option.Id">Edit</button>
+                            @if (option.IsActive)
+                            {
+                                <form method="post" asp-action="Retire" asp-route-id="@option.Id" style="display:inline;">
+                                    <button class="btn btn-outline btn-small" type="submit">Retire</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                    <tr data-edit-panel="l-@option.Id" hidden>
+                        <td colspan="7">
+                            <form method="post" asp-action="Save" asp-route-id="@option.Id">
+                                <input type="hidden" name="Group" value="@option.Group" />
+                                <div class="form-grid three">
+                                    <div><label>Name</label><input class="field" name="Name" value="@option.Name" required /></div>
+                                    <div><label>Code</label><input class="field" name="Code" value="@option.Code" required /></div>
+                                    <div><label>Price</label><input class="field" name="Price" inputmode="decimal" value="@Money.FromMinor(option.PriceMinor, store.Currency)" /></div>
+                                    <div class="full"><label>Description</label><input class="field" name="Description" value="@option.Description" /></div>
+                                    <div><label>Max sphere (D)</label><input class="field" name="MaxSphere" inputmode="decimal" value="@option.MaxSphere" /></div>
+                                    <div><label>Max cylinder (D)</label><input class="field" name="MaxCylinder" inputmode="decimal" value="@option.MaxCylinder" /></div>
+                                    <div><label>Sort order</label><input class="field" name="Position" type="number" value="@option.Position" /></div>
+                                    <div><label>Requires</label><input class="field" name="Requires" value="@option.Requires" /></div>
+                                    <div><label>Excludes</label><input class="field" name="Excludes" value="@option.Excludes" /></div>
+                                    <label class="checkline"><input type="checkbox" name="IsDefault" value="true" checked="@option.IsDefault" /><span>Ticked by default</span></label>
+                                    <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked="@option.IsActive" /><span>Offered in the shop</span></label>
+                                </div>
+                                <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save option</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn btn-outline btn-small" style="margin-top:10px;" type="button" data-edit-toggle="new-@group">Add an option</button>
+        <div data-edit-panel="new-@group" hidden style="margin-top:10px;">
+            <form method="post" asp-action="Save">
+                <input type="hidden" name="Group" value="@group" />
+                <div class="form-grid three">
+                    <div><label>Name</label><input class="field" name="Name" required /></div>
+                    <div><label>Code</label><input class="field" name="Code" required /></div>
+                    <div><label>Price</label><input class="field" name="Price" inputmode="decimal" value="0" /></div>
+                    <div class="full"><label>Description</label><input class="field" name="Description" placeholder="One line the customer will read when choosing." /></div>
+                    <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked /><span>Offered in the shop</span></label>
+                </div>
+                <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add option</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/admin.js" asp-append-version="true" defer></script>
+}

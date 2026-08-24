@@ -1,0 +1,244 @@
+@using System.Text.Json
+@using Microsoft.Extensions.Options
+@using VisionCart.Application.Prescriptions
+@model Order
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = $"Order {Model.OrderNo}";
+    var store = Store.Value;
+    string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+    var openPayment = Model.Payments.FirstOrDefault(p => p.Status == "pending");
+    var settled = Model.Payments.FirstOrDefault(p => p.Status == "succeeded");
+    var shipment = Model.Shipments.FirstOrDefault();
+}
+
+<p class="small"><a asp-action="Index">← Orders</a></p>
+<h1>@Model.OrderNo</h1>
+<p class="muted">Placed @Model.PlacedAt.ToString("d MMMM yyyy 'at' HH:mm")</p>
+
+<p style="margin:12px 0 20px;">
+    <span class="chip">@Humanise.Value(Model.Status)</span>
+    <span class="chip @(Model.PaymentStatus == PaymentStatuses.Paid ? "chip-paid" : "chip-pending")">@Humanise.Value(Model.PaymentStatus)</span>
+    <span class="chip">@Humanise.Value(Model.FulfilmentStatus)</span>
+</p>
+
+<div class="admin-two-col">
+    <div>
+        <div class="panel">
+            <h2>Lab ticket</h2>
+            @foreach (var item in Model.Items)
+            {
+                <div style="border-top:1px solid var(--ink-100);padding-top:14px;margin-top:14px;">
+                    <div style="display:flex;justify-content:space-between;gap:12px;">
+                        <div>
+                            <strong>@item.TitleSnapshot</strong>@(item.Qty > 1 ? $" × {item.Qty}" : "")<br />
+                            <code class="muted">@item.SkuSnapshot</code>
+                        </div>
+                        <div class="num"><strong>@M(item.TotalMinor)</strong></div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(item.LensSummary))
+                    {
+                        <p class="small muted" style="margin:6px 0;">@item.LensSummary</p>
+                    }
+
+                    @if (item.PrescriptionSnapshot is not null)
+                    {
+                        @* The frozen copy, not the live record: this is what the
+                           lenses were actually ordered against. *@
+                        var snapshot = JsonDocument.Parse(item.PrescriptionSnapshot).RootElement;
+                        var summary = snapshot.TryGetProperty("summary", out var sEl) ? sEl.GetString() : null;
+                        var pd = snapshot.TryGetProperty("patientPdMm", out var pEl) && pEl.ValueKind != JsonValueKind.Null
+                            ? pEl.GetDouble().ToString("0.#") : null;
+
+                        <div style="background:var(--ink-50);border-radius:8px;padding:10px 12px;margin:8px 0;">
+                            <p class="small" style="margin:0;font-family:ui-monospace,monospace;">@summary</p>
+                            @if (pd is not null)
+                            {
+                                <p class="small muted" style="margin:4px 0 0;">Binocular PD: @pd mm</p>
+                            }
+                        </div>
+                    }
+
+                    @if (item.Prescription is { } rx && rx.Status != RxStatuses.Verified)
+                    {
+                        <p class="alert alert-warn" style="margin:8px 0;">
+                            Prescription is @Humanise.Value(rx.Status).ToLowerInvariant() —
+                            verify it on the patient file before cutting.
+                        </p>
+                    }
+
+                    <form method="post" asp-action="UpdateLab" asp-route-id="@Model.Id"
+                          style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px;">
+                        <input type="hidden" name="orderItemId" value="@item.Id" />
+                        <div>
+                            <label class="field-label" for="lab-@item.Id">Lab stage</label>
+                            <select id="lab-@item.Id" name="labStatus" style="min-width:150px;">
+                                @foreach (var stage in LabStatuses.All)
+                                {
+                                    <option value="@stage" selected="@(item.LabStatus == stage)">@Humanise.Value(stage)</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label" for="ref-@item.Id">Lab reference</label>
+                            <input class="field" id="ref-@item.Id" name="labRef" value="@item.LabRef"
+                                   style="min-width:160px;" />
+                        </div>
+                        <button class="btn btn-outline btn-small" type="submit">Update</button>
+                    </form>
+                </div>
+            }
+        </div>
+
+        <div class="panel">
+            <h2>Move this order along</h2>
+            <form method="post" asp-action="UpdateStatus" asp-route-id="@Model.Id">
+                <div class="form-grid">
+                    <div>
+                        <label for="status">Order status</label>
+                        <select id="status" name="status">
+                            @foreach (var s in OrderStatuses.All)
+                            {
+                                <option value="@s" selected="@(Model.Status == s)">@Humanise.Value(s)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label for="fulfilmentStatus">Fulfilment</label>
+                        <select id="fulfilmentStatus" name="fulfilmentStatus">
+                            @foreach (var s in FulfilmentStatuses.All)
+                            {
+                                <option value="@s" selected="@(Model.FulfilmentStatus == s)">@Humanise.Value(s)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="full">
+                        <label for="internalNotes">Internal notes</label>
+                        <textarea class="field" id="internalNotes" name="internalNotes" rows="2">@Model.InternalNotes</textarea>
+                    </div>
+                </div>
+                <button class="btn btn-primary" style="margin-top:12px;" type="submit">Save</button>
+                <p class="hint">
+                    Cancelling returns the frames to stock automatically, and the customer is
+                    emailed about status changes that affect them.
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <div>
+        <div class="panel">
+            <h2>Totals</h2>
+            <div class="totals-row"><span>Frames</span><span>@M(Model.SubtotalMinor)</span></div>
+            @if (Model.LensTotalMinor > 0)
+            {
+                <div class="totals-row"><span>Lenses</span><span>@M(Model.LensTotalMinor)</span></div>
+            }
+            @if (Model.DiscountMinor > 0)
+            {
+                <div class="totals-row discount">
+                    <span>Discount@(Model.PromoCode is not null ? $" ({Model.PromoCode})" : "")</span>
+                    <span>− @M(Model.DiscountMinor)</span>
+                </div>
+            }
+            <div class="totals-row"><span>Delivery</span><span>@M(Model.ShippingMinor)</span></div>
+            @if (Model.TaxMinor > 0)
+            {
+                <div class="totals-row"><span>Tax</span><span>@M(Model.TaxMinor)</span></div>
+            }
+            <div class="totals-row grand"><span>Total</span><span>@M(Model.TotalMinor)</span></div>
+        </div>
+
+        <div class="panel">
+            <h2>Customer</h2>
+            <p class="small" style="margin:0 0 8px;">
+                @Model.Email<br />@Model.Phone
+            </p>
+            @if (Model.PatientId is not null)
+            {
+                <a class="btn btn-outline btn-small" asp-controller="Patients" asp-action="Detail"
+                   asp-route-id="@Model.PatientId">
+                    Open patient file @Model.Patient?.FileNo
+                </a>
+            }
+            @if (Model.ShippingAddress is { } address)
+            {
+                <p class="small muted" style="margin-top:12px;">
+                    @address.FullName<br />
+                    @address.Line1<br />
+                    @if (!string.IsNullOrWhiteSpace(address.Line2)) { @address.Line2<br /> }
+                    @address.City@(string.IsNullOrWhiteSpace(address.State) ? "" : ", " + address.State)
+                    @address.PostalCode<br />@address.Country
+                </p>
+            }
+        </div>
+
+        <div class="panel">
+            <h2>Payment</h2>
+            @foreach (var payment in Model.Payments)
+            {
+                <p class="small" style="margin:0 0 6px;">
+                    @Humanise.Value(payment.Provider) — @Humanise.Value(payment.Status)
+                    · @M(payment.AmountMinor)
+                    @if (payment.RefundedMinor > 0)
+                    {
+                        <br /><span class="muted">Refunded @M(payment.RefundedMinor)</span>
+                    }
+                </p>
+            }
+
+            @if (Model.PaymentStatus != PaymentStatuses.Paid)
+            {
+                <form method="post" asp-action="MarkPaid" asp-route-id="@Model.Id" style="margin-top:10px;">
+                    <label class="field-label" for="reference">Payment reference</label>
+                    <input class="field" id="reference" name="reference" placeholder="Transfer ID or receipt no" />
+                    <button class="btn btn-primary btn-small" style="margin-top:8px;" type="submit">Mark as paid</button>
+                </form>
+            }
+            else if (settled is not null && settled.RefundedMinor < settled.AmountMinor)
+            {
+                <form method="post" asp-action="Refund" asp-route-id="@Model.Id" style="margin-top:10px;">
+                    <input type="hidden" name="paymentId" value="@settled.Id" />
+                    <label class="field-label" for="amount">Refund amount (blank = full)</label>
+                    <input class="field" id="amount" name="amount" inputmode="decimal"
+                           placeholder="@Money.FromMinor(settled.AmountMinor - settled.RefundedMinor, store.Currency)" />
+                    <button class="btn btn-outline btn-small" style="margin-top:8px;" type="submit">Refund</button>
+                </form>
+            }
+        </div>
+
+        <div class="panel">
+            <h2>Shipping</h2>
+            @if (shipment is not null)
+            {
+                <p class="small" style="margin:0 0 10px;">
+                    @shipment.Carrier.ToUpperInvariant() — @Humanise.Value(shipment.Status)
+                    @if (!string.IsNullOrWhiteSpace(shipment.TrackingNumber))
+                    {
+                        <br />@shipment.TrackingNumber
+                    }
+                </p>
+            }
+            <form method="post" asp-action="Ship" asp-route-id="@Model.Id">
+                <input type="hidden" name="rateRef" value="@shipment?.ProviderRef" />
+                <label class="field-label" for="carrier">Carrier</label>
+                <select id="carrier" name="carrier">
+                    @foreach (var c in Carriers.All)
+                    {
+                        <option value="@c" selected="@(shipment?.Carrier == c)">@c.ToUpperInvariant()</option>
+                    }
+                </select>
+                <label class="field-label" for="trackingNumber" style="margin-top:8px;">Tracking number</label>
+                <input class="field" id="trackingNumber" name="trackingNumber" value="@shipment?.TrackingNumber" />
+                <label class="field-label" for="trackingUrl" style="margin-top:8px;">Tracking URL</label>
+                <input class="field" id="trackingUrl" name="trackingUrl" value="@shipment?.TrackingUrl" />
+                <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Mark as shipped</button>
+                <p class="hint">
+                    With a live carrier configured this buys a real label; otherwise it records
+                    the courier details you type here. Either way the customer is emailed.
+                </p>
+            </form>
+        </div>
+    </div>
+</div>

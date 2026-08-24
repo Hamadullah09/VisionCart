@@ -1,0 +1,302 @@
+[
+  {
+    "key": "rectangle-black",
+    "shape": "rectangle",
+    "rimType": "full_rim",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": false,
+    "url": "/frames/rectangle-black.png"
+  },
+  {
+    "key": "rectangle-tortoise",
+    "shape": "rectangle",
+    "rimType": "full_rim",
+    "color": "tortoise",
+    "colorLabel": "Tortoise",
+    "colorHex": "#7a4a1e",
+    "tinted": false,
+    "url": "/frames/rectangle-tortoise.png"
+  },
+  {
+    "key": "rectangle-navy",
+    "shape": "rectangle",
+    "rimType": "full_rim",
+    "color": "navy",
+    "colorLabel": "Midnight Navy",
+    "colorHex": "#1e2b4a",
+    "tinted": false,
+    "url": "/frames/rectangle-navy.png"
+  },
+  {
+    "key": "rectangle-crystal",
+    "shape": "rectangle",
+    "rimType": "full_rim",
+    "color": "crystal",
+    "colorLabel": "Crystal Clear",
+    "colorHex": "#b9c6d1",
+    "tinted": false,
+    "url": "/frames/rectangle-crystal.png"
+  },
+  {
+    "key": "round-gold",
+    "shape": "round",
+    "rimType": "full_rim",
+    "color": "gold",
+    "colorLabel": "Brushed Gold",
+    "colorHex": "#c9a227",
+    "tinted": false,
+    "url": "/frames/round-gold.png"
+  },
+  {
+    "key": "round-black",
+    "shape": "round",
+    "rimType": "full_rim",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": false,
+    "url": "/frames/round-black.png"
+  },
+  {
+    "key": "round-rose",
+    "shape": "round",
+    "rimType": "full_rim",
+    "color": "rose",
+    "colorLabel": "Rose Gold",
+    "colorHex": "#b76e79",
+    "tinted": false,
+    "url": "/frames/round-rose.png"
+  },
+  {
+    "key": "round-silver",
+    "shape": "round",
+    "rimType": "full_rim",
+    "color": "silver",
+    "colorLabel": "Silver",
+    "colorHex": "#9aa3ad",
+    "tinted": false,
+    "url": "/frames/round-silver.png"
+  },
+  {
+    "key": "cat_eye-tortoise",
+    "shape": "cat_eye",
+    "rimType": "full_rim",
+    "color": "tortoise",
+    "colorLabel": "Tortoise",
+    "colorHex": "#7a4a1e",
+    "tinted": false,
+    "url": "/frames/cat_eye-tortoise.png"
+  },
+  {
+    "key": "cat_eye-black",
+    "shape": "cat_eye",
+    "rimType": "full_rim",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": false,
+    "url": "/frames/cat_eye-black.png"
+  },
+  {
+    "key": "cat_eye-rose",
+    "shape": "cat_eye",
+    "rimType": "full_rim",
+    "color": "rose",
+    "colorLabel": "Rose Gold",
+    "colorHex": "#b76e79",
+    "tinted": false,
+    "url": "/frames/cat_eye-rose.png"
+  },
+  {
+    "key": "aviator-gold",
+    "shape": "aviator",
+    "rimType": "full_rim",
+    "color": "gold",
+    "colorLabel": "Brushed Gold",
+    "colorHex": "#c9a227",
+    "tinted": true,
+    "url": "/frames/aviator-gold.png"
+  },
+  {
+    "key": "aviator-silver",
+    "shape": "aviator",
+    "rimType": "full_rim",
+    "color": "silver",
+    "colorLabel": "Silver",
+    "colorHex": "#9aa3ad",
+    "tinted": true,
+    "url": "/frames/aviator-silver.png"
+  },
+  {
+    "key": "aviator-black",
+    "shape": "aviator",
+    "rimType": "full_rim",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": true,
+    "url": "/frames/aviator-black.png"
+  },
+  {
+    "key": "wayfarer-black",
+    "shape": "wayfarer",
+    "rimType": "full_rim",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": false,
+    "url": "/frames/wayfarer-black.png"
+  },
+  {
+    "key": "wayfarer-tortoise",
+    "shape": "wayfarer",
+    "rimType": "full_rim",
+    "color": "tortoise",
+    "colorLabel": "Tortoise",
+    "colorHex": "#7a4a1e",
+    "tinted": false,
+    "url": "/frames/wayfarer-tortoise.png"
+  },
+  {
+    "key": "wayfarer-navy",
+    "shape": "wayfarer",
+    "rimType": "full_rim",
+    "color": "navy",
+    "colorLabel": "Midnight Navy",
+    "colorHex": "#1e2b4a",
+    "tinted": false,
+    "url": "/frames/wayfarer-navy.png"
+  },
+  {
+    "key": "square-black",
+    "shape": "square",
+    "rimType": "full_rim",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": false,
+    "url": "/frames/square-black.png"
+  },
+  {
+    "key": "square-crystal",
+    "shape": "square",
+    "rimType": "full_rim",
+    "color": "crystal",
+    "colorLabel": "Crystal Clear",
+    "colorHex": "#b9c6d1",
+    "tinted": false,
+    "url": "/frames/square-crystal.png"
+  },
+  {
+    "key": "square-olive",
+    "shape": "square",
+    "rimType": "full_rim",
+    "color": "olive",
+    "colorLabel": "Olive",
+    "colorHex": "#4a5535",
+    "tinted": false,
+    "url": "/frames/square-olive.png"
+  },
+  {
+    "key": "oval-silver",
+    "shape": "oval",
+    "rimType": "semi_rimless",
+    "color": "silver",
+    "colorLabel": "Silver",
+    "colorHex": "#9aa3ad",
+    "tinted": false,
+    "url": "/frames/oval-silver.png"
+  },
+  {
+    "key": "oval-gold",
+    "shape": "oval",
+    "rimType": "semi_rimless",
+    "color": "gold",
+    "colorLabel": "Brushed Gold",
+    "colorHex": "#c9a227",
+    "tinted": false,
+    "url": "/frames/oval-gold.png"
+  },
+  {
+    "key": "geometric-navy",
+    "shape": "geometric",
+    "rimType": "full_rim",
+    "color": "navy",
+    "colorLabel": "Midnight Navy",
+    "colorHex": "#1e2b4a",
+    "tinted": false,
+    "url": "/frames/geometric-navy.png"
+  },
+  {
+    "key": "geometric-olive",
+    "shape": "geometric",
+    "rimType": "full_rim",
+    "color": "olive",
+    "colorLabel": "Olive",
+    "colorHex": "#4a5535",
+    "tinted": false,
+    "url": "/frames/geometric-olive.png"
+  },
+  {
+    "key": "geometric-gold",
+    "shape": "geometric",
+    "rimType": "full_rim",
+    "color": "gold",
+    "colorLabel": "Brushed Gold",
+    "colorHex": "#c9a227",
+    "tinted": false,
+    "url": "/frames/geometric-gold.png"
+  },
+  {
+    "key": "browline-tortoise",
+    "shape": "browline",
+    "rimType": "semi_rimless",
+    "color": "tortoise",
+    "colorLabel": "Tortoise",
+    "colorHex": "#7a4a1e",
+    "tinted": false,
+    "url": "/frames/browline-tortoise.png"
+  },
+  {
+    "key": "browline-black",
+    "shape": "browline",
+    "rimType": "semi_rimless",
+    "color": "black",
+    "colorLabel": "Matte Black",
+    "colorHex": "#1b1b1f",
+    "tinted": false,
+    "url": "/frames/browline-black.png"
+  },
+  {
+    "key": "browline-silver",
+    "shape": "browline",
+    "rimType": "semi_rimless",
+    "color": "silver",
+    "colorLabel": "Silver",
+    "colorHex": "#9aa3ad",
+    "tinted": false,
+    "url": "/frames/browline-silver.png"
+  },
+  {
+    "key": "rectangle-rimless-silver",
+    "shape": "rectangle",
+    "rimType": "rimless",
+    "color": "silver",
+    "colorLabel": "Silver",
+    "colorHex": "#9aa3ad",
+    "tinted": false,
+    "url": "/frames/rectangle-rimless-silver.png"
+  },
+  {
+    "key": "rectangle-rimless-gold",
+    "shape": "rectangle",
+    "rimType": "rimless",
+    "color": "gold",
+    "colorLabel": "Brushed Gold",
+    "colorHex": "#c9a227",
+    "tinted": false,
+    "url": "/frames/rectangle-rimless-gold.png"
+  }
+]

@@ -1,0 +1,96 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# local artefacts
+/prisma/dev.db
+/prisma/dev.db-journal
+/public/uploads/*
+!/public/uploads/.gitkeep
+/public/models
+/public/wasm
+.env
+
+# ---------------------------------------------------------------------------
+# .NET port (dotnet/)
+# ---------------------------------------------------------------------------
+
+# Build output
+[Bb]in/
+[Oo]bj/
+/dotnet/publish/
+*.user
+*.suo
+.vs/
+
+# Local developer configuration. Carries LocalDB connection details and the
+# demo staff passwords, so it stays off the remote — copy
+# appsettings.Development.example.json and fill it in. See dotnet/README.md.
+appsettings.Development.json
+
+# Build-time tooling. Node is never needed to run or deploy the application.
+/dotnet/src/VisionCart.Web/node_modules/
+/dotnet/tools/screenshots/node_modules/
+
+# Written at runtime
+/dotnet/src/VisionCart.Web/wwwroot/uploads/*
+!/dotnet/src/VisionCart.Web/wwwroot/uploads/.gitkeep
+/dotnet/src/VisionCart.Web/logs/
+/dotnet/**/logs/
+/dotnet/tools/screenshots/test-wwwroot/
+
+# Test scratch space
+/dotnet/tests/**/test-wwwroot/
+TestResults/
+
+# ---------------------------------------------------------------------------
+# LaTeX build artefacts — the PDFs are committed, the intermediates are not
+# ---------------------------------------------------------------------------
+*.aux
+*.lof
+*.lot
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+MANUAL.log
+USER-MANUAL.log

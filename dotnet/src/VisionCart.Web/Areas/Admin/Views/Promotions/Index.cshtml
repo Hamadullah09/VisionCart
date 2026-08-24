@@ -1,0 +1,67 @@
+@using Microsoft.Extensions.Options
+@using VisionCart.Application.Promotions
+@model IReadOnlyList<Promotion>
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Promotions";
+    var store = Store.Value;
+}
+
+<div class="panel-head">
+    <div>
+        <h1>Promotions</h1>
+        <p class="muted">Deals go live the moment you save — no deploy, no developer.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="New">New deal</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <p class="alert alert-info">No deals configured yet.</p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+                <tr><th>Deal</th><th>Code</th><th>Type</th><th>Value</th><th>Window</th>
+                    <th class="num">Used</th><th>Stacks</th><th>Live</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td>@p.Name<br /><span class="small muted">@p.BannerText</span></td>
+                    <td>@(p.Code is null ? Html.Raw("<span class=\"small muted\">auto</span>") : Html.Raw($"<code>{p.Code}</code>"))</td>
+                    <td class="small">@PromotionKinds.Labels.GetValueOrDefault(p.Kind, Humanise.Value(p.Kind))</td>
+                    <td class="small">
+                        @(p.Kind == PromotionKinds.PercentOff
+                            ? $"{p.Value / 100.0:0.#}%"
+                            : p.Kind is PromotionKinds.AmountOff or PromotionKinds.Bundle
+                                ? Money.Format(p.Value, store.Currency, store.CurrencySymbol)
+                                : "—")
+                    </td>
+                    <td class="small muted">
+                        @(p.EndsAt is { } end ? $"Until {end:dd/MM/yyyy}" : "Always")
+                    </td>
+                    <td class="num">@p.UsageCount@(p.UsageLimit is { } lim ? $" / {lim}" : "")</td>
+                    <td>@(p.Stackable ? "✓" : "")</td>
+                    <td>
+                        <form method="post" asp-action="Toggle" asp-route-id="@p.Id">
+                            <button class="btn btn-outline btn-small" type="submit">
+                                @(p.IsActive ? "Live" : "Paused")
+                            </button>
+                        </form>
+                    </td>
+                    <td><a asp-action="Edit" asp-route-id="@p.Id">Edit</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <p class="hint">
+        The highest-priority offer always applies. Others join it only if every promotion
+        in play is marked stackable — so a headline deal never silently doubles up, but a
+        delivery perk can ride alongside a discount code.
+    </p>
+}

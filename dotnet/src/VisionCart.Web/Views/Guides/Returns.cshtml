@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "Returns";
+    var days = ViewData["ReturnDays"];
+    var email = ViewData["StoreEmail"];
+}
+<article style="max-width:70ch;">
+<h1>Returns and remakes</h1>
+<p class="muted">You have @days days to change your mind.</p>
+
+<h2>Changing your mind</h2>
+<p>If the frames are not right, tell us within @days days of delivery and we will
+arrange a return. Frames must come back unworn and in their case, with the cloth
+and any packaging.</p>
+
+<h2>If the prescription is wrong</h2>
+<p>If the lenses were made to a prescription and something feels off, contact us
+before returning anything. Most problems are a remake rather than a return, and a
+remake is free when the error is ours.</p>
+<p>If your own prescription has changed since you ordered, we can usually re-cut
+lenses into the same frames at lens-only cost.</p>
+
+<h2>What we cannot take back</h2>
+<ul>
+<li>Frames with obvious wear or damage.</li>
+<li>Lenses cut to a prescription you have since confirmed was correct, once the
+@days-day window has passed.</li>
+</ul>
+
+<h2>Starting a return</h2>
+<p>Email <a href="mailto:@email">@email</a> with your order number — it begins
+with <code>VC-</code> and is on your confirmation page. We will reply with
+instructions and a return label where applicable.</p>
+</article>

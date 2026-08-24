@@ -1,0 +1,67 @@
+@model AppointmentsViewModel
+@{
+    ViewData["Title"] = "Your appointments";
+    var upcoming = Model.Appointments
+        .Where(a => a.StartsAt >= DateTime.UtcNow && a.Status == AppointmentStatuses.Scheduled)
+        .OrderBy(a => a.StartsAt).ToList();
+    var past = Model.Appointments.Except(upcoming).OrderByDescending(a => a.StartsAt).ToList();
+}
+
+<h1>Your appointments</h1>
+<p class="muted">Eye tests, fittings and collections at the practice.</p>
+
+@if (TempData["AccountOk"] is string ok)
+{
+    <p class="alert alert-ok">@ok</p>
+}
+@if (TempData["AccountError"] is string error)
+{
+    <p class="alert alert-error" role="alert">@error</p>
+}
+
+<p><a class="btn btn-primary" asp-action="Book">Book an appointment</a></p>
+
+<h2>Coming up</h2>
+@if (upcoming.Count == 0)
+{
+    <p class="alert alert-info">You have no appointments booked.</p>
+}
+else
+{
+    <table>
+        <thead><tr><th>When</th><th>Type</th><th>Length</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var appointment in upcoming)
+        {
+            <tr>
+                <td><strong>@appointment.StartsAt.ToString("dddd d MMMM yyyy, HH:mm")</strong></td>
+                <td>@Humanise.Value(appointment.Kind)</td>
+                <td>@appointment.Minutes min</td>
+                <td>
+                    <form method="post" asp-action="Cancel" asp-route-id="@appointment.Id">
+                        <button class="btn btn-outline btn-small" type="submit">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@if (past.Count > 0)
+{
+    <h2>Past</h2>
+    <table>
+        <thead><tr><th>When</th><th>Type</th><th>Status</th></tr></thead>
+        <tbody>
+        @foreach (var appointment in past)
+        {
+            <tr>
+                <td>@appointment.StartsAt.ToString("d MMM yyyy, HH:mm")</td>
+                <td>@Humanise.Value(appointment.Kind)</td>
+                <td><span class="chip">@Humanise.Value(appointment.Status)</span></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,155 @@
+@model DataRequestDetailViewModel
+@{
+    ViewData["Title"] = "Data request";
+    var request = Model.Request;
+    var isErasure = request.Kind == DataSubjectRequestKinds.Erasure;
+    var isAdmin = User.IsInRole(Roles.Admin);
+    var done = request.Status == DataSubjectRequestStatuses.Completed;
+}
+
+<p><a asp-action="Index">← All data requests</a></p>
+<h1>@(DataSubjectRequestKinds.Labels.TryGetValue(request.Kind, out var label) ? label : request.Kind)</h1>
+<p class="muted">
+    Raised @request.CreatedAt.ToString("d MMMM yyyy") ·
+    <span class="chip">@Humanise.Value(request.Status)</span>
+</p>
+
+<div class="admin-two-col">
+    <div>
+        <div class="panel">
+            <h2 style="margin-top:0;">The request</h2>
+            <dl class="column-help">
+                <dt>Contact</dt><dd>@request.Email</dd>
+                <dt>Linked patient file</dt>
+                <dd>
+                    @if (Model.Patient is null)
+                    {
+                        <span class="muted">
+                            No file matched this address. Link one from the patient record
+                            before an erasure can be actioned.
+                        </span>
+                    }
+                    else
+                    {
+                        <a asp-controller="Patients" asp-action="Detail" asp-route-id="@Model.Patient.Id">
+                            @Model.Patient.FileNo
+                        </a>
+                    }
+                </dd>
+            </dl>
+
+            @if (!string.IsNullOrWhiteSpace(request.CustomerMessage))
+            {
+                <h3 style="font-size:15px;">What the customer wrote</h3>
+                <p class="audit-detail" style="max-width:none;">@request.CustomerMessage</p>
+            }
+        </div>
+
+        <div class="panel">
+            <h2 style="margin-top:0;">Progress this request</h2>
+            <form method="post" asp-action="SetStatus" asp-route-id="@request.Id">
+                <label for="status">Status</label>
+                <select class="field" id="status" name="status">
+                    @foreach (var status in DataSubjectRequestStatuses.All)
+                    {
+                        <option value="@status" selected="@(status == request.Status)">
+                            @Humanise.Value(status)
+                        </option>
+                    }
+                </select>
+
+                <label for="staffNotes" style="margin-top:10px;">Internal notes</label>
+                <textarea class="field" id="staffNotes" name="staffNotes" rows="3"
+                          placeholder="What you did, and how identity was confirmed.">@request.StaffNotes</textarea>
+                <p class="hint">Visible to staff only. Never shown to the customer.</p>
+
+                <button class="btn btn-primary" type="submit" style="margin-top:10px;">Save</button>
+            </form>
+        </div>
+    </div>
+
+    <div>
+        @if (isErasure)
+        {
+            <div class="panel" style="border-color:#ecdcb0;">
+                <h2 style="margin-top:0;">Erasure</h2>
+
+                @if (Model.Impact is null)
+                {
+                    <p class="alert alert-warn">
+                        No patient file is linked, so there is nothing to erase yet.
+                    </p>
+                }
+                else
+                {
+                    <p>Erasing this customer will affect:</p>
+                    <ul class="small">
+                        <li><strong>@Model.Impact.Orders</strong> orders — kept, contact details removed</li>
+                        <li><strong>@Model.Impact.Prescriptions</strong> prescriptions — kept, no longer identifiable</li>
+                        <li><strong>@Model.Impact.Appointments</strong> appointments — kept</li>
+                        <li><strong>@Model.Impact.Addresses</strong> addresses — redacted and hidden</li>
+                    </ul>
+
+                    <p class="hint">
+                        This is pseudonymisation, not deletion. Prescriptions are medical
+                        records and orders are financial records, so both are kept for
+                        their retention period — but nothing left behind identifies a
+                        person. <strong>It cannot be undone.</strong>
+                    </p>
+
+                    @if (done)
+                    {
+                        <p class="alert alert-ok">This request has already been completed.</p>
+                    }
+                    else if (!Model.Impact.CanErase)
+                    {
+                        <p class="alert alert-error" role="alert">@Model.Impact.Blocker</p>
+                    }
+                    else if (!isAdmin)
+                    {
+                        <p class="alert alert-warn">
+                            Erasure is restricted to an administrator. Ask one to action it.
+                        </p>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="Erase" asp-route-id="@request.Id">
+                            <label for="confirm">Type <code>ERASE</code> to confirm</label>
+                            <input class="field" id="confirm" name="confirm" autocomplete="off" required />
+                            <button class="btn btn-primary btn-danger" type="submit" style="margin-top:10px;">
+                                Erase this customer's details
+                            </button>
+                        </form>
+                    }
+                }
+            </div>
+        }
+
+        @if (request.Kind == DataSubjectRequestKinds.Export)
+        {
+            <div class="panel">
+                <h2 style="margin-top:0;">Export</h2>
+                <p class="small">
+                    A customer who can still sign in can download their own data from
+                    <code>/account/privacy</code> without staff involvement. Use the
+                    patients export only when they cannot.
+                </p>
+                <a class="btn btn-outline" asp-controller="Import" asp-action="Index">Go to export</a>
+            </div>
+        }
+
+        <div class="panel">
+            <h2 style="margin-top:0;">Handled</h2>
+            <p class="small muted">
+                @if (request.HandledAt is null)
+                {
+                    <text>Not yet closed.</text>
+                }
+                else
+                {
+                    <text>Closed @request.HandledAt.Value.ToString("d MMM yyyy HH:mm").</text>
+                }
+            </p>
+        </div>
+    </div>
+</div>

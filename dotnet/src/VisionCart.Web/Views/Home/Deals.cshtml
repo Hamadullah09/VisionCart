@@ -1,0 +1,52 @@
+@using Microsoft.Extensions.Options
+@model IReadOnlyList<Promotion>
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Deals";
+    var store = Store.Value;
+}
+<h1>Current offers</h1>
+<p class="muted">Everything on this page is live right now. Codes apply at checkout.</p>
+
+@if (Model.Count == 0)
+{
+    <p class="alert alert-info">There are no offers running at the moment. Check back soon.</p>
+}
+else
+{
+    <div class="grid grid-3" style="margin-top:24px;">
+        @foreach (var deal in Model)
+        {
+            <div class="card" style="padding:20px;">
+                <h3 style="margin:0 0 8px;font-size:18px;">@deal.Name</h3>
+                <p class="muted small">@(deal.Description ?? IPromotionService.Describe(deal))</p>
+                @if (deal.Code is not null)
+                {
+                    <p><code class="chip">@deal.Code</code></p>
+                }
+                else
+                {
+                    <p class="small muted">Applied automatically.</p>
+                }
+                <ul class="small muted" style="padding-left:18px;margin:10px 0 0;">
+                    @if (deal.MinSubtotalMinor > 0)
+                    {
+                        <li>Spend at least @Money.Format(deal.MinSubtotalMinor, store.Currency, store.CurrencySymbol)</li>
+                    }
+                    @if (deal.MinQty > 1)
+                    {
+                        <li>Buy @deal.MinQty or more</li>
+                    }
+                    @if (deal.FirstOrderOnly)
+                    {
+                        <li>First orders only</li>
+                    }
+                    @if (deal.EndsAt is { } ends)
+                    {
+                        <li>Ends @ends.ToString("d MMMM yyyy")</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+}

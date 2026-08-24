@@ -1,0 +1,20 @@
+@model VisionCart.Web.Controllers.LoginInput
+@{ ViewData["Title"] = "Sign in"; }
+<div style="max-width:420px;margin:40px auto;">
+    <h1>Sign in</h1>
+    <div asp-validation-summary="All" class="alert alert-error" role="alert"></div>
+    <form method="post">
+        <input type="hidden" asp-for="ReturnUrl" />
+        <label asp-for="Email" class="small muted">Email</label>
+        <input class="field" asp-for="Email" type="email" autocomplete="username" autofocus />
+        <label asp-for="Password" class="small muted" style="margin-top:12px;display:block;">Password</label>
+        <input class="field" asp-for="Password" type="password" autocomplete="current-password" />
+        <label style="display:flex;gap:8px;align-items:center;margin:12px 0;">
+            <input asp-for="RememberMe" type="checkbox" />
+            <span class="small">Keep me signed in</span>
+        </label>
+        <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+    </form>
+    <p class="small" style="margin-top:16px;"><a href="/forgot-password">Forgotten your password?</a></p>
+    <p class="small muted">No account yet? <a asp-action="Register" asp-route-next="@Model.ReturnUrl">Create one</a>.</p>
+</div>

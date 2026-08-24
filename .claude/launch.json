@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "visioncart-dotnet",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "dotnet/src/VisionCart.Web",
+        "--launch-profile",
+        "VisionCart.Web"
+      ],
+      "port": 5217,
+      "autoPort": false
+    },
+    {
+      "name": "visioncart-legacy",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

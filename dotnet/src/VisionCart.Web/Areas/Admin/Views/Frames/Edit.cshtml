@@ -1,0 +1,304 @@
+@model FrameEditViewModel
+@{
+    var isNew = Model.Frame is null;
+    ViewData["Title"] = isNew ? "New frame" : Model.Frame!.Name;
+    var d = Model.Details;
+}
+
+<p class="small"><a asp-action="Index">← Frames</a></p>
+<div class="panel-head">
+    <div>
+        <h1>@(isNew ? "New frame" : Model.Frame!.Name)</h1>
+        @if (!isNew)
+        {
+            <p class="muted"><code>@Model.Frame!.Sku</code></p>
+        }
+    </div>
+    @if (!isNew)
+    {
+        <div style="display:flex;gap:8px;">
+            <a class="btn btn-outline btn-small" href="/frames/@Model.Frame!.Slug" target="_blank" rel="noopener">View in shop ↗</a>
+            <form method="post" asp-action="Archive" asp-route-id="@Model.Frame.Id">
+                <button class="btn btn-outline btn-small" type="submit">Archive</button>
+            </form>
+        </div>
+    }
+</div>
+
+<form method="post" asp-action="Save" asp-route-id="@Model.Frame?.Id">
+    <div class="admin-two-col">
+        <div>
+            <div class="panel">
+                <h2>Basics</h2>
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="Name">Frame name</label>
+                        <input class="field" id="Name" name="Name" value="@d.Name" required autofocus />
+                    </div>
+                    <div>
+                        <label for="Sku">SKU</label>
+                        <input class="field" id="Sku" name="Sku" value="@d.Sku" />
+                        <p class="hint">Left blank, we'll generate one.</p>
+                    </div>
+                    <div>
+                        <label for="Slug">URL slug</label>
+                        <input class="field" id="Slug" name="Slug" value="@d.Slug" />
+                        <p class="hint">Left blank, we'll build it from the name.</p>
+                    </div>
+                    <div>
+                        <label for="BrandId">Brand</label>
+                        <select id="BrandId" name="BrandId">
+                            <option value="">No brand</option>
+                            @foreach (var brand in Model.Brands)
+                            {
+                                <option value="@brand.Id" selected="@(d.BrandId == brand.Id)">@brand.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label for="Status">Status</label>
+                        <select id="Status" name="Status">
+                            @foreach (var s in ProductStatuses.All)
+                            {
+                                <option value="@s" selected="@(d.Status == s)">@Humanise.Value(s)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="full">
+                        <label for="Description">Description</label>
+                        <textarea class="field" id="Description" name="Description" rows="3"
+                                  placeholder="How they wear, who they suit, what they're made of.">@d.Description</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Style</h2>
+                <div class="form-grid three">
+                    <div>
+                        <label for="Shape">Shape</label>
+                        <select id="Shape" name="Shape">
+                            <option value="">—</option>
+                            @foreach (var s in FrameShapes.All)
+                            {
+                                <option value="@s" selected="@(d.Shape == s)">@Humanise.Value(s)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label for="Material">Material</label>
+                        <select id="Material" name="Material">
+                            <option value="">—</option>
+                            @foreach (var m in FrameMaterials.All)
+                            {
+                                <option value="@m" selected="@(d.Material == m)">@Humanise.Value(m)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label for="RimType">Rim</label>
+                        <select id="RimType" name="RimType">
+                            @foreach (var r in RimTypes.All)
+                            {
+                                <option value="@r" selected="@(d.RimType == r)">@Humanise.Value(r)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label for="Gender">Wearer</label>
+                        <select id="Gender" name="Gender">
+                            @foreach (var g in Genders.All)
+                            {
+                                <option value="@g" selected="@(d.Gender == g)">@Humanise.Value(g)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="full">
+                        <label for="FaceShapes">Suits these face shapes</label>
+                        <input class="field" id="FaceShapes" name="FaceShapes" value="@d.FaceShapes"
+                               placeholder="round,oval,heart" />
+                        <p class="hint">Comma separated. Used to recommend frames after a try-on measures the face.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Measurements (mm)</h2>
+                <div class="form-grid three">
+                    <div><label for="LensWidthMm">Lens width</label><input class="field" id="LensWidthMm" name="LensWidthMm" inputmode="decimal" value="@d.LensWidthMm" /></div>
+                    <div><label for="BridgeWidthMm">Bridge</label><input class="field" id="BridgeWidthMm" name="BridgeWidthMm" inputmode="decimal" value="@d.BridgeWidthMm" /></div>
+                    <div><label for="TempleLengthMm">Temple</label><input class="field" id="TempleLengthMm" name="TempleLengthMm" inputmode="decimal" value="@d.TempleLengthMm" /></div>
+                    <div><label for="LensHeightMm">Lens height</label><input class="field" id="LensHeightMm" name="LensHeightMm" inputmode="decimal" value="@d.LensHeightMm" /></div>
+                    <div><label for="TotalWidthMm">Total width</label><input class="field" id="TotalWidthMm" name="TotalWidthMm" inputmode="decimal" value="@d.TotalWidthMm" /><p class="hint">Sets the size band.</p></div>
+                    <div><label for="WeightGrams">Weight (g)</label><input class="field" id="WeightGrams" name="WeightGrams" inputmode="decimal" value="@d.WeightGrams" /></div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="panel">
+                <h2>Price &amp; rules</h2>
+                <div class="form-grid">
+                    <div>
+                        <label for="Price">Frame price</label>
+                        <input class="field" id="Price" name="Price" inputmode="decimal" value="@d.Price" required />
+                    </div>
+                    <div>
+                        <label for="CompareAt">Was price</label>
+                        <input class="field" id="CompareAt" name="CompareAt" inputmode="decimal" value="@d.CompareAt" />
+                        <p class="hint">Shows a strikethrough.</p>
+                    </div>
+                    <div class="full">
+                        <label for="Cost">Cost to us</label>
+                        <input class="field" id="Cost" name="Cost" inputmode="decimal" value="@d.Cost" />
+                        <p class="hint">Internal only. Never shown to a customer.</p>
+                    </div>
+                    <label class="checkline full">
+                        <input type="checkbox" name="IsFeatured" value="true" checked="@d.IsFeatured" />
+                        <span>Feature on the home page</span>
+                    </label>
+                    <label class="checkline full">
+                        <input type="checkbox" name="AllowFrameOnly" value="true" checked="@d.AllowFrameOnly" />
+                        <span>Can be bought without lenses</span>
+                    </label>
+                    <label class="checkline full">
+                        <input type="checkbox" name="RequiresPrescription" value="true" checked="@d.RequiresPrescription" />
+                        <span>Prescription lenses only</span>
+                    </label>
+                    <div class="full">
+                        <label for="Position">Sort order</label>
+                        <input class="field" id="Position" name="Position" type="number" value="@d.Position" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Collections</h2>
+                @foreach (var category in Model.Categories)
+                {
+                    <label class="checkline" style="margin-bottom:6px;">
+                        <input type="checkbox" name="categoryIds" value="@category.Id"
+                               checked="@Model.SelectedCategoryIds.Contains(category.Id)" />
+                        <span>@category.Name</span>
+                    </label>
+                }
+            </div>
+
+            <div class="panel">
+                <h2>Search listing</h2>
+                <label for="MetaTitle" class="field-label">Page title</label>
+                <input class="field" id="MetaTitle" name="MetaTitle" value="@d.MetaTitle" />
+                <label for="MetaDesc" class="field-label" style="margin-top:8px;">Meta description</label>
+                <input class="field" id="MetaDesc" name="MetaDesc" value="@d.MetaDesc" />
+            </div>
+
+            <button class="btn btn-primary btn-block" type="submit">Save frame</button>
+        </div>
+    </div>
+</form>
+
+@if (!isNew)
+{
+    <div class="panel">
+        <h2>Colourways</h2>
+        <p class="hint" style="margin-top:0;">Stock, price and try-on calibration live here.</p>
+
+        @foreach (var variant in Model.Frame!.Variants)
+        {
+            <div style="border-top:1px solid var(--ink-100);padding-top:14px;margin-top:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="swatch" style="background:@(variant.ColorHex ?? "#ccc");width:20px;height:20px;"></span>
+                        <div>
+                            <strong>@variant.ColorName</strong><br />
+                            <code class="muted small">@variant.Sku · @variant.StockQty in stock</code>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        @if (variant.TryOnImageUrl is not null)
+                        {
+                            <span class="chip chip-paid">Try-on ready</span>
+                        }
+                        else
+                        {
+                            <span class="chip chip-pending">No try-on artwork</span>
+                        }
+                        <button class="btn btn-outline btn-small" type="button" data-edit-toggle="v-@variant.Id">Edit</button>
+                    </div>
+                </div>
+
+                <div data-edit-panel="v-@variant.Id" hidden style="margin-top:12px;">
+                    <form method="post" asp-action="SaveVariant" asp-route-id="@Model.Frame.Id"
+                          asp-route-variantId="@variant.Id">
+                        <div class="form-grid three">
+                            <div><label>Colour name</label><input class="field" name="ColorName" value="@variant.ColorName" required /></div>
+                            <div><label>Swatch hex</label><input class="field" name="ColorHex" value="@variant.ColorHex" /></div>
+                            <div><label>SKU</label><input class="field" name="Sku" value="@variant.Sku" /></div>
+                            <div><label>Barcode</label><input class="field" name="Barcode" value="@variant.Barcode" /></div>
+                            <div><label>Price override</label><input class="field" name="PriceOverride" inputmode="decimal"
+                                     value="@(variant.PriceMinor is { } p ? Money.FromMinor(p, "PKR") : null)" /></div>
+                            <div><label>In stock</label><input class="field" name="StockQty" type="number" value="@variant.StockQty" /></div>
+                            <div><label>Warn at</label><input class="field" name="LowStockAt" type="number" value="@variant.LowStockAt" /></div>
+                            <div><label>Sort order</label><input class="field" name="Position" type="number" value="@variant.Position" /></div>
+                            <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked="@variant.IsActive" /><span>Show in the shop</span></label>
+                        </div>
+                        <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save colourway</button>
+                    </form>
+
+                    <div style="border-top:1px solid var(--ink-100);margin-top:14px;padding-top:12px;">
+                        <h3 style="font-size:14px;margin:0 0 4px;">Virtual try-on calibration</h3>
+                        <p class="hint" style="margin-top:0;">
+                            The two anchors are where the wearer's pupils must land inside the artwork,
+                            as a fraction of the image. Everything else — scale, rotation, position —
+                            is solved from the detected pupils, so a correctly anchored asset needs no
+                            per-face tuning. A colourway without artwork never appears in the mirror.
+                        </p>
+                        <form method="post" asp-action="Calibrate" asp-route-id="@Model.Frame.Id"
+                              asp-route-variantId="@variant.Id">
+                            <div class="form-grid three">
+                                <div class="full">
+                                    <label>Artwork URL (transparent PNG, temples pointing out)</label>
+                                    <input class="field" name="tryOnImageUrl" value="@variant.TryOnImageUrl" />
+                                </div>
+                                <div><label>Left anchor X</label><input class="field" name="anchorLeftX" inputmode="decimal" value="@variant.AnchorLeftX" /></div>
+                                <div><label>Left anchor Y</label><input class="field" name="anchorLeftY" inputmode="decimal" value="@variant.AnchorLeftY" /></div>
+                                <div><label>Right anchor X</label><input class="field" name="anchorRightX" inputmode="decimal" value="@variant.AnchorRightX" /></div>
+                                <div><label>Right anchor Y</label><input class="field" name="anchorRightY" inputmode="decimal" value="@variant.AnchorRightY" /></div>
+                                <div><label>Scale adjust</label><input class="field" name="tryOnScaleAdj" inputmode="decimal" value="@variant.TryOnScaleAdj" /></div>
+                                <div><label>Opacity</label><input class="field" name="tryOnOpacity" inputmode="decimal" value="@variant.TryOnOpacity" /></div>
+                            </div>
+                            <button class="btn btn-outline btn-small" style="margin-top:10px;" type="submit">Save calibration</button>
+                            @if (variant.TryOnImageUrl is not null)
+                            {
+                                <a class="btn btn-outline btn-small" style="margin-top:10px;"
+                                   href="/try-on?variant=@variant.Id" target="_blank" rel="noopener">Preview in the mirror ↗</a>
+                            }
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div style="border-top:1px solid var(--ink-100);padding-top:14px;margin-top:14px;">
+            <button class="btn btn-outline btn-small" type="button" data-edit-toggle="v-new">Add a colourway</button>
+            <div data-edit-panel="v-new" hidden style="margin-top:12px;">
+                <form method="post" asp-action="SaveVariant" asp-route-id="@Model.Frame.Id">
+                    <div class="form-grid three">
+                        <div><label>Colour name</label><input class="field" name="ColorName" required /></div>
+                        <div><label>Swatch hex</label><input class="field" name="ColorHex" placeholder="#1b1b1f" /></div>
+                        <div><label>SKU</label><input class="field" name="Sku" /></div>
+                        <div><label>In stock</label><input class="field" name="StockQty" type="number" value="0" /></div>
+                        <div><label>Warn at</label><input class="field" name="LowStockAt" type="number" value="3" /></div>
+                        <div><label>Sort order</label><input class="field" name="Position" type="number" value="0" /></div>
+                        <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked /><span>Show in the shop</span></label>
+                    </div>
+                    <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add colourway</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/admin.js" asp-append-version="true" defer></script>
+}

@@ -1,0 +1,130 @@
+@model CatalogueViewModel
+@{
+    ViewData["Title"] = "All frames";
+    var f = Model.Filters;
+}
+
+<h1>All frames</h1>
+<p class="muted">@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s")</p>
+
+<div class="catalogue" style="margin-top:24px;">
+    <form class="filters" method="get">
+        <label for="q">Search</label>
+        <input class="field" type="text" id="q" name="q" value="@f.Q" placeholder="Name, brand or SKU" />
+
+        <label for="gender">Wearer</label>
+        <select id="gender" name="gender">
+            <option value="">Any</option>
+            @foreach (var g in Genders.All)
+            {
+                <option value="@g" selected="@(f.Gender == g)">@Humanise.Value(g)</option>
+            }
+        </select>
+
+        <label for="shape">Shape</label>
+        <select id="shape" name="shape">
+            <option value="">Any</option>
+            @foreach (var (value, count) in Model.Facets.Shapes)
+            {
+                <option value="@value" selected="@(f.Shape == value)">@Humanise.Value(value) (@count)</option>
+            }
+        </select>
+
+        <label for="material">Material</label>
+        <select id="material" name="material">
+            <option value="">Any</option>
+            @foreach (var (value, count) in Model.Facets.Materials)
+            {
+                <option value="@value" selected="@(f.Material == value)">@Humanise.Value(value) (@count)</option>
+            }
+        </select>
+
+        <label for="rimType">Rim</label>
+        <select id="rimType" name="rimType">
+            <option value="">Any</option>
+            @foreach (var r in RimTypes.All)
+            {
+                <option value="@r" selected="@(f.RimType == r)">@Humanise.Value(r)</option>
+            }
+        </select>
+
+        <label for="brand">Brand</label>
+        <select id="brand" name="brand">
+            <option value="">Any</option>
+            @foreach (var (name, slug) in Model.Facets.Brands)
+            {
+                <option value="@slug" selected="@(f.Brand == slug)">@name</option>
+            }
+        </select>
+
+        <label for="category">Collection</label>
+        <select id="category" name="category">
+            <option value="">Any</option>
+            @foreach (var (name, slug) in Model.Facets.Categories)
+            {
+                <option value="@slug" selected="@(f.Category == slug)">@name</option>
+            }
+        </select>
+
+        <label for="sizeBand">Frame size</label>
+        <select id="sizeBand" name="sizeBand">
+            <option value="">Any</option>
+            @foreach (var s in SizeBands.All)
+            {
+                <option value="@s" selected="@(f.SizeBand == s)">@Humanise.Value(s)</option>
+            }
+        </select>
+
+        <label for="sort">Sort by</label>
+        <select id="sort" name="sort">
+            <option value="">Featured</option>
+            <option value="price_asc" selected="@(f.Sort == "price_asc")">Price, low to high</option>
+            <option value="price_desc" selected="@(f.Sort == "price_desc")">Price, high to low</option>
+            <option value="newest" selected="@(f.Sort == "newest")">Newest</option>
+        </select>
+
+        <div style="display:flex;gap:8px;margin-top:18px;">
+            <button class="btn btn-primary" type="submit">Apply</button>
+            <a class="btn btn-outline" asp-action="Index">Clear</a>
+        </div>
+    </form>
+
+    <div>
+        @if (Model.Results.Items.Count == 0)
+        {
+            <p class="alert alert-info">
+                No frames match those filters. Try widening your search.
+            </p>
+        }
+        else
+        {
+            <div class="grid grid-3">
+                @foreach (var frame in Model.Results.Items)
+                {
+                    <partial name="_ProductCard" model="frame" />
+                }
+            </div>
+
+            @if (Model.Results.Pages > 1)
+            {
+                <nav style="display:flex;gap:8px;justify-content:center;margin-top:32px;align-items:center;">
+                    @if (Model.Results.HasPrevious)
+                    {
+                        <a class="btn btn-outline btn-small"
+                           href="@Url.Action("Index", new { q = f.Q, gender = f.Gender, shape = f.Shape, material = f.Material, rimType = f.RimType, brand = f.Brand, category = f.Category, sizeBand = f.SizeBand, sort = f.Sort, page = Model.Results.Page - 1 })">
+                            ← Previous
+                        </a>
+                    }
+                    <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
+                    @if (Model.Results.HasNext)
+                    {
+                        <a class="btn btn-outline btn-small"
+                           href="@Url.Action("Index", new { q = f.Q, gender = f.Gender, shape = f.Shape, material = f.Material, rimType = f.RimType, brand = f.Brand, category = f.Category, sizeBand = f.SizeBand, sort = f.Sort, page = Model.Results.Page + 1 })">
+                            Next →
+                        </a>
+                    }
+                </nav>
+            }
+        }
+    </div>
+</div>

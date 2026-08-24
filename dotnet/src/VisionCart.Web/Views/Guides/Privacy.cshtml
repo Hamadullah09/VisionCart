@@ -1,0 +1,50 @@
+@{
+    ViewData["Title"] = "Privacy & your data";
+    var storesSnapshots = (bool)(ViewData["StoresSnapshots"] ?? false);
+    var email = ViewData["StoreEmail"];
+}
+<article style="max-width:70ch;">
+<h1>Privacy and your data</h1>
+<p class="muted">Your prescription is health data, and we treat it that way.</p>
+
+<h2>Your photograph never leaves your device</h2>
+<p>The face detection behind the virtual try-on runs entirely inside your own web
+browser. The model and its runtime are served from this website — no third party
+is contacted, and no photograph or camera frame is ever uploaded while you are
+trying frames on.</p>
+
+@if (storesSnapshots)
+{
+    <p>This shop is currently set to <strong>keep</strong> try-on snapshots you
+    explicitly choose to save, so an optician can refer to them. You can still
+    download an image without saving it to your file.</p>
+}
+else
+{
+    <p>This shop is currently set <strong>not to keep</strong> try-on images at
+    all. The save option is switched off and the server refuses such uploads
+    outright. You can still download your own picture.</p>
+}
+
+<h2>Your patient file</h2>
+<p>Ordering prescription lenses creates a patient file with a reference number.
+We need it to make your lenses, to remake them if something is wrong, and to
+answer questions about a past order. Guests get one too, for the same reasons.</p>
+
+<h2>Prescriptions are never overwritten</h2>
+<p>When you give us a new prescription we store it as a new version. The old one
+stays on file, and every order keeps its own copy of the prescription it was
+dispensed against, so an invoice from years ago still reads correctly.</p>
+
+<h2>Who can see it</h2>
+<p>Our staff and opticians can see your file in order to dispense and follow up
+your order. Every change to a patient record, a price or an order is recorded
+with who made it and when. Clinical values are deliberately kept out of that
+record, because it is read more widely than the file it describes.</p>
+
+<h2>Correcting or deleting your data</h2>
+<p>You can ask us to correct anything in your file, or to erase it. Email
+<a href="mailto:@email">@email</a> and we will confirm what we hold, action the
+request, and tell you what we are legally required to keep — dispensing records
+generally must be retained for a period even after a request to erase.</p>
+</article>

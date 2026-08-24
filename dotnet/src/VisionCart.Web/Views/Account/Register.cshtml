@@ -1,0 +1,23 @@
+@model VisionCart.Web.Controllers.RegisterInput
+@{ ViewData["Title"] = "Create an account"; }
+<div style="max-width:420px;margin:40px auto;">
+    <h1>Create an account</h1>
+    <p class="muted small">An account keeps your prescription on file, so a repeat pair takes a minute.</p>
+    <div asp-validation-summary="All" class="alert alert-error" role="alert"></div>
+    <form method="post">
+        <input type="hidden" asp-for="ReturnUrl" />
+        <label asp-for="Name" class="small muted">Your name</label>
+        <input class="field" asp-for="Name" autocomplete="name" autofocus />
+        <label asp-for="Email" class="small muted" style="margin-top:12px;display:block;">Email</label>
+        <input class="field" asp-for="Email" type="email" autocomplete="username" />
+        <label asp-for="Phone" class="small muted" style="margin-top:12px;display:block;">Phone (optional)</label>
+        <input class="field" asp-for="Phone" type="tel" autocomplete="tel" />
+        <label asp-for="Password" class="small muted" style="margin-top:12px;display:block;">Password</label>
+        <input class="field" asp-for="Password" type="password" autocomplete="new-password" />
+        <p class="small muted">At least 8 characters, with a digit and a lower-case letter.</p>
+        <label asp-for="ConfirmPassword" class="small muted" style="margin-top:12px;display:block;">Confirm password</label>
+        <input class="field" asp-for="ConfirmPassword" type="password" autocomplete="new-password" />
+        <button class="btn btn-primary btn-block" style="margin-top:16px;" type="submit">Create account</button>
+    </form>
+    <p class="small muted" style="margin-top:16px;">Already have one? <a asp-action="Login" asp-route-next="@Model.ReturnUrl">Sign in</a>.</p>
+</div>

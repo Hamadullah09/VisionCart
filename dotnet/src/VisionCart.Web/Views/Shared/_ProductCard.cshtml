@@ -1,0 +1,43 @@
+@using Microsoft.Extensions.Options
+@model FrameCard
+@inject IOptions<StoreOptions> Store
+@{
+    var store = Store.Value;
+    var lead = Model.Variants.FirstOrDefault();
+    var price = Model.LowestPriceMinor;
+}
+<a class="card product-card" asp-controller="Frames" asp-action="Detail" asp-route-slug="@Model.Slug">
+    <div class="shot">
+        @if (Model.IsOnSale)
+        {
+            <span class="tag">Sale</span>
+        }
+        @if (lead?.ImageUrl is { } url)
+        {
+            <img src="@url" alt="@Model.Name in @lead.ColorName" loading="lazy" />
+        }
+    </div>
+    <div class="body">
+        @if (Model.BrandName is { } brand)
+        {
+            <p class="brand-name">@brand</p>
+        }
+        <h3>@Model.Name</h3>
+        <p class="small muted" style="margin:0 0 6px;">
+            @Humanise.Value(Model.Shape) · @Humanise.Value(Model.Material)
+        </p>
+        <div class="swatches">
+            @foreach (var v in Model.Variants.Take(6))
+            {
+                <span class="swatch" style="background:@(v.ColorHex ?? "#ccc")" title="@v.ColorName"></span>
+            }
+        </div>
+        <p class="price">
+            @Money.Format(price, store.Currency, store.CurrencySymbol)
+            @if (Model.CompareAtMinor is { } was && was > price)
+            {
+                <span class="was">@Money.Format(was, store.Currency, store.CurrencySymbol)</span>
+            }
+        </p>
+    </div>
+</a>

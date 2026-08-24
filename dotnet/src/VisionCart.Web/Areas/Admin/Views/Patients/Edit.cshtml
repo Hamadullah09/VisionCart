@@ -1,0 +1,61 @@
+@model PatientEditViewModel
+@{ ViewData["Title"] = "New patient"; }
+
+<p class="small"><a asp-action="Index">← Patients</a></p>
+<h1>New patient file</h1>
+<p class="muted">A file number is allocated automatically.</p>
+
+<div asp-validation-summary="All" class="alert alert-error" role="alert"></div>
+
+<div class="panel" style="max-width:760px;">
+    <form method="post" asp-action="Create">
+        <div class="form-grid">
+            <div>
+                <label for="FirstName">First name</label>
+                <input class="field" id="FirstName" name="FirstName" value="@Model.Details.FirstName" required autofocus />
+            </div>
+            <div>
+                <label for="LastName">Last name</label>
+                <input class="field" id="LastName" name="LastName" value="@Model.Details.LastName" />
+            </div>
+            <div>
+                <label for="Email">Email</label>
+                <input class="field" id="Email" name="Email" type="email" value="@Model.Details.Email" />
+            </div>
+            <div>
+                <label for="Phone">Phone</label>
+                <input class="field" id="Phone" name="Phone" value="@Model.Details.Phone" />
+            </div>
+            <div>
+                <label for="DateOfBirth">Date of birth</label>
+                <input class="field" id="DateOfBirth" name="DateOfBirth" type="date" />
+            </div>
+            <div>
+                <label for="Gender">Gender</label>
+                <select id="Gender" name="Gender">
+                    <option value="">Prefer not to say</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label for="PdMm">Distance PD (mm)</label>
+                <input class="field" id="PdMm" name="PdMm" inputmode="decimal" />
+            </div>
+            <div>
+                <label for="PdNearMm">Near PD (mm)</label>
+                <input class="field" id="PdNearMm" name="PdNearMm" inputmode="decimal" />
+            </div>
+            <div class="full">
+                <label for="Notes">Clinical notes</label>
+                <textarea class="field" id="Notes" name="Notes" rows="3"></textarea>
+            </div>
+            <label class="checkline full">
+                <input type="checkbox" name="ConsentMarketing" value="true" />
+                <span>Consented to marketing contact</span>
+            </label>
+        </div>
+        <button class="btn btn-primary" style="margin-top:14px;" type="submit">Create file</button>
+    </form>
+</div>

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VisionCart.Application/VisionCart.Application.csproj" />
+    <Project Path="src/VisionCart.Domain/VisionCart.Domain.csproj" />
+    <Project Path="src/VisionCart.Infrastructure/VisionCart.Infrastructure.csproj" />
+    <Project Path="src/VisionCart.Web/VisionCart.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VisionCart.IntegrationTests/VisionCart.IntegrationTests.csproj" />
+    <Project Path="tests/VisionCart.UnitTests/VisionCart.UnitTests.csproj" />
+  </Folder>
+</Solution>

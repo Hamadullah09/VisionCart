@@ -1,0 +1,107 @@
+@using Microsoft.Extensions.Options
+@model OrderListViewModel
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Orders";
+    var store = Store.Value;
+    string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+    var f = Model.Filters;
+}
+
+<h1>Orders</h1>
+<p class="muted">@Model.Results.Total shown · @M(Model.PaidTotalMinor) paid</p>
+
+<form method="get" class="filter-bar">
+    <div>
+        <label for="q">Search</label>
+        <input class="field" type="text" id="q" name="q" value="@f.Q" placeholder="Order no, email or phone" />
+    </div>
+    <div>
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">Any status</option>
+            @foreach (var s in OrderStatuses.All)
+            {
+                <option value="@s" selected="@(f.Status == s)">@Humanise.Value(s)</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label for="paymentStatus">Payment</label>
+        <select id="paymentStatus" name="paymentStatus">
+            <option value="">Any payment</option>
+            @foreach (var s in PaymentStatuses.All)
+            {
+                <option value="@s" selected="@(f.PaymentStatus == s)">@Humanise.Value(s)</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label for="labStatus">Lab stage</label>
+        <select id="labStatus" name="labStatus">
+            <option value="">Any stage</option>
+            @foreach (var s in LabStatuses.All)
+            {
+                <option value="@s" selected="@(f.LabStatus == s)">@Humanise.Value(s)</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+    <a class="btn btn-outline" asp-action="Index">Clear</a>
+</form>
+
+@if (Model.Results.Items.Count == 0)
+{
+    <p class="alert alert-info">No orders match those filters.</p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Order</th><th>Placed</th><th>Customer</th><th>Items</th>
+                    <th class="num">Total</th><th>Payment</th><th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var o in Model.Results.Items)
+            {
+                <tr>
+                    <td><code>@o.OrderNo</code></td>
+                    <td class="small">@o.PlacedAt.ToString("dd/MM/yyyy")<br /><span class="muted">@o.PlacedAt.ToString("HH:mm")</span></td>
+                    <td class="small">
+                        @(o.PatientName ?? o.Email)
+                        @if (o.FileNo is not null)
+                        {
+                            <br /><code class="muted">@o.FileNo</code>
+                        }
+                    </td>
+                    <td class="small muted">@o.Items</td>
+                    <td class="num">@M(o.TotalMinor)</td>
+                    <td><span class="chip @(o.PaymentStatus == PaymentStatuses.Paid ? "chip-paid" : "chip-pending")">@Humanise.Value(o.PaymentStatus)</span></td>
+                    <td><span class="chip">@Humanise.Value(o.Status)</span></td>
+                    <td><a asp-action="Detail" asp-route-id="@o.Id">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Results.Pages > 1)
+    {
+        <nav class="pager">
+            @if (Model.Results.HasPrevious)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, status = f.Status, paymentStatus = f.PaymentStatus, labStatus = f.LabStatus, page = Model.Results.Page - 1 })">← Previous</a>
+            }
+            <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
+            @if (Model.Results.HasNext)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, status = f.Status, paymentStatus = f.PaymentStatus, labStatus = f.LabStatus, page = Model.Results.Page + 1 })">Next →</a>
+            }
+        </nav>
+    }
+}

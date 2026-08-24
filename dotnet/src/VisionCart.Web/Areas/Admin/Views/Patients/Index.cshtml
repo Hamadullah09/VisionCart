@@ -1,0 +1,85 @@
+@model PatientListViewModel
+@{
+    ViewData["Title"] = "Patients";
+    var f = Model.Filters;
+}
+
+<div class="panel-head">
+    <div>
+        <h1>Patients</h1>
+        <p class="muted">@Model.Results.Total file@(Model.Results.Total == 1 ? "" : "s")</p>
+    </div>
+    <a class="btn btn-primary" asp-action="New">New patient</a>
+</div>
+
+<form method="get" class="filter-bar">
+    <div>
+        <label for="q">Search</label>
+        <input class="field" type="text" id="q" name="q" value="@f.Q"
+               placeholder="File no, name, phone or email" style="min-width:260px;" />
+    </div>
+    <label class="checkline" style="margin-bottom:8px;">
+        <input type="checkbox" name="pending" value="true" checked="@f.PendingRxOnly" />
+        <span>Only files with a prescription waiting</span>
+    </label>
+    <button class="btn btn-primary" type="submit">Filter</button>
+    <a class="btn btn-outline" asp-action="Index">Clear</a>
+</form>
+
+@if (Model.Results.Items.Count == 0)
+{
+    <p class="alert alert-info">No patient files match that search.</p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>File</th><th>Name</th><th>Contact</th>
+                    <th class="num">PD</th><th class="num">Orders</th><th>Prescriptions</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var p in Model.Results.Items)
+            {
+                <tr>
+                    <td><code>@p.FileNo</code></td>
+                    <td>@p.Name</td>
+                    <td class="small muted">@p.Email<br />@p.Phone</td>
+                    <td class="num">@(p.PdMm?.ToString("0.#") ?? "—")</td>
+                    <td class="num">@p.Orders</td>
+                    <td>
+                        @if (p.PendingPrescriptions > 0)
+                        {
+                            <span class="chip chip-pending">@p.PendingPrescriptions waiting</span>
+                        }
+                        else
+                        {
+                            <span class="small muted">—</span>
+                        }
+                    </td>
+                    <td><a asp-action="Detail" asp-route-id="@p.Id">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Results.Pages > 1)
+    {
+        <nav class="pager">
+            @if (Model.Results.HasPrevious)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, pending = f.PendingRxOnly, page = Model.Results.Page - 1 })">← Previous</a>
+            }
+            <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
+            @if (Model.Results.HasNext)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, pending = f.PendingRxOnly, page = Model.Results.Page + 1 })">Next →</a>
+            }
+        </nav>
+    }
+}

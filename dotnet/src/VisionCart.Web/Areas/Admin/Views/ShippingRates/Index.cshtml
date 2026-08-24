@@ -1,0 +1,110 @@
+@using Microsoft.Extensions.Options
+@model IReadOnlyList<ShippingRate>
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Delivery rates";
+    var store = Store.Value;
+    string M(int minor) => minor == 0 ? "Free" : Money.Format(minor, store.Currency, store.CurrencySymbol);
+}
+
+<h1>Delivery rates</h1>
+<p class="muted">
+    What checkout quotes when no live carrier is configured — and the fallback when one
+    is configured but unreachable, so a carrier outage never blocks a sale.
+</p>
+
+<div class="admin-table" style="margin-top:16px;">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th><th>Country</th><th>Region</th><th>Applies when</th>
+                <th class="num">Price</th><th>ETA</th><th>Carrier</th><th>Live</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model)
+        {
+            <tr>
+                <td>@r.Name<br /><code class="small muted">@r.Code</code></td>
+                <td>@r.Country</td>
+                <td class="small muted">@(r.Region ?? "—")</td>
+                <td class="small muted">
+                    @M(r.MinSubtotalMinor)+@(r.MaxSubtotalMinor is { } max ? $" to {M(max)}" : "")
+                </td>
+                <td class="num">@M(r.PriceMinor)</td>
+                <td class="small muted">@r.EtaDaysMin–@r.EtaDaysMax days</td>
+                <td class="small">@(r.Carrier?.ToUpperInvariant() ?? "—")</td>
+                <td>
+                    <form method="post" asp-action="Toggle" asp-route-id="@r.Id">
+                        <button class="btn btn-outline btn-small" type="submit">@(r.IsActive ? "Live" : "Paused")</button>
+                    </form>
+                </td>
+                <td><button class="btn btn-outline btn-small" type="button" data-edit-toggle="r-@r.Id">Edit</button></td>
+            </tr>
+            <tr data-edit-panel="r-@r.Id" hidden>
+                <td colspan="9">
+                    <form method="post" asp-action="Save" asp-route-id="@r.Id">
+                        <div class="form-grid three">
+                            <div><label>Name</label><input class="field" name="Name" value="@r.Name" required /></div>
+                            <div><label>Country (2 letters)</label><input class="field" name="Country" value="@r.Country" maxlength="2" required /></div>
+                            <div><label>Region</label><input class="field" name="Region" value="@r.Region" /></div>
+                            <div><label>Price</label><input class="field" name="Price" inputmode="decimal" value="@Money.FromMinor(r.PriceMinor, store.Currency)" /></div>
+                            <div><label>Applies from spend</label><input class="field" name="MinSubtotal" inputmode="decimal" value="@Money.FromMinor(r.MinSubtotalMinor, store.Currency)" /></div>
+                            <div><label>Up to spend</label><input class="field" name="MaxSubtotal" inputmode="decimal" value="@(r.MaxSubtotalMinor is { } m ? Money.FromMinor(m, store.Currency) : null)" /></div>
+                            <div><label>ETA min (days)</label><input class="field" name="EtaDaysMin" type="number" value="@r.EtaDaysMin" /></div>
+                            <div><label>ETA max (days)</label><input class="field" name="EtaDaysMax" type="number" value="@r.EtaDaysMax" /></div>
+                            <div>
+                                <label>Carrier</label>
+                                <select name="Carrier">
+                                    <option value="">—</option>
+                                    @foreach (var c in Carriers.All)
+                                    {
+                                        <option value="@c" selected="@(r.Carrier == c)">@c.ToUpperInvariant()</option>
+                                    }
+                                </select>
+                            </div>
+                            <div><label>Effective from</label><input class="field" name="EffectiveFrom" type="date" value="@r.EffectiveFrom?.ToString("yyyy-MM-dd")" /></div>
+                            <div><label>Effective to</label><input class="field" name="EffectiveTo" type="date" value="@r.EffectiveTo?.ToString("yyyy-MM-dd")" /></div>
+                            <div><label>Sort order</label><input class="field" name="Position" type="number" value="@r.Position" /></div>
+                            <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked="@r.IsActive" /><span>Offered at checkout</span></label>
+                        </div>
+                        <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save rate</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<button class="btn btn-outline" style="margin-top:14px;" type="button" data-edit-toggle="r-new">Add a delivery rate</button>
+<div class="panel" data-edit-panel="r-new" hidden style="margin-top:12px;">
+    <form method="post" asp-action="Save">
+        <div class="form-grid three">
+            <div><label>Name</label><input class="field" name="Name" required placeholder="Standard delivery" /></div>
+            <div><label>Country (2 letters)</label><input class="field" name="Country" value="PK" maxlength="2" required /></div>
+            <div><label>Region</label><input class="field" name="Region" /></div>
+            <div><label>Price</label><input class="field" name="Price" inputmode="decimal" value="0" /></div>
+            <div><label>Applies from spend</label><input class="field" name="MinSubtotal" inputmode="decimal" value="0" /></div>
+            <div><label>Up to spend</label><input class="field" name="MaxSubtotal" inputmode="decimal" /></div>
+            <div><label>ETA min (days)</label><input class="field" name="EtaDaysMin" type="number" value="2" /></div>
+            <div><label>ETA max (days)</label><input class="field" name="EtaDaysMax" type="number" value="5" /></div>
+            <div>
+                <label>Carrier</label>
+                <select name="Carrier">
+                    <option value="">—</option>
+                    @foreach (var c in Carriers.All)
+                    {
+                        <option value="@c">@c.ToUpperInvariant()</option>
+                    }
+                </select>
+            </div>
+            <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked /><span>Offered at checkout</span></label>
+        </div>
+        <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add rate</button>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="~/js/admin.js" asp-append-version="true" defer></script>
+}

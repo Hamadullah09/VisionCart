@@ -1,0 +1,44 @@
+@using Microsoft.Extensions.Options
+@model IReadOnlyList<Order>
+@inject IOptions<StoreOptions> Store
+@{
+    ViewData["Title"] = "Your account";
+    var store = Store.Value;
+}
+<h1>Your account</h1>
+<p class="muted">Signed in as @User.Identity?.Name</p>
+
+<nav class="account-nav">
+    <a class="btn btn-outline btn-small" asp-controller="Addresses" asp-action="Index">Your addresses</a>
+    <a class="btn btn-outline btn-small" asp-controller="Appointments" asp-action="Index">Appointments</a>
+    <a class="btn btn-outline btn-small" asp-controller="Privacy" asp-action="Index">Your data</a>
+</nav>
+
+<h2>Recent orders</h2>
+@if (Model.Count == 0)
+{
+    <p class="alert alert-info">You haven't placed an order yet.</p>
+    <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse frames</a>
+}
+else
+{
+    <table>
+        <thead><tr><th>Order</th><th>Placed</th><th>Status</th><th>Total</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var order in Model)
+        {
+            <tr>
+                <td><code>@order.OrderNo</code></td>
+                <td>@order.PlacedAt.ToString("d MMM yyyy")</td>
+                <td><span class="chip">@Humanise.Value(order.Status)</span></td>
+                <td>@Money.Format(order.TotalMinor, store.Currency, store.CurrencySymbol)</td>
+                <td><a asp-controller="Order" asp-action="Detail" asp-route-orderNo="@order.OrderNo">View</a></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<form method="post" action="/logout" style="margin-top:28px;">
+    <button class="btn btn-outline" type="submit">Sign out</button>
+</form>

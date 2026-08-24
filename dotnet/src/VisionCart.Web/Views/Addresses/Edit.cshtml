@@ -1,0 +1,61 @@
+@model VisionCart.Application.Accounts.AddressInput
+@{
+    var isNew = string.IsNullOrEmpty(Model.Id);
+    ViewData["Title"] = isNew ? "Add an address" : "Edit address";
+}
+
+<h1>@(isNew ? "Add an address" : "Edit address")</h1>
+
+<form method="post" asp-action="Save" class="narrow-form">
+    <div asp-validation-summary="ModelOnly" class="alert alert-error" role="alert"></div>
+    <input type="hidden" asp-for="Id" />
+
+    <div class="form-grid">
+        <div>
+            <label asp-for="Label">Label (optional)</label>
+            <input class="field" asp-for="Label" placeholder="Home, Work…" />
+        </div>
+        <div>
+            <label asp-for="FullName">Full name</label>
+            <input class="field" asp-for="FullName" required />
+            <span asp-validation-for="FullName" class="field-error"></span>
+        </div>
+        <div class="full">
+            <label asp-for="Line1">Address</label>
+            <input class="field" asp-for="Line1" required />
+            <span asp-validation-for="Line1" class="field-error"></span>
+        </div>
+        <div class="full">
+            <label asp-for="Line2">Address line 2 (optional)</label>
+            <input class="field" asp-for="Line2" />
+        </div>
+        <div>
+            <label asp-for="City">City</label>
+            <input class="field" asp-for="City" required />
+            <span asp-validation-for="City" class="field-error"></span>
+        </div>
+        <div>
+            <label asp-for="State">Province / state</label>
+            <input class="field" asp-for="State" />
+        </div>
+        <div>
+            <label asp-for="PostalCode">Postal code</label>
+            <input class="field" asp-for="PostalCode" />
+        </div>
+        <div>
+            <label asp-for="Phone">Phone</label>
+            <input class="field" asp-for="Phone" type="tel" />
+        </div>
+        <div class="full checkline">
+            <input type="checkbox" asp-for="IsDefault" id="IsDefault" />
+            <label for="IsDefault" style="text-transform:none;letter-spacing:0;margin:0;">
+                Use this as my default delivery address
+            </label>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn btn-primary" type="submit">Save address</button>
+        <a class="btn btn-outline" asp-action="Index">Cancel</a>
+    </div>
+</form>

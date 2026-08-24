@@ -1,0 +1,109 @@
+@model AuditViewModel
+@{
+    ViewData["Title"] = "Audit log";
+    var f = Model.Filters;
+}
+
+<h1>Audit log</h1>
+<p class="muted">
+    Every change to a patient record, a price or an order — who did it, when, and from
+    where. @Model.Results.Total entr@(Model.Results.Total == 1 ? "y" : "ies").
+</p>
+
+<p class="alert alert-info">
+    Clinical values are deliberately kept out of these entries. The log is read far more
+    widely than the records it describes, so a prescription never appears here — open the
+    patient file to read one.
+</p>
+
+<form method="get" class="filter-bar">
+    <div>
+        <label for="q">Search</label>
+        <input class="field" type="text" id="q" name="q" value="@f.Q"
+               placeholder="Entity id, actor or IP" style="min-width:220px;" />
+    </div>
+    <div>
+        <label for="action">Action</label>
+        <select id="action" name="action">
+            <option value="">Any action</option>
+            @foreach (var a in Model.Actions)
+            {
+                <option value="@a" selected="@(f.Action == a)">@a</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label for="entity">Entity</label>
+        <select id="entity" name="entity">
+            <option value="">Any entity</option>
+            @foreach (var e in Model.Entities)
+            {
+                <option value="@e" selected="@(f.Entity == e)">@e</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label for="from">From</label>
+        <input class="field" type="date" id="from" name="from" value="@f.From?.ToString("yyyy-MM-dd")" />
+    </div>
+    <div>
+        <label for="to">To</label>
+        <input class="field" type="date" id="to" name="to" value="@f.To?.ToString("yyyy-MM-dd")" />
+    </div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+    <a class="btn btn-outline" asp-action="Index">Clear</a>
+</form>
+
+@if (Model.Results.Items.Count == 0)
+{
+    <p class="alert alert-info">No entries match those filters.</p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+                <tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Detail</th><th>From</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var row in Model.Results.Items)
+            {
+                <tr>
+                    <td class="small" style="white-space:nowrap;">
+                        @row.CreatedAt.ToString("dd/MM/yyyy")<br />
+                        <span class="muted">@row.CreatedAt.ToString("HH:mm:ss")</span>
+                    </td>
+                    <td class="small">@(row.Actor ?? "—")</td>
+                    <td class="small"><code>@row.Action</code></td>
+                    <td class="small">
+                        @row.Entity
+                        @if (row.EntityId is not null)
+                        {
+                            <br /><code class="muted" style="font-size:11px;">@row.EntityId</code>
+                        }
+                    </td>
+                    <td class="audit-detail">@row.Detail</td>
+                    <td class="small muted">@row.Ip</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Results.Pages > 1)
+    {
+        <nav class="pager">
+            @if (Model.Results.HasPrevious)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, action = f.Action, entity = f.Entity, from = f.From?.ToString("yyyy-MM-dd"), to = f.To?.ToString("yyyy-MM-dd"), page = Model.Results.Page - 1 })">← Previous</a>
+            }
+            <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
+            @if (Model.Results.HasNext)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, action = f.Action, entity = f.Entity, from = f.From?.ToString("yyyy-MM-dd"), to = f.To?.ToString("yyyy-MM-dd"), page = Model.Results.Page + 1 })">Next →</a>
+            }
+        </nav>
+    }
+}

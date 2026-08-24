@@ -1,0 +1,194 @@
+@model ImportViewModel
+@{
+    ViewData["Title"] = "Import & export";
+}
+
+<h1>Import &amp; export</h1>
+<p class="muted">
+    Move catalogue and patient data in and out as spreadsheets. Exports are shaped so you
+    can edit them and import the same file straight back.
+</p>
+
+@if (Model.Outcome is { } outcome)
+{
+    <div class="panel" style="border-color:@(outcome.Failed > 0 ? "#ecdcb0" : "#bfe3ce");">
+        <h2 style="margin-top:0;">
+            @(outcome.DryRun ? "Check complete" : "Import complete")
+        </h2>
+        <p>
+            @outcome.Total row@(outcome.Total == 1 ? "" : "s") read ·
+            <strong>@outcome.Ok ok</strong>
+            @if (outcome.Failed > 0)
+            {
+                <text> · <strong>@outcome.Failed failed</strong></text>
+            }
+        </p>
+
+        @if (outcome.DryRun)
+        {
+            <p class="hint" style="margin-top:0;">
+                Nothing has been written. Fix any rows below, then run it for real.
+            </p>
+        }
+
+        @if (outcome.Errors.Count > 0)
+        {
+            <div class="admin-table" style="margin-top:10px;">
+                <table>
+                    <thead><tr><th style="width:100px;">Line</th><th>Problem</th></tr></thead>
+                    <tbody>
+                    @foreach (var error in outcome.Errors)
+                    {
+                        <tr>
+                            <td><code>@error.Row</code></td>
+                            <td class="small">@error.Message</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            @if (outcome.Failed > outcome.Errors.Count)
+            {
+                <p class="hint">
+                    Showing the first @outcome.Errors.Count of @outcome.Failed problems.
+                </p>
+            }
+        }
+    </div>
+}
+
+<div class="admin-two-col">
+    <div>
+        <div class="panel">
+            <h2 style="margin-top:0;">Import</h2>
+            <p class="hint" style="margin-top:0;">
+                The check always runs first. Nothing is written until you press
+                <em>Import for real</em>, and the check lists bad rows by the line number
+                you'll see in your spreadsheet.
+            </p>
+
+            <form method="post" asp-action="Run" enctype="multipart/form-data">
+                <div class="form-grid">
+                    <div>
+                        <label for="kind">What are you importing?</label>
+                        <select id="kind" name="kind">
+                            @foreach (var (key, label) in Model.Kinds)
+                            {
+                                <option value="@key">@label</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label for="file">CSV file</label>
+                        <input class="field" id="file" name="file" type="file" accept=".csv,text/csv" required />
+                        <p class="hint">Up to 5 MB.</p>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button class="btn btn-primary" type="submit" name="dryRun" value="true">Check the file</button>
+                    <button class="btn btn-outline" type="submit" name="dryRun" value="false">Import for real</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2 style="margin-top:0;">Columns</h2>
+
+            <h3 style="font-size:15px;">Frames &amp; stock</h3>
+            <dl class="column-help">
+                <dt>variant_sku</dt><dd>required — unique per colourway, and the key we match on</dd>
+                <dt>frame_name</dt><dd>required</dd>
+                <dt>price</dt><dd>required — in major units, e.g. 8500</dd>
+                <dt>frame_sku</dt><dd>groups colourways of the same model together</dd>
+                <dt>brand</dt><dd>created if it doesn't exist yet</dd>
+                <dt>color_name / color_hex</dt><dd>the colourway and its swatch</dd>
+                <dt>stock_qty</dt><dd>whole number</dd>
+                <dt>shape / material / rim_type / gender</dt><dd>see the frame form for valid values</dd>
+                <dt>lens_width_mm / bridge_width_mm / temple_length_mm / total_width_mm</dt><dd>sizing</dd>
+                <dt>compare_at / cost</dt><dd>was-price and internal cost</dd>
+                <dt>status</dt><dd>draft, active or archived</dd>
+                <dt>try_on_image</dt><dd>URL of a transparent PNG, if you already host one</dd>
+            </dl>
+
+            <h3 style="font-size:15px;">Patients &amp; prescriptions</h3>
+            <dl class="column-help">
+                <dt>first_name</dt><dd>required</dd>
+                <dt>file_no</dt><dd>match an existing file; blank creates a new one</dd>
+                <dt>last_name / email / phone</dt><dd>contact details</dd>
+                <dt>date_of_birth</dt><dd>YYYY-MM-DD</dd>
+                <dt>pd_mm</dt><dd>distance pupillary distance</dd>
+                <dt>od_sphere / od_cylinder / od_axis / od_add / od_pd</dt><dd>right eye</dd>
+                <dt>os_sphere / os_cylinder / os_axis / os_add / os_pd</dt><dd>left eye</dd>
+                <dt>issued / expires / prescriber</dt><dd>prescription metadata</dd>
+                <dt>marketing_consent</dt><dd>yes or no</dd>
+            </dl>
+            <p class="hint">
+                Diopters must sit on a 0.25 D step and a cylinder must have its axis — the
+                same rules the customer and optician forms enforce. An imported prescription
+                always arrives <em>pending verification</em>; it never goes straight to the lab.
+            </p>
+        </div>
+    </div>
+
+    <div>
+        <div class="panel">
+            <h2 style="margin-top:0;">Export</h2>
+            @foreach (var (key, label, description) in Model.Datasets)
+            {
+                <p style="margin:0 0 12px;">
+                    <a class="btn btn-outline btn-block" asp-action="Export" asp-route-type="@key">@label</a>
+                    <span class="hint">@description</span>
+                </p>
+            }
+            <p class="alert alert-warn" style="margin-top:14px;">
+                Patient and prescription exports contain clinical data. Handle the files
+                accordingly — every download is recorded in the audit log.
+            </p>
+        </div>
+
+        <div class="panel">
+            <h2 style="margin-top:0;">Recent imports</h2>
+            @if (Model.RecentJobs.Count == 0)
+            {
+                <p class="muted small">No imports yet.</p>
+            }
+            else
+            {
+                <div class="admin-table">
+                    <table>
+                        <thead><tr><th>File</th><th>Type</th><th>When</th><th>Rows</th><th>Status</th></tr></thead>
+                        <tbody>
+                        @foreach (var job in Model.RecentJobs)
+                        {
+                            <tr>
+                                <td class="small">@job.Filename</td>
+                                <td class="small muted">
+                                    @Humanise.Value(job.Kind)
+                                    @if (job.IsDryRun)
+                                    {
+                                        <br /><span class="chip">check only</span>
+                                    }
+                                </td>
+                                <td class="small muted">@job.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="small">
+                                    @job.OkRows ok
+                                    @if (job.ErrorRows > 0)
+                                    {
+                                        <text> · @job.ErrorRows failed</text>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="chip @(job.Status == "completed" ? "chip-paid" : "chip-pending")">
+                                        @Humanise.Value(job.Status)
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

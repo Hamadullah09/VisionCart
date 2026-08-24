@@ -1,0 +1,129 @@
+@model MediaViewModel
+@{
+    ViewData["Title"] = "Media";
+    var f = Model.Filters;
+}
+
+<h1>Media library</h1>
+<p class="muted">
+    Drop a whole shoot in at once. Images are auto-rotated from their EXIF orientation,
+    capped at 2000&nbsp;px, converted to WebP and thumbnailed. Try-on overlays stay PNG so
+    they keep their transparency.
+</p>
+
+@if (Model.PendingPurges > 0)
+{
+    <div class="alert alert-warn">
+        @Model.PendingPurges file@(Model.PendingPurges == 1 ? "" : "s") @(Model.PendingPurges == 1 ? "is" : "are")
+        marked deleted but @(Model.PendingPurges == 1 ? "its" : "their") storage object hasn't gone yet.
+        The sweep retries hourly.
+        <form method="post" asp-action="Purge" style="display:inline;margin-left:8px;">
+            <button class="btn btn-outline btn-small" type="submit">Retry now</button>
+        </form>
+    </div>
+}
+
+@* The token is rendered as a real hidden field, not stuffed into a data-
+   attribute: IHtmlContent.ToString() yields the type name rather than the
+   markup, so an attribute built that way silently carries no token at all and
+   every upload is rejected with a 400. *@
+<div class="panel" data-uploader data-upload-url="@Url.Action("Upload")">
+    @Html.AntiForgeryToken()
+    <div class="dropzone" data-dropzone tabindex="0" role="button"
+         aria-label="Drop product photos here, or click to choose files">
+        <p style="margin:0;font-weight:600;">Drop product photos here</p>
+        <p class="small muted" style="margin:6px 0 0;">
+            Any number at once. JPG, PNG or WebP up to 15&nbsp;MB each.
+        </p>
+        <p class="small muted" style="margin:6px 0 0;">or click to choose files</p>
+        <input type="file" accept="image/*" multiple hidden data-file-input />
+    </div>
+
+    <div class="form-grid" style="margin-top:14px;">
+        <div>
+            <label for="upload-tags">Tag this batch (optional)</label>
+            <input class="field" id="upload-tags" data-upload-tags
+                   placeholder="e.g. autumn-shoot, acetate" />
+        </div>
+        <label class="checkline" style="align-self:end;padding-bottom:8px;">
+            <input type="checkbox" data-keep-alpha />
+            <span>Keep transparency (for try-on overlays)</span>
+        </label>
+    </div>
+
+    <ul class="upload-list" data-upload-list hidden></ul>
+</div>
+
+<form method="get" class="filter-bar">
+    <div>
+        <label for="q">Search</label>
+        <input class="field" type="text" id="q" name="q" value="@f.Q" placeholder="Filename or tag" />
+    </div>
+    <div>
+        <label for="tag">Tag</label>
+        <select id="tag" name="tag">
+            <option value="">Any tag</option>
+            @foreach (var tag in Model.Tags)
+            {
+                <option value="@tag" selected="@(f.Tag == tag)">@tag</option>
+            }
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+    <a class="btn btn-outline" asp-action="Index">Clear</a>
+</form>
+
+<h2>Library (@Model.Results.Total)</h2>
+
+@if (Model.Results.Items.Count == 0)
+{
+    <p class="alert alert-info">Nothing in the library yet.</p>
+}
+else
+{
+    <div class="media-grid">
+        @foreach (var asset in Model.Results.Items)
+        {
+            <figure class="media-tile">
+                <a href="@asset.Url" target="_blank" rel="noreferrer noopener">
+                    <img src="@(asset.ThumbUrl ?? asset.Url)" alt="@asset.Filename" loading="lazy" />
+                </a>
+                <figcaption>
+                    <span class="media-name" title="@asset.Filename">@asset.Filename</span>
+                    <span class="small muted">
+                        @asset.Width&times;@asset.Height ·
+                        @((asset.SizeBytes ?? 0) / 1024) KB
+                    </span>
+                    @if (!string.IsNullOrWhiteSpace(asset.Tags))
+                    {
+                        <span class="small muted">@asset.Tags</span>
+                    }
+                    <form method="post" asp-action="Delete" asp-route-id="@asset.Id">
+                        <button class="btn btn-outline btn-small" type="submit">Delete</button>
+                    </form>
+                </figcaption>
+            </figure>
+        }
+    </div>
+
+    @if (Model.Results.Pages > 1)
+    {
+        <nav class="pager">
+            @if (Model.Results.HasPrevious)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, tag = f.Tag, page = Model.Results.Page - 1 })">← Previous</a>
+            }
+            <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
+            @if (Model.Results.HasNext)
+            {
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = f.Q, tag = f.Tag, page = Model.Results.Page + 1 })">Next →</a>
+            }
+        </nav>
+    }
+}
+
+@section Scripts {
+    <script src="~/js/media-uploader.js" asp-append-version="true" defer></script>
+}

@@ -1,0 +1,1369 @@
+% =====================================================================
+%  VisionCart Optical — User Manual
+%
+%  A guide for the people who USE the shop: customers buying glasses,
+%  staff serving them, and the owner running the business.
+%
+%  This is deliberately not a technical document. Nothing here assumes
+%  any knowledge of computers beyond using a web browser.
+%
+%  Build:  pdflatex USER-MANUAL.tex   (run twice, for the contents page)
+% =====================================================================
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[english]{babel}
+\usepackage{microtype}
+
+\usepackage[
+  a4paper,
+  top=2.6cm, bottom=2.6cm, left=2.7cm, right=2.7cm,
+  headheight=15pt
+]{geometry}
+
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf,skip=6pt]{caption}
+\usepackage{tcolorbox}
+\usepackage{fontawesome5}
+\usepackage[hidelinks]{hyperref}
+
+\tcbuselibrary{skins,breakable}
+
+% ---------------------------------------------------------------------
+%  Colours — taken from the shop's own palette so the manual and the
+%  screens it describes look like they belong together.
+% ---------------------------------------------------------------------
+\definecolor{vcblue}{HTML}{0B5FA5}
+\definecolor{vcdark}{HTML}{121A26}
+\definecolor{vcink}{HTML}{1A2230}
+\definecolor{vcgrey}{HTML}{5B6472}
+\definecolor{vcrule}{HTML}{D9DEE6}
+\definecolor{vcpaper}{HTML}{F4F6FA}
+\definecolor{vcgreen}{HTML}{1B7A47}
+\definecolor{vcamber}{HTML}{8A5A1B}
+\definecolor{vcamberbg}{HTML}{FDF6E3}
+\definecolor{vcgreenbg}{HTML}{E5F4EC}
+\definecolor{vcbluebg}{HTML}{EAF2FA}
+\definecolor{vcred}{HTML}{A32828}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=vcblue,
+  urlcolor=vcblue,
+  pdftitle={VisionCart Optical — User Manual},
+  pdfauthor={VisionCart Optical}
+}
+
+% ---------------------------------------------------------------------
+%  Headings
+% ---------------------------------------------------------------------
+\titleformat{\part}[display]
+  {\normalfont\huge\bfseries\color{vcblue}}
+  {\Large\MakeUppercase{\partname\ \thepart}}{14pt}{\Huge}
+\titleformat{\chapter}[display]
+  {\normalfont\LARGE\bfseries\color{vcink}}
+  {\normalsize\color{vcblue}\MakeUppercase{Chapter \thechapter}}{8pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{-18pt}{26pt}
+
+\titleformat{\section}
+  {\normalfont\large\bfseries\color{vcink}}{\thesection}{0.8em}{}
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries\color{vcink}}{\thesubsection}{0.7em}{}
+
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{1}
+
+% ---------------------------------------------------------------------
+%  Running heads
+% ---------------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{vcrule}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\small\color{vcgrey}VisionCart Optical — User Manual}
+\fancyhead[R]{\small\color{vcgrey}\leftmark}
+\fancyfoot[C]{\small\color{vcgrey}\thepage}
+
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}\fancyfoot[C]{\small\color{vcgrey}\thepage}}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+
+% ---------------------------------------------------------------------
+%  Callout boxes
+% ---------------------------------------------------------------------
+\newtcolorbox{tipbox}[1][]{
+  breakable, enhanced, colback=vcbluebg, colframe=vcblue,
+  boxrule=0pt, leftrule=2.5pt, arc=1pt, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  fonttitle=\bfseries\small, coltitle=white, title={\faLightbulb\ \ Tip}, #1}
+
+\newtcolorbox{warnbox}[1][]{
+  breakable, enhanced, colback=vcamberbg, colframe=vcamber,
+  boxrule=0pt, leftrule=2.5pt, arc=1pt, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  fonttitle=\bfseries\small, coltitle=white, title={\faExclamationTriangle\ \ Take care}, #1}
+
+\newtcolorbox{notebox}[1][]{
+  breakable, enhanced, colback=vcgreenbg, colframe=vcgreen,
+  boxrule=0pt, leftrule=2.5pt, arc=1pt, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  fonttitle=\bfseries\small, coltitle=white, title={\faInfoCircle\ \ Good to know}, #1}
+
+% ---------------------------------------------------------------------
+%  Shorthands
+% ---------------------------------------------------------------------
+\newcommand{\shot}[3]{%
+  \begin{figure}[H]
+    \centering
+    \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.6pt}%
+    {\color{vcrule}\fbox{\includegraphics[width=#2\linewidth]{dotnet/docs/screenshots/#1}}}
+    \caption{#3}
+  \end{figure}}
+
+\newcommand{\btn}[1]{\textbf{#1}}
+\newcommand{\menu}[1]{\textsf{\textbf{#1}}}
+\newcommand{\field}[1]{\textsf{#1}}
+
+\setlist[itemize]{leftmargin=1.3em, itemsep=3pt, topsep=5pt}
+\setlist[enumerate]{leftmargin=1.5em, itemsep=5pt, topsep=5pt}
+
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+\linespread{1.06}
+
+% =====================================================================
+\begin{document}
+
+% ---------------------------------------------------------------------
+%  Title page
+% ---------------------------------------------------------------------
+\begin{titlepage}
+\centering
+\vspace*{2.2cm}
+
+{\color{vcblue}\Large\bfseries VISIONCART OPTICAL}\\[2.2cm]
+
+{\Huge\bfseries User Manual}\\[10pt]
+{\LARGE\color{vcgrey} How to use the shop}\\[2.6cm]
+
+\begin{minipage}{0.78\textwidth}
+\centering\large\color{vcgrey}
+A plain-English guide for customers buying glasses, for the staff who
+serve them, and for the owner running the business.\\[10pt]
+\normalsize No technical knowledge is needed --- if you can use a web
+browser, you can use everything in this book.
+\end{minipage}
+
+\vfill
+
+{\color{vcgrey}\small
+Covers the complete shop: online catalogue, virtual try-on,\\
+prescriptions, appointments, orders and the back office.\\[14pt]
+August 2026}
+
+\vspace{1.4cm}
+\end{titlepage}
+
+% ---------------------------------------------------------------------
+%  How to use this manual
+% ---------------------------------------------------------------------
+\chapter*{Before you start}
+\addcontentsline{toc}{chapter}{Before you start}
+\markboth{Before you start}{}
+
+\section*{Who this manual is for}
+
+This manual is written for three different people, and you only need to
+read your own part.
+
+\begin{longtable}{@{}p{0.28\textwidth}p{0.66\textwidth}@{}}
+\toprule
+\textbf{If you are\ldots} & \textbf{Read\ldots} \\
+\midrule
+\endhead
+A customer buying glasses &
+\textbf{Part I}. How to find frames, try them on with your camera, enter
+your prescription and place an order. \\[6pt]
+Shop staff or an optician &
+\textbf{Part II}. How to handle orders, check prescriptions, run the
+appointment diary and keep the catalogue up to date. \\[6pt]
+The shop owner or manager &
+\textbf{Part III}. Staff accounts, the record of who did what, and the
+handful of things worth checking each week. \\
+\bottomrule
+\end{longtable}
+
+You do not need to read the parts that are not yours.
+
+\section*{How to read the instructions}
+
+Anything you click or type is printed in \btn{bold}. Where a page is
+shown in a picture, the picture appears directly beneath the step that
+mentions it.
+
+Three kinds of note appear throughout:
+
+\begin{tipbox}
+Something that will save you time, or a shortcut worth knowing.
+\end{tipbox}
+
+\begin{warnbox}
+Something that cannot easily be undone, or a mistake that is expensive
+to unpick. Read these before acting.
+\end{warnbox}
+
+\begin{notebox}
+Background --- why the shop behaves the way it does. Useful, but you can
+skip it and still do the job.
+\end{notebox}
+
+\section*{A word about your eyes}
+
+VisionCart is an optical practice, not a fashion shop that happens to
+sell glasses. That difference shows up everywhere in this manual:
+
+\begin{itemize}
+  \item A prescription is a \emph{medical} document. The shop treats it
+        as one --- it is checked by a qualified optician before any
+        lenses are made.
+  \item Your prescription is never edited once it has been used on an
+        order. A change creates a new version, and the old one stays on
+        file exactly as it was.
+  \item Nothing about your eyes ever appears in a web address, so it
+        cannot leak through your browser history or be seen by anyone
+        looking over your shoulder at the address bar.
+\end{itemize}
+
+\begin{warnbox}
+This manual explains how to \emph{use} the shop. It is not medical
+advice. If your vision has changed, book a sight test --- do not simply
+reorder your old prescription.
+\end{warnbox}
+
+\clearpage
+\tableofcontents
+\clearpage
+
+% =====================================================================
+\part{Buying glasses}
+% =====================================================================
+
+\chapter{What VisionCart does}
+
+VisionCart is an online optician. You can browse frames, see how they
+look on your own face using your camera, enter the prescription your
+optician gave you, choose your lenses and have the finished glasses
+delivered.
+
+\shot{01-home}{1.0}{The shop's front page. Everything starts from the
+menu along the top: \menu{All frames}, \menu{Men}, \menu{Women},
+\menu{Kids}, \menu{Virtual try-on} and \menu{Deals}.}
+
+\section{What you can do without an account}
+
+Almost everything. You can browse, use the virtual try-on, and place an
+order as a guest without signing up.
+
+You only need an account if you want to:
+
+\begin{itemize}
+  \item look back at your past orders,
+  \item save delivery addresses so you do not retype them,
+  \item book an appointment at the practice,
+  \item download a copy of everything the shop holds about you.
+\end{itemize}
+
+\begin{notebox}
+Even as a guest, the shop opens a \emph{patient file} for you. That is
+how an optical practice keeps track of your prescriptions so your
+glasses can be remade if they are damaged, and so a follow-up
+appointment has your history. It is a legal requirement, not marketing.
+\end{notebox}
+
+\chapter{Finding frames you like}
+
+Click \menu{All frames} in the menu.
+
+\shot{02-catalogue}{1.0}{The catalogue. Filters run down the left-hand
+side; the frames themselves fill the rest of the page.}
+
+\section{Narrowing things down}
+
+The filters on the left let you narrow the list by:
+
+\begin{itemize}
+  \item \textbf{Shape} --- rectangle, round, oval, aviator, cat-eye and so on.
+  \item \textbf{Material} --- acetate, metal, titanium, and mixtures.
+  \item \textbf{Rim} --- full rim, half rim, or rimless.
+  \item \textbf{Who it is for} --- men's, women's, unisex or children's.
+  \item \textbf{Price}.
+\end{itemize}
+
+You can combine as many filters as you like. To start again, click
+\btn{Clear}.
+
+\begin{tipbox}
+If you already wear glasses you are happy with, look inside one of the
+arms. There is usually a set of numbers like \texttt{52\hspace{1pt}\rule[0.55ex]{5pt}{0.5pt}\hspace{1pt}18 140}. That is the
+lens width, the bridge width and the arm length in millimetres ---
+filter for a similar size and the new pair will fit much like the old
+one.
+\end{tipbox}
+
+\section{Looking at a single frame}
+
+Click any frame to open its own page.
+
+\shot{03-product}{1.0}{A frame's page. The colour swatches change the
+picture; the panel on the right is where you choose lenses and enter
+your prescription.}
+
+Here you can see the different colours it comes in, its measurements,
+and the price. If the frame is available for virtual try-on there is a
+\btn{Try it on} button.
+
+% ---------------------------------------------------------------------
+\chapter{Trying frames on with your camera}
+
+This is the part most people come for. The shop can show you what a
+frame looks like on your own face, in real time.
+
+\shot{04-tryon}{1.0}{The virtual try-on studio.}
+
+\section{How to use it}
+
+\begin{enumerate}
+  \item Click \menu{Virtual try-on} in the top menu.
+  \item Click \btn{Use my camera}. Your browser will ask for permission
+        to use the camera --- click \btn{Allow}. Nothing happens until
+        you do.
+  \item Once your face appears, pick any frame from the strip along the
+        bottom. It will be placed on your face at the right size.
+  \item Turn your head slowly from side to side to see the frame from
+        different angles.
+\end{enumerate}
+
+\begin{notebox}
+\textbf{Your photograph never leaves your computer.} All the work of
+finding your eyes and placing the frame happens inside your own browser.
+No picture of your face is sent to the shop, stored on our servers, or
+seen by anybody --- unless you deliberately press \btn{Save to my file},
+in which case you are choosing to keep it with your order.
+\end{notebox}
+
+\section{If the camera will not start}
+
+\begin{itemize}
+  \item \textbf{You were not asked for permission.} You may have refused
+        it before. Click the small padlock or camera icon in your
+        browser's address bar and allow the camera for this site.
+  \item \textbf{Another program is using the camera.} Close video-call
+        software and try again.
+  \item \textbf{You would rather not use the camera at all.} Use
+        \btn{Upload a photo} instead. A clear, front-facing photo in
+        good light works best.
+\end{itemize}
+
+\section{If the frame sits in the wrong place}
+
+The shop finds your pupils automatically, but strong glare, a hat, or a
+heavy fringe can confuse it. If the frame looks wrong:
+
+\begin{enumerate}
+  \item Click \btn{Adjust eye points}.
+  \item Click once on the centre of your right pupil, then once on your
+        left.
+  \item The frame is repositioned around the two points you marked.
+\end{enumerate}
+
+\section{Your pupillary distance (PD)}
+
+While the try-on is running, the shop measures the distance between the
+centres of your pupils. This is your \textbf{pupillary distance}, usually
+written PD, and it is measured in millimetres --- most adults are
+between 54 and 74.
+
+It matters because your lenses have to be positioned so that the optical
+centre of each lens sits in front of the centre of each pupil. If the PD
+is wrong, strong lenses can cause eye strain or headaches.
+
+\begin{tipbox}
+The shop shows how confident it is in the measurement. If it says the
+reading is uncertain, hold your head straight, look directly at the
+camera, and make sure the room is evenly lit. If your optician has
+already written a PD on your prescription, use theirs --- you can type
+it in by hand.
+\end{tipbox}
+
+% ---------------------------------------------------------------------
+\chapter{Your prescription}
+
+When you buy prescription lenses, you need the prescription your
+optician gave you after your last sight test. It will look something
+like the table below.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+& \textbf{SPH} & \textbf{CYL} & \textbf{AXIS} & \textbf{ADD} & \textbf{PD} \\
+\midrule
+\textbf{Right (OD)} & $-2.25$ & $-0.75$ & 175 & --- & 31.5 \\
+\textbf{Left (OS)}  & $-2.00$ & $-0.50$ & 10  & --- & 31.5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{What the words mean}
+
+\begin{longtable}{@{}p{0.20\textwidth}p{0.74\textwidth}@{}}
+\toprule
+\textbf{Term} & \textbf{In plain English} \\
+\midrule
+\endhead
+\textbf{OD} & Your \emph{right} eye. From the Latin \emph{oculus dexter}. \\[5pt]
+\textbf{OS} & Your \emph{left} eye. From \emph{oculus sinister}. \\[5pt]
+\textbf{SPH} (Sphere) &
+How short-sighted or long-sighted you are. A minus number means you
+cannot see far away clearly; a plus number means you struggle up close.
+The bigger the number, the stronger the lens. \\[5pt]
+\textbf{CYL} (Cylinder) &
+Corrects astigmatism --- an eye shaped slightly more like a rugby ball
+than a football. Many people have none, and the box is simply blank. \\[5pt]
+\textbf{AXIS} &
+Only used when there is a cylinder value. It is an angle between 1 and
+180 that tells the lab which way round to grind the correction. \\[5pt]
+\textbf{ADD} &
+Extra magnifying power for reading. It appears on prescriptions for
+bifocals and varifocals. \\[5pt]
+\textbf{PD} &
+Pupillary distance --- see the previous chapter. \\
+\bottomrule
+\end{longtable}
+
+\shot{08-guide-prescription}{1.0}{The shop's own prescription guide, at
+\menu{Help} $\rightarrow$ \menu{Understanding your prescription}.}
+
+\section{Typing it in}
+
+On the frame's page, choose \btn{Prescription lenses} and the boxes
+appear. Every value is chosen from a drop-down list rather than typed
+freely.
+
+\begin{notebox}
+The drop-downs only offer values that step by 0.25 --- $-2.00$,
+$-2.25$, $-2.50$ and so on. This is not the shop being awkward: real
+prescriptions only ever come in quarter-steps, and a typed value like
+$-2.13$ is one nobody can make. Choosing from a list means a slipped
+finger cannot turn into a ruined pair of glasses.
+\end{notebox}
+
+\begin{warnbox}
+\textbf{Check the right and left columns carefully.} Swapping them is
+the single most common mistake, and the resulting glasses will feel
+wrong in a way that is hard to describe. Read your prescription once
+more before you continue.
+\end{warnbox}
+
+If your prescription has a cylinder value, you must also give the axis.
+The shop will not let you continue without it --- a cylinder with no
+axis cannot be made.
+
+\section{Prescriptions that have run out}
+
+Prescriptions expire, usually after two years. If yours is out of date,
+book a sight test. The shop will accept the order, but an optician will
+check it before anything is made, and they may contact you.
+
+% ---------------------------------------------------------------------
+\chapter{Choosing lenses}
+
+Once your prescription is in, you choose the lenses themselves. There
+are four decisions, and the price updates as you make each one.
+
+\section{Lens type}
+
+\begin{itemize}
+  \item \textbf{Single vision} --- one prescription across the whole
+        lens. The usual choice for distance or reading glasses.
+  \item \textbf{Bifocal} --- distance at the top, reading at the bottom,
+        with a visible line between.
+  \item \textbf{Varifocal} (progressive) --- distance, middle and
+        reading, blending smoothly with no line.
+\end{itemize}
+
+\section{Thickness}
+
+Stronger prescriptions need thicker lenses. A higher \emph{index} makes
+the same prescription thinner and lighter, at a higher price.
+
+\begin{longtable}{@{}p{0.16\textwidth}p{0.78\textwidth}@{}}
+\toprule
+\textbf{Index} & \textbf{Best for} \\
+\midrule
+\endhead
+1.50 & Weak prescriptions, roughly up to $\pm 2.00$. \\
+1.56 & A little thinner; a good general choice. \\
+1.60 & Around $\pm 2.00$ to $\pm 4.00$. Noticeably slimmer. \\
+1.67 & Around $\pm 4.00$ to $\pm 6.00$. \\
+1.74 & Very strong prescriptions. The thinnest available. \\
+\bottomrule
+\end{longtable}
+
+\begin{tipbox}
+If your prescription is stronger than about $\pm 4.00$ and you have
+chosen a large frame, it is worth paying for a higher index. A big lens
+with a strong prescription gets thick at the edges, and it shows.
+\end{tipbox}
+
+\section{Coatings}
+
+\begin{itemize}
+  \item \textbf{Anti-reflective} --- cuts glare from headlights and
+        screens. Recommended for almost everyone.
+  \item \textbf{Scratch-resistant} --- a harder surface.
+  \item \textbf{Blue-light filter} --- reduces blue light from screens.
+  \item \textbf{Photochromic} --- darkens in sunlight, clears indoors.
+\end{itemize}
+
+\section{Tints}
+
+For sunglasses: grey, brown or green, in a choice of strengths.
+
+% ---------------------------------------------------------------------
+\chapter{Placing your order}
+
+\section{The bag}
+
+Click \menu{Bag} in the top right to see what you have chosen.
+
+\shot{05-cart}{1.0}{The bag. Each line shows the frame, the lenses you
+chose and a summary of the prescription attached to it.}
+
+You can change quantities or remove a line here. The prices are worked
+out fresh by the shop every time you open this page.
+
+\section{Discount codes}
+
+If you have a code, type it into the \field{Discount code} box and click
+\btn{Apply}. If it will not work, the shop says exactly why --- expired,
+minimum spend not met, or not valid on those frames --- rather than
+simply refusing.
+
+\section{Checking out}
+
+Click \btn{Checkout} and fill in:
+
+\begin{enumerate}
+  \item \textbf{Your contact details} --- email address and telephone
+        number. The email address is where your confirmation and updates
+        are sent, so check it carefully.
+  \item \textbf{Delivery address.} If you have an account with saved
+        addresses, choose one from the list.
+  \item \textbf{Delivery method} --- the options and costs for your area.
+  \item \textbf{How you would like to pay.}
+\end{enumerate}
+
+\section{Ways to pay}
+
+\begin{itemize}
+  \item \textbf{Cash on delivery} --- pay the courier when the glasses
+        arrive.
+  \item \textbf{Bank transfer} --- the shop's account details are shown
+        after you order. Send your receipt quoting the order number.
+  \item \textbf{Card} --- if the shop has card payments switched on.
+\end{itemize}
+
+\section{What happens next}
+
+You will see a confirmation page with your order number, which looks
+like \texttt{VC-2026-000123}, and receive an email straight away.
+
+Then, behind the scenes:
+
+\begin{enumerate}
+  \item An optician checks your prescription. This is a real person, and
+        it is the step that protects you.
+  \item Once approved, the order goes to the lab and your lenses are
+        made and fitted to your frame.
+  \item The finished glasses are dispatched, and you get an email with
+        tracking details.
+\end{enumerate}
+
+\begin{notebox}
+If the optician finds a problem --- a value that looks unlikely, or a
+prescription that has expired --- they will contact you rather than
+guess. You are told why, and nothing is made until it is sorted out.
+\end{notebox}
+
+% ---------------------------------------------------------------------
+\chapter{Your account}
+
+\shot{10-account}{1.0}{The account page, with recent orders and links to
+everything else.}
+
+\section{Creating one}
+
+Click \menu{Sign in} then \btn{Create one}. You need an email address
+and a password of at least eight characters.
+
+\shot{07-register}{0.92}{Creating an account.}
+
+\section{Your orders}
+
+Your recent orders are listed on the account page. Click any of them to
+see its full detail, including where it has reached.
+
+\section{Your addresses}
+
+\shot{11-addresses}{1.0}{The address book. The address marked
+\emph{Default} is the one checkout offers first.}
+
+Click \btn{Add an address} to save a new one.
+
+\shot{12-address-form}{0.92}{Adding an address.}
+
+\begin{itemize}
+  \item The \field{Label} is just for you --- ``Home'', ``Work'',
+        ``Mum's''.
+  \item Ticking \field{Use this as my default} makes checkout offer it
+        first.
+  \item \btn{Remove} takes an address out of your book. Your past orders
+        keep their own record of where they were delivered, so nothing
+        is lost from your order history.
+\end{itemize}
+
+\section{Changing your password}
+
+Click \menu{Sign in}, then \btn{Forgotten your password?}. You will be
+emailed a link that works once and expires after six hours.
+
+\begin{notebox}
+Changing your password signs you out everywhere else. If you have used a
+shared or public computer, changing your password is the quickest way to
+be certain nobody is still signed in as you.
+\end{notebox}
+
+% ---------------------------------------------------------------------
+\chapter{Booking an appointment}
+
+If the practice offers sight tests and fittings, you can book online.
+
+\shot{13-appointments}{1.0}{Your appointments, with anything upcoming at
+the top.}
+
+\section{Making a booking}
+
+\begin{enumerate}
+  \item From your account, click \menu{Appointments}, then
+        \btn{Book an appointment}.
+  \item Choose a date and what the appointment is for.
+  \item Click any available time.
+\end{enumerate}
+
+\shot{14-book-appointment}{1.0}{Choosing a time. Times already taken are
+shown crossed out rather than hidden, so you can see how busy a day is.}
+
+\section{Types of appointment}
+
+\begin{longtable}{@{}p{0.22\textwidth}p{0.72\textwidth}@{}}
+\toprule
+\textbf{Type} & \textbf{What happens} \\
+\midrule
+\endhead
+Eye test & A full sight test with an optometrist. \\
+Fitting & Adjusting new glasses so they sit correctly. \\
+Collection & Picking up finished glasses. \\
+Adjustment & Straightening or tightening an existing pair. \\
+Follow-up & A check after a change in prescription. \\
+\bottomrule
+\end{longtable}
+
+\section{Opening hours}
+
+The practice is open \textbf{10:00 to 18:00, Monday to Saturday}, and
+closed on Sundays. Appointments can be booked up to 60 days ahead.
+
+\section{Cancelling}
+
+Click \btn{Cancel} beside the appointment. Please give as much notice as
+you can --- the slot goes straight back into the diary for somebody
+else.
+
+% ---------------------------------------------------------------------
+\chapter{Your data and your privacy}
+
+Because VisionCart is an optical practice, it holds health information
+about you. You have rights over that information, and the shop gives you
+buttons rather than a form to fill in.
+
+\shot{15-your-data}{1.0}{Your data, at \menu{Account} $\rightarrow$
+\menu{Your data}.}
+
+\section{Getting a copy of everything}
+
+Click \btn{Download my data (JSON)}. You get a single file containing your
+account details, addresses, orders, prescriptions and appointments.
+
+\section{Asking for a change}
+
+\shot{09-data-request}{0.92}{The request form. You do not need to be
+signed in --- the right to ask does not depend on being able to get into
+your account.}
+
+You can ask the shop to:
+
+\begin{itemize}
+  \item \textbf{Correct} something that is wrong.
+  \item \textbf{Send you a copy} of your data.
+  \item \textbf{Restrict} how your data is used.
+  \item \textbf{Erase} you from the records.
+\end{itemize}
+
+The shop replies within 30 days, and may check who you are first.
+
+\section{What ``erase'' really means}
+
+\begin{warnbox}
+Erasure removes everything that identifies you --- your name, email,
+telephone number, date of birth and addresses.
+
+It does \textbf{not} delete your prescriptions or your past orders.
+A prescription is a medical record and an order is a financial one, and
+both have to be kept for a period the law sets. What is kept can no
+longer be connected to you by name.
+
+Erasure cannot be undone, and it closes your account.
+\end{warnbox}
+
+% =====================================================================
+\part{Running the shop}
+% =====================================================================
+
+\chapter{Signing in to the back office}
+
+The back office is where the shop is run. Everything in Part II happens
+there.
+
+\shot{06-signin}{0.92}{The sign-in page --- the same one customers use.
+What you can see afterwards depends on your account.}
+
+Go to your shop's address followed by \texttt{/admin}, or sign in
+normally and you will be taken there.
+
+\section{The four kinds of account}
+
+\begin{longtable}{@{}p{0.20\textwidth}p{0.74\textwidth}@{}}
+\toprule
+\textbf{Role} & \textbf{Can do} \\
+\midrule
+\endhead
+\textbf{Customer} &
+Shop, manage their own account. No access to the back office at all. \\[5pt]
+\textbf{Staff} &
+Orders, patients, the diary, the catalogue, media, offers, delivery
+charges, import and export, data requests. \\[5pt]
+\textbf{Optician} &
+Everything Staff can do, \emph{plus} approving and rejecting
+prescriptions. \\[5pt]
+\textbf{Administrator} &
+Everything, plus shop settings, the audit trail and erasing customer
+data. \\
+\bottomrule
+\end{longtable}
+
+\begin{notebox}
+If you cannot see a menu item described in this manual, your account
+does not have that role. That is deliberate --- ask an administrator
+rather than sharing somebody else's sign-in.
+\end{notebox}
+
+\begin{warnbox}
+Never share an account. Every change is recorded against whoever was
+signed in, and a shared login makes that record worthless exactly when
+you need it.
+\end{warnbox}
+
+% ---------------------------------------------------------------------
+\chapter{The dashboard}
+
+The dashboard is the first thing you see, and it is designed to answer
+one question: \emph{what needs attention today?}
+
+\shot{20-dashboard}{1.0}{The dashboard. Tiles shaded amber are the ones
+waiting on somebody.}
+
+\section{The tiles}
+
+\begin{longtable}{@{}p{0.30\textwidth}p{0.64\textwidth}@{}}
+\toprule
+\textbf{Tile} & \textbf{Meaning} \\
+\midrule
+\endhead
+Orders today & Orders placed since midnight. \\
+Paid, last 30 days & Money actually received. \\
+\textbf{Awaiting payment} & Orders placed but not yet paid for. \\
+In the lab & Orders with the lens laboratory now. \\
+Patient files & How many people the practice has on record. \\
+Live frames & Frames currently on sale. \\
+\textbf{Prescriptions to check} & Waiting for an optician. \\
+\textbf{Low stock lines} & Colourways nearly sold out. \\
+\bottomrule
+\end{longtable}
+
+The amber tiles are work. The others are information.
+
+\section{Prescriptions waiting for an optician}
+
+Beneath the tiles is the queue of prescriptions waiting to be checked,
+oldest first. This is the most important list in the shop --- nothing
+can be made until an optician has been through it.
+
+% ---------------------------------------------------------------------
+\chapter{Orders, day to day}
+
+\shot{21-orders}{1.0}{The order list. Payment and progress are shown
+separately, because an order can be paid but not yet made, or made but
+not yet paid.}
+
+\section{Finding an order}
+
+Use the search box for an order number, an email address or a telephone
+number. The three drop-downs narrow the list by progress, payment or lab
+stage.
+
+\section{The life of an order}
+
+\begin{longtable}{@{}p{0.20\textwidth}p{0.74\textwidth}@{}}
+\toprule
+\textbf{Stage} & \textbf{Meaning} \\
+\midrule
+\endhead
+Pending & Placed, not yet paid. \\
+Paid & Payment received. \\
+In lab & With the laboratory, being made. \\
+Ready & Made, waiting to be sent or collected. \\
+Shipped & On its way. \\
+Delivered & Complete. \\
+Cancelled & Stopped. Stock goes back on the shelf. \\
+Refunded & Money returned. \\
+\bottomrule
+\end{longtable}
+
+\section{Taking a payment by hand}
+
+For cash on delivery or a bank transfer, open the order and click
+\btn{Mark as paid}, adding a reference such as the transfer number.
+
+\begin{notebox}
+Marking an order paid by hand does exactly what an automatic card
+payment does --- same record, same email to the customer. There is no
+second, weaker path through the shop.
+\end{notebox}
+
+\section{Sending an order out}
+
+Open the order, click \btn{Mark as shipped}, choose the courier and enter the
+tracking number. The customer is emailed automatically.
+
+\section{Cancelling an order}
+
+Click \btn{Cancel} and give a reason.
+
+\begin{warnbox}
+Cancelling returns the frames to stock. If the lenses have already been
+made to a prescription, they cannot be sold to anybody else --- check
+with the lab before cancelling anything that has passed \emph{In lab}.
+\end{warnbox}
+
+% ---------------------------------------------------------------------
+\chapter{Checking prescriptions}
+
+\begin{notebox}
+This chapter is for \textbf{opticians}. Other staff can see
+prescriptions but cannot approve them.
+\end{notebox}
+
+Every prescription typed in by a customer or imported from a spreadsheet
+arrives as \textbf{pending verification}. Nothing is made until an
+optician has looked at it.
+
+\section{Working through the queue}
+
+From the dashboard, click any patient in
+\menu{Prescriptions waiting for an optician}, or go to \menu{Patients}
+and open a file.
+
+Check the values against whatever the customer supplied, then:
+
+\begin{itemize}
+  \item \btn{Verify} --- the order moves on to the lab, and the
+        customer is emailed.
+  \item \btn{Send \& reject} --- give a reason. The customer is emailed the
+        reason, so write it as something they can act on: ``the axis is
+        missing for the right eye'' rather than ``invalid''.
+\end{itemize}
+
+\section{Why a prescription can never be edited}
+
+\begin{warnbox}
+Once a prescription has been used on an order it is locked. If something
+needs to change, you create a \emph{new version}; the old one stays
+exactly as it was.
+
+This is not awkwardness. If a customer ever reports a problem with their
+glasses, the practice must be able to show precisely what was made and
+what it was made from. A record that can be quietly edited afterwards
+proves nothing.
+\end{warnbox}
+
+\section{Changes the shop will not accept}
+
+Two rules are enforced everywhere --- the customer's form, your screen,
+and spreadsheet imports alike:
+
+\begin{itemize}
+  \item Every value must sit on a 0.25 step.
+  \item A cylinder must have an axis.
+\end{itemize}
+
+Both exist because a lab cannot make anything else.
+
+% ---------------------------------------------------------------------
+\chapter{Patient files}
+
+\shot{22-patients}{1.0}{The patient list. Everyone who has ever ordered
+has a file, including guests.}
+
+Each file holds the person's contact details, every prescription they
+have had, their orders, appointments and any documents.
+
+\section{Finding somebody}
+
+Search by name, file number, email or telephone. File numbers look like
+\texttt{P-000042}.
+
+\section{Adding a prescription}
+
+Open the file and click \btn{Add prescription}. This creates a new
+version --- it never overwrites what is there.
+
+\begin{warnbox}
+Patient files contain health information. Do not leave one open on a
+screen the public can see, and never email a screenshot of one.
+\end{warnbox}
+
+% ---------------------------------------------------------------------
+\chapter{The appointment diary}
+
+\shot{23-diary}{1.0}{The diary. Move through the calendar with
+\btn{Earlier}, \btn{Today} and \btn{Later}, and change how many days are
+shown.}
+
+\section{During the day}
+
+Each booking has three buttons:
+
+\begin{itemize}
+  \item \btn{Seen} --- the patient attended.
+  \item \btn{No show} --- they did not.
+  \item \btn{Cancel} --- the slot goes back into the diary.
+\end{itemize}
+
+\section{Booking somebody in over the telephone}
+
+Use the booking form on the diary page: choose the patient, the date and
+time, the type and the length.
+
+The diary will not let you double-book. If two bookings would overlap
+for the same clinician, the second is refused with an explanation.
+
+\begin{tipbox}
+\btn{Seen} only becomes available once the appointment time has passed.
+If you cannot click it, check you are not looking at tomorrow.
+\end{tipbox}
+
+% ---------------------------------------------------------------------
+\chapter{The frame catalogue}
+
+\shot{24-frames}{1.0}{The frame list, with stock levels.}
+
+\section{Adding a frame}
+
+Click \btn{New frame}.
+
+\shot{25-frame-form}{1.0}{The frame form.}
+
+\begin{longtable}{@{}p{0.26\textwidth}p{0.68\textwidth}@{}}
+\toprule
+\textbf{Field} & \textbf{Notes} \\
+\midrule
+\endhead
+Name and SKU & The SKU is your own product code and must be unique. \\
+Brand & Created automatically if it is new. \\
+Price & In rupees, as you would write it on a price list. \\
+Shape, material, rim & Used by the shop's filters. \\
+Measurements & Lens width, bridge and arm length in millimetres. \\
+Status & \emph{Draft} is invisible to customers; \emph{Active} is on
+sale; \emph{Archived} is withdrawn but kept for old orders. \\
+\bottomrule
+\end{longtable}
+
+\section{Colourways}
+
+Each frame can have several colours. Each has its own product code,
+stock level and photographs, so you can sell out of black without
+affecting tortoiseshell.
+
+\begin{notebox}
+Prices are typed the way you would say them --- \texttt{8500} means
+Rs.\,8,500. The shop converts and stores them in a way that cannot drift
+by a rupee no matter how many discounts are applied.
+\end{notebox}
+
+% ---------------------------------------------------------------------
+\chapter{Lens options and prices}
+
+\shot{26-lenses}{1.0}{Lens options, grouped by type, thickness, coating
+and tint.}
+
+Click \btn{Add an option} to create one. Each option has a code, a
+name, a price and a position in its group.
+Turning one off hides it from customers immediately but leaves past
+orders untouched.
+
+% ---------------------------------------------------------------------
+\chapter{Photographs and try-on artwork}
+
+\shot{27-media}{1.0}{The media library.}
+
+\section{Uploading}
+
+Drag a whole shoot onto the drop area, or click to choose files. Each
+photograph is:
+
+\begin{itemize}
+  \item turned the right way up automatically,
+  \item reduced to a sensible size,
+  \item converted to a modern format that loads quickly,
+  \item given a thumbnail.
+\end{itemize}
+
+Files upload one at a time, so a single bad file is reported by name
+while the rest of the shoot goes through.
+
+\section{Try-on artwork}
+
+Artwork for the virtual try-on must be a PNG with a transparent
+background. Tick \field{Keep transparency} before uploading, or the
+frame will appear with a white box around it.
+
+\begin{warnbox}
+An image attached to a colourway cannot be deleted --- the shop refuses,
+rather than leaving a product page with a broken picture. Detach it
+first.
+\end{warnbox}
+
+% ---------------------------------------------------------------------
+\chapter{Offers and discount codes}
+
+\shot{28-promotions}{1.0}{Promotions.}
+
+Click \btn{New deal} to create one.
+
+\section{Kinds of offer}
+
+\begin{itemize}
+  \item \textbf{Percentage off} the basket.
+  \item \textbf{Fixed amount off}.
+  \item \textbf{Free delivery}.
+  \item \textbf{Buy one, get one} --- the cheaper pair is the free one.
+\end{itemize}
+
+\section{The settings that matter}
+
+\begin{longtable}{@{}p{0.26\textwidth}p{0.68\textwidth}@{}}
+\toprule
+\textbf{Setting} & \textbf{What it does} \\
+\midrule
+\endhead
+Code & Leave blank for an offer that applies automatically. \\
+Minimum spend & Below this, the offer does not apply --- and the
+customer is told why. \\
+Maximum discount & Caps how much can come off. \\
+Can be combined & Whether it may stack with other offers. \\
+Priority & Which offer wins when several could apply. \\
+Starts / ends & Leave blank to run indefinitely. \\
+\bottomrule
+\end{longtable}
+
+\begin{warnbox}
+An offer with no minimum spend, no cap and no end date is how shops lose
+money. Set at least an end date.
+\end{warnbox}
+
+% ---------------------------------------------------------------------
+\chapter{Delivery charges}
+
+\shot{29-delivery}{1.0}{Delivery rates.}
+
+Click \btn{Add a delivery rate} to create one. Each rate has a name
+the customer sees, the area it applies to, a price
+and an estimated number of days. Set the price to zero for free
+delivery.
+
+% ---------------------------------------------------------------------
+\chapter{Spreadsheets: importing and exporting}
+
+\shot{30-import-export}{1.0}{Import and export.}
+
+\section{Exporting}
+
+Four exports are available --- frames and stock, patients, prescriptions
+and orders. Each downloads as a spreadsheet file you can open in Excel.
+
+\begin{warnbox}
+Patient and prescription exports contain health information. Every
+download is recorded. Do not email these files or leave them in a
+shared folder.
+\end{warnbox}
+
+\section{Importing}
+
+\begin{enumerate}
+  \item Export the matching file first --- it already has the right
+        columns.
+  \item Edit it in Excel.
+  \item Choose the file, then click \btn{Check the file}.
+  \item Read the report. Nothing has been written yet.
+  \item If it looks right, click \btn{Import for real}.
+\end{enumerate}
+
+\begin{tipbox}
+\btn{Check the file} lists problems by the line number you see in Excel,
+so you can jump straight to the row and fix it.
+\end{tipbox}
+
+\section{How rows are matched}
+
+Frames are matched on the colourway's product code, patients on their
+file number. A row that matches updates the existing record; a row that
+does not creates a new one.
+
+\begin{notebox}
+A bad row does not stop the good ones. If ten rows are fine and one is
+wrong, the ten are imported and the one is reported.
+\end{notebox}
+
+% ---------------------------------------------------------------------
+\chapter{Customer data requests}
+
+\shot{31-data-requests}{1.0}{The data-request queue, oldest first ---
+there is a legal clock running on each one.}
+
+\section{Working through a request}
+
+Open it, confirm who the person is, do what they asked, then set the
+status to \emph{Completed} and write a note saying what you did and how
+you confirmed their identity.
+
+\begin{warnbox}
+\textbf{Erasure is permanent and administrator-only.} It removes
+everything identifying the customer across their file, orders and
+addresses, and closes their account. Prescriptions and order totals are
+kept, but can no longer be traced to a person.
+
+The shop asks you to type \texttt{ERASE} to confirm, and refuses
+entirely while the customer has an order still on its way --- the
+courier needs somewhere to deliver to.
+\end{warnbox}
+
+% =====================================================================
+\part{Looking after the shop}
+% =====================================================================
+
+\chapter{Settings}
+
+\shot{33-settings}{1.0}{Shop settings. Administrators only.}
+
+Here you set the shop's name, currency, tax rate, contact details, which
+payment methods are offered and the text customers see for bank
+transfers.
+
+\begin{warnbox}
+Changing the tax rate affects every new order immediately. It does not
+change orders already placed --- those keep the figures they were sold
+at, which is exactly what an accountant needs.
+\end{warnbox}
+
+% ---------------------------------------------------------------------
+\chapter{The audit trail}
+
+\shot{32-audit}{1.0}{The audit trail. Administrators only.}
+
+Every change to a patient record, a price or an order is recorded: who
+did it, what they did, when, and from which computer.
+
+\section{What it is for}
+
+\begin{itemize}
+  \item Answering ``who changed this price?''
+  \item Showing a regulator that patient records are controlled.
+  \item Investigating a mistake without guesswork.
+\end{itemize}
+
+\begin{notebox}
+The trail deliberately records \emph{that} a prescription was changed,
+never the values themselves. Clinical detail lives on the patient file,
+where access is controlled --- not in a log that staff browse casually.
+\end{notebox}
+
+% ---------------------------------------------------------------------
+\chapter{Everyday care}
+
+A short list of things worth doing regularly.
+
+\section{Each day}
+
+\begin{itemize}
+  \item Clear the \textbf{Prescriptions to check} queue. Nothing gets
+        made until you do.
+  \item Look at \textbf{Awaiting payment} for orders that have stalled.
+  \item Check the diary for tomorrow.
+\end{itemize}
+
+\section{Each week}
+
+\begin{itemize}
+  \item Review \textbf{Low stock lines} and reorder.
+  \item Check the data-request queue --- the legal clock does not stop
+        for a busy week.
+  \item Glance at the audit trail for anything unexpected.
+\end{itemize}
+
+\section{Each month}
+
+\begin{itemize}
+  \item Export your orders for your accountant.
+  \item Review which offers are still running.
+  \item Confirm your backups actually exist.
+\end{itemize}
+
+\begin{warnbox}
+\textbf{A database backup on its own is not a backup.} Your product
+photographs live alongside it, not inside it. Restoring one without the
+other gives you a catalogue of broken pictures. Back up both, and check
+once in a while that you can actually restore them.
+\end{warnbox}
+
+\section{Is the shop healthy?}
+
+Two addresses answer that without needing anyone technical:
+
+\begin{itemize}
+  \item \texttt{/health/live} --- is the shop switched on?
+  \item \texttt{/health/ready} --- can it actually take an order?
+\end{itemize}
+
+The second is the one that matters. A shop can be switched on and still
+be unable to reach its records, and from the outside those look
+identical.
+
+% =====================================================================
+\appendix
+% =====================================================================
+
+\chapter{Glossary}
+
+\begin{longtable}{@{}p{0.26\textwidth}p{0.68\textwidth}@{}}
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+\endhead
+\textbf{ADD} & Extra reading power, on bifocal and varifocal prescriptions. \\
+\textbf{Anti-reflective} & A coating that cuts glare from lights and screens. \\
+\textbf{Astigmatism} & An eye shaped slightly more like a rugby ball than a football. Corrected by the cylinder and axis. \\
+\textbf{Axis} & An angle from 1 to 180 telling the lab which way round to grind a cylinder. \\
+\textbf{Bifocal} & Two prescriptions in one lens with a visible line. \\
+\textbf{Bridge} & The part over your nose. Measured in millimetres. \\
+\textbf{Colourway} & One colour of a frame. Each has its own code, stock and pictures. \\
+\textbf{CYL} & Cylinder. The astigmatism correction. \\
+\textbf{Diopter} & The unit lens strength is measured in. Always in steps of 0.25. \\
+\textbf{Index} & How efficiently a lens bends light. Higher means thinner. \\
+\textbf{OD} & Your right eye. \\
+\textbf{OS} & Your left eye. \\
+\textbf{Patient file} & The practice's record of one person. \\
+\textbf{PD} & Pupillary distance --- between the centres of your pupils, in millimetres. \\
+\textbf{Photochromic} & Lenses that darken in sunlight. \\
+\textbf{Single vision} & One prescription across the whole lens. \\
+\textbf{SKU} & A product code. \\
+\textbf{SPH} & Sphere. How short- or long-sighted you are. \\
+\textbf{Varifocal} & Distance, middle and reading in one lens, with no line. \\
+\bottomrule
+\end{longtable}
+
+% ---------------------------------------------------------------------
+\chapter{If something goes wrong}
+
+\section*{For customers}
+
+\begin{longtable}{@{}p{0.34\textwidth}p{0.60\textwidth}@{}}
+\toprule
+\textbf{Problem} & \textbf{Try this} \\
+\midrule
+\endhead
+The camera will not start &
+Allow camera access from the padlock icon in your browser's address bar,
+and close any video-call software. \\[5pt]
+The frame sits crookedly &
+Click \btn{Adjust eye points} and mark the centre of each pupil. \\[5pt]
+My discount code is refused &
+The shop says why. Usually the code has expired or the basket is below
+the minimum. \\[5pt]
+I cannot enter my prescription &
+Values step by 0.25 and a cylinder needs an axis. Check your
+prescription again. \\[5pt]
+No confirmation email &
+Check your spam folder, then contact the shop with your order number. \\[5pt]
+I have forgotten my password &
+\btn{Forgotten your password?} on the sign-in page. \\
+\bottomrule
+\end{longtable}
+
+\section*{For staff}
+
+\begin{longtable}{@{}p{0.34\textwidth}p{0.60\textwidth}@{}}
+\toprule
+\textbf{Problem} & \textbf{Try this} \\
+\midrule
+\endhead
+A menu item is missing &
+Your account does not have that role. Ask an administrator. \\[5pt]
+``That slot has just been taken'' &
+Somebody booked it while you were typing. Choose another time. \\[5pt]
+An import failed &
+Read the line numbers in the report and fix those rows in Excel. \\[5pt]
+An image will not delete &
+It is attached to a colourway. Detach it first. \\[5pt]
+Lenses cannot be marked ready &
+The prescription has not been approved by an optician yet. \\[5pt]
+Too many sign-in attempts &
+Sign-in is limited to protect accounts. Wait five minutes. \\
+\bottomrule
+\end{longtable}
+
+\vspace{1.4cm}
+\begin{center}
+\color{vcgrey}\small
+\rule{0.35\textwidth}{0.4pt}\\[10pt]
+\emph{VisionCart Optical --- User Manual}\\
+August 2026
+\end{center}
+
+\end{document}
