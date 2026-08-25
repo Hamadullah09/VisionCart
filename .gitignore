@@ -94,3 +94,11 @@ TestResults/
 *.fdb_latexmk
 MANUAL.log
 USER-MANUAL.log
+
+# Generated media. The recordings are ~36 MB of binary that git would keep
+# forever and could never diff, so the tooling is committed instead — one
+# command rebuilds them:
+#   cd dotnet/tools/videoguide && VISIONCART_PASSWORD=... node record.mjs
+/dotnet/docs/videoguide/*.webm
+/dotnet/tools/videoguide/.recordings/
+/dotnet/tools/videoguide/node_modules/

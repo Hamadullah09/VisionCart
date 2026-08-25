@@ -1,0 +1,8 @@
+{
+  "name": "visioncart-videoguide",
+  "private": true,
+  "type": "module",
+  "description": "Records the illustrated user-guide videos. Documentation tooling only — never part of the application or its deployment.",
+  "scripts": { "record": "node record.mjs" },
+  "devDependencies": { "playwright-core": "^1.49.0" }
+}

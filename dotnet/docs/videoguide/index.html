@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VisionCart Video Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:   #F5F3EF;
+    --card:    #FFFFFF;
+    --ink:     #1B2430;
+    --soft:    #5A6675;
+    --faint:   #8B96A3;
+    --rule:    #E2DFD9;
+    --accent:  #0B5FA5;
+    --accent-2:#0E4D3E;
+    --shadow: 0 1px 2px rgba(27,36,48,.05), 0 8px 26px rgba(27,36,48,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161B; --card: #1A2028; --ink: #ECEFF2; --soft: #A7B2BE;
+      --faint: #78848F; --rule: #2A323C; --accent: #5CA8E4; --accent-2: #52C3A2;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.34);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161B; --card: #1A2028; --ink: #ECEFF2; --soft: #A7B2BE;
+    --faint: #78848F; --rule: #2A323C; --accent: #5CA8E4; --accent-2: #52C3A2;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 26px rgba(0,0,0,.34);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 24px 100px;
+    background: var(--paper); color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header { padding: 72px 0 40px; border-bottom: 1px solid var(--rule); margin-bottom: 44px; }
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 16px;
+  }
+  h1 {
+    font-family: Fraunces, Georgia, serif; font-weight: 600;
+    font-size: clamp(34px, 6vw, 50px); line-height: 1.08;
+    letter-spacing: -.015em; margin: 0 0 18px; text-wrap: balance;
+  }
+  .lede { font-size: 19px; color: var(--soft); max-width: 56ch; margin: 0 0 22px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 26px; font-size: 14px; color: var(--faint); }
+  .meta b { color: var(--soft); font-weight: 500; }
+
+  .episode {
+    background: var(--card); border: 1px solid var(--rule);
+    border-radius: 12px; padding: 26px 26px 24px; margin-bottom: 30px;
+    box-shadow: var(--shadow);
+  }
+  .ep-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; flex-wrap: wrap; }
+  .ep-num {
+    font-family: Fraunces, Georgia, serif; font-size: 30px; font-weight: 600;
+    color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .ep-title { font-family: Fraunces, Georgia, serif; font-size: 25px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .ep-for {
+    margin-left: auto; font-size: 11.5px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--accent-2);
+    border: 1px solid currentColor; border-radius: 100px; padding: 3px 11px; white-space: nowrap;
+  }
+  .ep-sub { color: var(--soft); margin: 0 0 18px; max-width: 62ch; }
+
+  video {
+    width: 100%; display: block; border-radius: 8px;
+    background: #0B1A2A; border: 1px solid var(--rule);
+  }
+
+  .ep-foot { display: flex; gap: 10px 22px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+  .runtime { font-size: 13.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .covers { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; }
+  .covers li {
+    font-size: 13px; color: var(--soft); background: var(--paper);
+    border: 1px solid var(--rule); border-radius: 100px; padding: 3px 12px;
+  }
+
+  .note {
+    background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 18px 22px; margin: 40px 0 0; color: var(--soft); font-size: 15px;
+  }
+  .note strong { color: var(--ink); }
+  footer { margin-top: 46px; padding-top: 24px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--faint); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">VisionCart Optical</p>
+    <h1>Video guide</h1>
+    <p class="lede">
+      Eight and a half minutes, in five parts, covering everything the shop
+      does — from a customer buying their first pair to the staff who make
+      them.
+    </p>
+    <div class="meta">
+      <span><b>Runtime</b> 8 min 28 s</span>
+      <span><b>Sound</b> not needed — every step is captioned</span>
+      <span><b>Watch</b> in order, or jump to your part</span>
+    </div>
+  </header>
+
+  <article class="episode">
+    <div class="ep-head">
+      <span class="ep-num">01</span>
+      <h2 class="ep-title">Buying a pair of glasses</h2>
+      <span class="ep-for">For customers</span>
+    </div>
+    <p class="ep-sub">
+      The whole journey: finding frames you like, entering the prescription your
+      optician gave you, choosing lenses, and placing the order.
+    </p>
+    <video controls preload="metadata" src="01-buying-glasses.webm"></video>
+    <div class="ep-foot"><span class="runtime">2 min 02 s</span></div>
+    <ul class="covers">
+      <li>Browsing and filtering</li><li>Reading a frame's page</li>
+      <li>Typing a prescription</li><li>Choosing lenses</li>
+      <li>The bag and discount codes</li><li>Checkout and payment</li>
+    </ul>
+  </article>
+
+  <article class="episode">
+    <div class="ep-head">
+      <span class="ep-num">02</span>
+      <h2 class="ep-title">Trying frames on with your camera</h2>
+      <span class="ep-for">For customers</span>
+    </div>
+    <p class="ep-sub">
+      How the virtual try-on works, what to do when a frame sits crookedly, and
+      why your photograph never leaves your own computer.
+    </p>
+    <video controls preload="metadata" src="02-virtual-try-on.webm"></video>
+    <div class="ep-foot"><span class="runtime">1 min 02 s</span></div>
+    <ul class="covers">
+      <li>Starting the camera</li><li>Uploading a photo instead</li>
+      <li>Adjusting the eye points</li><li>What pupillary distance means</li>
+      <li>Where your photo goes</li>
+    </ul>
+  </article>
+
+  <article class="episode">
+    <div class="ep-head">
+      <span class="ep-num">03</span>
+      <h2 class="ep-title">Your account</h2>
+      <span class="ep-for">For customers</span>
+    </div>
+    <p class="ep-sub">
+      Saved addresses, booking an appointment at the practice, and the controls
+      you have over the data the shop holds about you.
+    </p>
+    <video controls preload="metadata" src="03-your-account.webm"></video>
+    <div class="ep-foot"><span class="runtime">1 min 25 s</span></div>
+    <ul class="covers">
+      <li>Past orders</li><li>The address book</li>
+      <li>Booking an appointment</li><li>Downloading your data</li>
+      <li>Asking for a correction or erasure</li>
+    </ul>
+  </article>
+
+  <article class="episode">
+    <div class="ep-head">
+      <span class="ep-num">04</span>
+      <h2 class="ep-title">Orders and prescriptions</h2>
+      <span class="ep-for">For staff</span>
+    </div>
+    <p class="ep-sub">
+      The back office day to day: reading the dashboard, taking a payment,
+      sending an order out, and the optician's check that sits before the lab.
+    </p>
+    <video controls preload="metadata" src="04-orders-prescriptions.webm"></video>
+    <div class="ep-foot"><span class="runtime">1 min 52 s</span></div>
+    <ul class="covers">
+      <li>Signing in</li><li>What the dashboard is telling you</li>
+      <li>Finding an order</li><li>Marking it paid</li>
+      <li>Dispatching</li><li>Verifying a prescription</li>
+      <li>Patient files</li>
+    </ul>
+  </article>
+
+  <article class="episode">
+    <div class="ep-head">
+      <span class="ep-num">05</span>
+      <h2 class="ep-title">Keeping the shop stocked</h2>
+      <span class="ep-for">For staff &amp; owner</span>
+    </div>
+    <p class="ep-sub">
+      Everything else: the appointment diary, the catalogue, photographs,
+      offers, delivery charges, spreadsheets, data requests and settings.
+    </p>
+    <video controls preload="metadata" src="05-catalogue-and-admin.webm"></video>
+    <div class="ep-foot"><span class="runtime">2 min 07 s</span></div>
+    <ul class="covers">
+      <li>The diary</li><li>Frames and stock</li><li>Lens prices</li>
+      <li>Product photographs</li><li>Offers and codes</li>
+      <li>Delivery charges</li><li>Import and export</li>
+      <li>Data requests</li><li>The audit trail</li><li>Settings</li>
+    </ul>
+  </article>
+
+  <div class="note">
+    <strong>A note on the try-on video.</strong> Part 2 was recorded on a machine
+    with no camera attached, so the preview panel stays dark. On your own
+    computer your face appears there, and the frame is placed on it as you move.
+    Everything else in the recording is the real, working shop.
+  </div>
+
+  <footer>
+    Keep this folder together — the videos sit alongside this page.
+    For step-by-step detail on any screen, see the written
+    <strong>User Manual</strong> (57 pages, illustrated).
+  </footer>
+
+</div>
+</body>
+</html>
