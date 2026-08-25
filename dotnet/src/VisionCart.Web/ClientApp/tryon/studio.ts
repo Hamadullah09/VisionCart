@@ -37,6 +37,13 @@ import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
 const CANVAS_W = 900;
 const CANVAS_H = 675;
 
+/**
+ * Ceiling on backing-store size, in multiples of the logical canvas. 2.5 covers
+ * a full-width stage on a 2x display; beyond that the memory and per-frame cost
+ * buy detail the eye cannot resolve.
+ */
+const MAX_BACKING_SCALE = 2.5;
+
 /** How close a pointer must land to a marker before it grabs it. */
 const GRAB_RADIUS = 60;
 
@@ -73,6 +80,9 @@ type Mode = "upload" | "camera";
 export class TryOnStudio {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
+
+  /** Real pixels per logical unit. 1 means the old fixed 900x675 behaviour. */
+  private backingScale = 1;
   private readonly video: HTMLVideoElement;
 
   private detector: FaceDetector | null = null;
@@ -102,8 +112,16 @@ export class TryOnStudio {
     if (!ctx) throw new Error("This browser cannot draw to a canvas.");
     this.ctx = ctx;
 
-    this.canvas.width = CANVAS_W;
-    this.canvas.height = CANVAS_H;
+    this.resizeBacking();
+
+    // The stage is fluid, so the displayed size changes with the window and
+    // the backing store has to follow it.
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        if (this.resizeBacking()) this.render();
+      });
+      observer.observe(this.canvas);
+    }
 
     this.selectedId = config.initialVariantId ?? config.frames[0]?.variantId ?? "";
 
@@ -259,6 +277,12 @@ export class TryOnStudio {
    */
   private render(): void {
     const ctx = this.ctx;
+
+    // Everything below is written in the 900x675 logical space the geometry
+    // uses. This maps that onto however many real pixels the backing store has.
+    ctx.setTransform(this.backingScale, 0, 0, this.backingScale, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     ctx.fillStyle = "#0b0f14";
@@ -515,6 +539,37 @@ export class TryOnStudio {
             ? "No camera found on this device. Upload a photo instead."
             : "The camera could not be started. Upload a photo instead.");
     }
+  }
+
+  /**
+   * Sizes the canvas to the pixels it is actually displayed on.
+   *
+   * The backing store used to be pinned at 900x675 while the CSS stretched it
+   * to the width of the stage. On any high-density screen that meant a photo
+   * was squeezed into 900 pixels and then blown back up to 1300-odd to be
+   * shown — soft on the way in, softer on the way out.
+   *
+   * Drawing stays in the 900x675 logical space; only the number of real pixels
+   * underneath it changes, so the geometry and the anchor contract are
+   * untouched. Returns true when the size actually changed.
+   */
+  private resizeBacking(): boolean {
+    const displayedWidth = this.canvas.clientWidth || CANVAS_W;
+    const density = window.devicePixelRatio || 1;
+
+    // Capped: a 4K monitor would otherwise ask for a backing store big enough
+    // to stall a phone, for detail nobody can see.
+    const scale = Math.min((displayedWidth * density) / CANVAS_W, MAX_BACKING_SCALE);
+    const width = Math.round(CANVAS_W * scale);
+    const height = Math.round(CANVAS_H * scale);
+
+    if (this.canvas.width === width && this.canvas.height === height) return false;
+
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.backingScale = scale;
+
+    return true;
   }
 
   // --- manual pupil dragging ----------------------------------------------
