@@ -34,8 +34,27 @@ import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
  * browser until the customer presses "Save to my file".
  */
 
-const CANVAS_W = 900;
-const CANVAS_H = 675;
+/**
+ * The long edge of the drawing surface, in logical units.
+ *
+ * The stage takes the shape of whatever it is showing, so the *aspect* varies;
+ * this keeps the amount of detail constant across shapes. A portrait photo used
+ * to be letterboxed into a fixed 4:3 landscape box and ended up occupying barely
+ * half the width — reduced to about 600 real pixels from a 3000-pixel original,
+ * which is what made an uploaded photo look soft and washed out.
+ */
+const LOGICAL_LONG_EDGE = 900;
+
+/** Shown before any media arrives, and the shape the camera usually takes. */
+const DEFAULT_ASPECT = 4 / 3;
+
+/**
+ * How far the stage will stretch to match its media. Beyond these the page
+ * layout suffers more than the picture gains — an 18:9 phone panorama would
+ * otherwise squeeze the frame picker off the screen.
+ */
+const MIN_ASPECT = 0.62;
+const MAX_ASPECT = 1.90;
 
 /**
  * Ceiling on backing-store size, in multiples of the logical canvas. 2.5 covers
@@ -43,6 +62,9 @@ const CANVAS_H = 675;
  * buy detail the eye cannot resolve.
  */
 const MAX_BACKING_SCALE = 2.5;
+
+/** Most of the window a tall portrait may claim, leaving room for the controls. */
+const MAX_STAGE_HEIGHT_FRACTION = 0.72;
 
 /** How close a pointer must land to a marker before it grabs it. */
 const GRAB_RADIUS = 60;
@@ -81,8 +103,12 @@ export class TryOnStudio {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
 
-  /** Real pixels per logical unit. 1 means the old fixed 900x675 behaviour. */
+  /** Real pixels per logical unit. */
   private backingScale = 1;
+
+  /** The logical drawing surface. Reshaped to match the photo or camera feed. */
+  private logicalW = LOGICAL_LONG_EDGE;
+  private logicalH = Math.round(LOGICAL_LONG_EDGE / DEFAULT_ASPECT);
   private readonly video: HTMLVideoElement;
 
   private detector: FaceDetector | null = null;
@@ -120,7 +146,8 @@ export class TryOnStudio {
       const observer = new ResizeObserver(() => {
         if (this.resizeBacking()) this.render();
       });
-      observer.observe(this.canvas);
+      // The stage, not the canvas — observing the element we resize would loop.
+      observer.observe(this.canvas.parentElement ?? this.canvas);
     }
 
     this.selectedId = config.initialVariantId ?? config.frames[0]?.variantId ?? "";
@@ -284,24 +311,24 @@ export class TryOnStudio {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.clearRect(0, 0, this.logicalW, this.logicalH);
     ctx.fillStyle = "#0b0f14";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillRect(0, 0, this.logicalW, this.logicalH);
 
     // 1. The person
     let drew = false;
 
     if (this.mode === "camera" && this.video.readyState >= 2) {
-      const box = fitCover(this.video.videoWidth, this.video.videoHeight, CANVAS_W, CANVAS_H);
+      const box = fitCover(this.video.videoWidth, this.video.videoHeight, this.logicalW, this.logicalH);
       ctx.save();
       // Mirror, so it behaves like a real mirror rather than a video call.
-      ctx.translate(CANVAS_W, 0);
+      ctx.translate(this.logicalW, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(this.video, CANVAS_W - box.x - box.width, box.y, box.width, box.height);
+      ctx.drawImage(this.video, this.logicalW - box.x - box.width, box.y, box.width, box.height);
       ctx.restore();
       drew = true;
     } else if (this.photo) {
-      const box = fitContain(this.photo.naturalWidth, this.photo.naturalHeight, CANVAS_W, CANVAS_H);
+      const box = fitContain(this.photo.naturalWidth, this.photo.naturalHeight, this.logicalW, this.logicalH);
       ctx.drawImage(this.photo, box.x, box.y, box.width, box.height);
       drew = true;
     }
@@ -310,7 +337,7 @@ export class TryOnStudio {
       ctx.fillStyle = "#5b6b7d";
       ctx.font = "500 22px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Upload a photo or start the camera", CANVAS_W / 2, CANVAS_H / 2);
+      ctx.fillText("Upload a photo or start the camera", this.logicalW / 2, this.logicalH / 2);
       return;
     }
 
@@ -408,7 +435,8 @@ export class TryOnStudio {
       this.mode = "upload";
       this.stopCamera();
 
-      const box = fitContain(image.naturalWidth, image.naturalHeight, CANVAS_W, CANVAS_H);
+      this.adoptAspect(image.naturalWidth, image.naturalHeight);
+      const box = fitContain(image.naturalWidth, image.naturalHeight, this.logicalW, this.logicalH);
       let found = false;
 
       if (this.detector?.status === "ready") {
@@ -484,6 +512,11 @@ export class TryOnStudio {
       this.photo = null;
       this.hasPhoto = false;
       this.mode = "camera";
+
+      // A webcam is usually 16:9 while the default stage is 4:3, so without
+      // this the feed is cropped on both sides before anyone sees it.
+      this.adoptAspect(this.video.videoWidth, this.video.videoHeight);
+
       this.adjust = { ...NO_ADJUSTMENT };
       this.syncSliders();
       this.syncChrome();
@@ -502,12 +535,12 @@ export class TryOnStudio {
               const landmarks = this.detector.detectVideo(this.video, timestamp);
               if (landmarks) {
                 const box = fitCover(
-                  this.video.videoWidth, this.video.videoHeight, CANVAS_W, CANVAS_H);
+                  this.video.videoWidth, this.video.videoHeight, this.logicalW, this.logicalH);
                 const measured = measureFace(landmarks, box.width, box.height);
                 if (measured) {
                   // The canvas shows a mirrored image, so mirror the points too.
                   const toCanvas = (p: Point): Point => ({
-                    x: CANVAS_W - (p.x + box.x),
+                    x: this.logicalW - (p.x + box.x),
                     y: p.y + box.y,
                   });
                   this.pupils = {
@@ -542,6 +575,34 @@ export class TryOnStudio {
   }
 
   /**
+   * Reshapes the stage to match what it is about to show.
+   *
+   * A portrait photo in a landscape box is mostly black bars, and the picture
+   * itself lands on barely half the available pixels. Taking the media's own
+   * shape means the photo fills the frame, so every pixel of the stage is
+   * carrying picture.
+   *
+   * The geometry is unaffected: pupils, anchors and the frame overlay are all
+   * solved in these same logical units, so they scale with the surface rather
+   * than against it.
+   */
+  private adoptAspect(mediaWidth: number, mediaHeight: number): void {
+    if (!mediaWidth || !mediaHeight) return;
+
+    const aspect = Math.min(MAX_ASPECT, Math.max(MIN_ASPECT, mediaWidth / mediaHeight));
+
+    const width = aspect >= 1 ? LOGICAL_LONG_EDGE : Math.round(LOGICAL_LONG_EDGE * aspect);
+    const height = aspect >= 1 ? Math.round(LOGICAL_LONG_EDGE / aspect) : LOGICAL_LONG_EDGE;
+
+    if (width === this.logicalW && height === this.logicalH) return;
+
+    this.logicalW = width;
+    this.logicalH = height;
+
+    this.resizeBacking();
+  }
+
+  /**
    * Sizes the canvas to the pixels it is actually displayed on.
    *
    * The backing store used to be pinned at 900x675 while the CSS stretched it
@@ -554,14 +615,33 @@ export class TryOnStudio {
    * untouched. Returns true when the size actually changed.
    */
   private resizeBacking(): boolean {
-    const displayedWidth = this.canvas.clientWidth || CANVAS_W;
+    const stage = this.canvas.parentElement;
+    const available = (stage?.clientWidth || this.canvas.clientWidth || this.logicalW);
+    const ceiling = window.innerHeight * MAX_STAGE_HEIGHT_FRACTION;
+
+    // Fit the logical shape inside the space available, honouring both limits.
+    // Doing this in script rather than in CSS is deliberate: `width: 100%` with
+    // a `max-height` does not narrow the element, it squashes what is drawn in
+    // it — which stretched every face sideways on a tall portrait photo.
+    const aspect = this.logicalW / this.logicalH;
+    let cssWidth = available;
+    let cssHeight = cssWidth / aspect;
+
+    if (cssHeight > ceiling) {
+      cssHeight = ceiling;
+      cssWidth = cssHeight * aspect;
+    }
+
+    this.canvas.style.width = `${Math.round(cssWidth)}px`;
+    this.canvas.style.height = `${Math.round(cssHeight)}px`;
+
     const density = window.devicePixelRatio || 1;
 
     // Capped: a 4K monitor would otherwise ask for a backing store big enough
     // to stall a phone, for detail nobody can see.
-    const scale = Math.min((displayedWidth * density) / CANVAS_W, MAX_BACKING_SCALE);
-    const width = Math.round(CANVAS_W * scale);
-    const height = Math.round(CANVAS_H * scale);
+    const scale = Math.min((cssWidth * density) / this.logicalW, MAX_BACKING_SCALE);
+    const width = Math.round(this.logicalW * scale);
+    const height = Math.round(this.logicalH * scale);
 
     if (this.canvas.width === width && this.canvas.height === height) return false;
 
@@ -577,8 +657,8 @@ export class TryOnStudio {
   private canvasPoint(event: PointerEvent): Point {
     const rect = this.canvas.getBoundingClientRect();
     return {
-      x: ((event.clientX - rect.left) / rect.width) * CANVAS_W,
-      y: ((event.clientY - rect.top) / rect.height) * CANVAS_H,
+      x: ((event.clientX - rect.left) / rect.width) * this.logicalW,
+      y: ((event.clientY - rect.top) / rect.height) * this.logicalH,
     };
   }
 

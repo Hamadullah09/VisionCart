@@ -208,7 +208,10 @@ th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: v
     background: #0b0f14;
     border: 1px solid #1e293b;
 }
-.tryon-stage canvas { display: block; width: 100%; aspect-ratio: 900 / 675; }
+/* The canvas sizes itself: the studio sets width and height in pixels so the
+   photo's shape is preserved exactly. Doing it in CSS with width:100% plus a
+   max-height squashes the drawing instead of narrowing the element. */
+.tryon-stage canvas { display: block; margin: 0 auto; }
 .tryon-stage canvas.is-manual { cursor: grab; touch-action: none; }
 .tryon-stage canvas.is-manual:active { cursor: grabbing; }
 .tryon-stage video { display: none; }
