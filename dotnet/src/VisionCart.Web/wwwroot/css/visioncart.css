@@ -21,6 +21,18 @@
     --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
 }
 
+/* The `hidden` attribute gets its display:none from the browser's own
+   stylesheet, which ANY author rule outranks. Twelve classes here set a
+   display, so `element.hidden = true` silently did nothing to them — most
+   visibly the try-on's busy overlay, which stayed permanently over the canvas
+   washing the photo out by 62% and blurring it, and looked for all the world
+   like a bad image rather than a stuck panel.
+
+   !important is the right tool here: this has to beat every author rule,
+   present and future. */
+[hidden] { display: none !important; }
+
+
 * { box-sizing: border-box; }
 
 body {
@@ -207,6 +219,13 @@ th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: v
     overflow: hidden;
     background: #0b0f14;
     border: 1px solid #1e293b;
+
+    /* Hug the canvas. The studio sizes the canvas to the shape of the photo, so
+       a full-width stage leaves dark gutters either side of a portrait that read
+       as letterboxing even though the picture fills every pixel it is given. */
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
 }
 /* The canvas sizes itself: the studio sets width and height in pixels so the
    photo's shape is preserved exactly. Doing it in CSS with width:100% plus a
