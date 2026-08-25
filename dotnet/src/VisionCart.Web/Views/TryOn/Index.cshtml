@@ -32,6 +32,10 @@
                 scaleAdj = f.TryOnScaleAdj,
             },
             opacity = f.TryOnOpacity,
+            lensWidthMm = f.LensWidthMm,
+            bridgeWidthMm = f.BridgeWidthMm,
+            templeLengthMm = f.TempleLengthMm,
+            totalWidthMm = f.TotalWidthMm,
         }),
         initialVariantId = Model.InitialVariantId,
         canSave = Model.CanSave,
@@ -148,9 +152,30 @@ else
                         <dt>Suggested size</dt><dd data-tryon-measure="sizeBand" style="text-transform:capitalize;"></dd>
                     </div>
                 </dl>
+
+                <h4 class="tryon-heading">How this frame fits you</h4>
+                <p class="tryon-verdict is-unknown" data-tryon-fit-verdict hidden></p>
+                <dl class="tryon-measures">
+                    <div data-tryon-measure-row>
+                        <dt>Frame width</dt><dd data-tryon-measure="frameWidth"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Size against your face</dt><dd data-tryon-measure="fitVerdict"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Height</dt><dd data-tryon-measure="fitHeight"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Tilt</dt><dd data-tryon-measure="fitTilt"></dd>
+                    </div>
+                </dl>
+                <ul class="tryon-fit-notes" data-tryon-fit-notes hidden></ul>
+
                 <p class="small muted" style="margin:10px 0 0;">
-                    An estimate from your photo, accurate to about &plusmn;2&nbsp;mm. Our optician
-                    confirms it before your lenses are cut.
+                    Size, height and tilt are set for you automatically. Nudge them with the
+                    sliders if you prefer &mdash; an estimate from your photo is accurate to
+                    about &plusmn;2&nbsp;mm, and our optician confirms it before your lenses
+                    are cut.
                 </p>
             </div>
 

@@ -93,6 +93,15 @@ public sealed class TryOnFrame
     public double AnchorRightY { get; init; }
     public double TryOnScaleAdj { get; init; }
     public double TryOnOpacity { get; init; }
+
+    // Physical dimensions, millimetres. The mirror needs these to draw a frame
+    // at its true size against a measured face rather than merely landing its
+    // lens centres on the pupils — a frame can sit on the pupils correctly and
+    // still be far too wide for the wearer.
+    public double? LensWidthMm { get; init; }
+    public double? BridgeWidthMm { get; init; }
+    public double? TempleLengthMm { get; init; }
+    public double? TotalWidthMm { get; init; }
 }
 
 public interface ICatalogService
@@ -281,6 +290,10 @@ public sealed class CatalogService(IApplicationDbContext db) : ICatalogService
             {
                 VariantId = v.Id,
                 FrameId = v.FrameId,
+                LensWidthMm = v.Frame.LensWidthMm,
+                BridgeWidthMm = v.Frame.BridgeWidthMm,
+                TempleLengthMm = v.Frame.TempleLengthMm,
+                TotalWidthMm = v.Frame.TotalWidthMm,
                 FrameName = v.Frame.Name,
                 ColorName = v.ColorName,
                 ColorHex = v.ColorHex,

@@ -301,3 +301,183 @@ export function fitCover(iw: number, ih: number, cw: number, ch: number) {
   const h = ih * scale;
   return { x: (cw - w) / 2, y: (ch - h) / 2, width: w, height: h, scale };
 }
+
+// --- automatic fit ----------------------------------------------------------
+
+/** Physical dimensions of a frame, millimetres, as printed on the arm. */
+export type FrameDimensions = {
+  lensWidthMm?: number | null;
+  bridgeWidthMm?: number | null;
+  templeLengthMm?: number | null;
+  totalWidthMm?: number | null;
+};
+
+export type AutoFit = {
+  /** Ready to hand straight to solveTransform. */
+  adjustment: Adjustment;
+
+  /** Millimetres of face per canvas pixel, from the measured PD. */
+  mmPerPixel: number | null;
+
+  /** How wide the frame really is, and how wide this face is. */
+  frameWidthMm: number | null;
+  faceWidthMm: number | null;
+
+  /**
+   * frame width ÷ face width. Opticians look for roughly 1.0: a frame about as
+   * wide as the face. Below ~0.92 it pinches, above ~1.08 it overhangs.
+   */
+  widthRatio: number | null;
+
+  /** Head roll the fit had to correct for, degrees. */
+  tiltDeg: number;
+
+  /** Millimetres the frame was raised or lowered to sit on the bridge. */
+  heightMm: number;
+
+  /** Where the pupil sits in the lens vertically, as a fraction from the top. */
+  pupilHeightInLens: number;
+
+  verdict: "good" | "narrow" | "wide" | "unknown";
+  notes: string[];
+};
+
+/**
+ * Pupils should not sit in the dead centre of a lens.
+ *
+ * A lens is ground with its optical centre on the pupil, and the wearer looks
+ * down far more than up — so the pupil belongs slightly above the middle,
+ * leaving the greater part of the lens below it for reading and for the floor
+ * in front of your feet. 0.45 is the usual single-vision compromise.
+ */
+export const PUPIL_HEIGHT_IN_LENS = 0.45;
+
+/** Ratios of frame width to face width an optician would call a good fit. */
+const RATIO_NARROW = 0.92;
+const RATIO_WIDE = 1.08;
+
+/**
+ * Works out the size, height and tilt that suit this face, so the customer is
+ * shown a real fit rather than a frame merely parked on their pupils.
+ *
+ * Three things are decided here, and each is a genuine optical rule rather than
+ * a guess at what looks nice:
+ *
+ * **Size.** The base solve lands the frame's lens centres on the pupils, which
+ * is correct optically but says nothing about whether the frame fits the head.
+ * With a measured PD we know how many millimetres a pixel is worth, so the
+ * frame can be drawn at its true manufactured width — a 145 mm frame on a
+ * 130 mm face then visibly overhangs, because it would.
+ *
+ * **Height.** The frame is raised so the pupil sits at {@link PUPIL_HEIGHT_IN_LENS}
+ * of the lens depth rather than halfway down it.
+ *
+ * **Tilt.** The head roll is already taken out by the base solve, so the extra
+ * rotation is zero; the measured roll is reported instead, because past about
+ * ten degrees the PD reading itself becomes unreliable and the customer is
+ * better off straightening up than being silently corrected.
+ */
+export function autoFit(
+  measurement: FaceMeasurement | null,
+  frame: FrameDimensions | null,
+  anchors: FrameAnchors = DEFAULT_ANCHORS,
+): AutoFit {
+  const notes: string[] = [];
+  const base: AutoFit = {
+    adjustment: { ...NO_ADJUSTMENT },
+    mmPerPixel: null,
+    frameWidthMm: null,
+    faceWidthMm: measurement?.faceWidthMm ?? null,
+    widthRatio: null,
+    tiltDeg: measurement?.rollDeg ?? 0,
+    heightMm: 0,
+    pupilHeightInLens: PUPIL_HEIGHT_IN_LENS,
+    verdict: "unknown",
+    notes,
+  };
+
+  if (!measurement) {
+    notes.push("No face was found, so the frame is placed by hand.");
+    return base;
+  }
+
+  // --- size ---------------------------------------------------------------
+  const pupilSpanPx = distance(measurement.leftPupil, measurement.rightPupil);
+
+  if (measurement.pdMm && pupilSpanPx > 0) {
+    base.mmPerPixel = measurement.pdMm / pupilSpanPx;
+  }
+
+  const frameWidthMm = frame?.totalWidthMm
+    ?? (frame?.lensWidthMm && frame?.bridgeWidthMm
+      ? frame.lensWidthMm * 2 + frame.bridgeWidthMm
+      : null);
+  base.frameWidthMm = frameWidthMm;
+
+  if (frameWidthMm && base.mmPerPixel) {
+    // Width the base solve would draw: the anchor span scales to the pupil
+    // span, and the whole asset scales with it.
+    const anchorSpan = Math.abs(anchors.rightX - anchors.leftX);
+    const solvedWidthPx = anchorSpan > 0 ? pupilSpanPx / anchorSpan : 0;
+    const trueWidthPx = frameWidthMm / base.mmPerPixel;
+
+    if (solvedWidthPx > 0) {
+      // Clamped: a wrong PD reading must not blow the frame up to fill the
+      // screen or shrink it to a dot.
+      base.adjustment.scale = clamp(trueWidthPx / solvedWidthPx, 0.7, 1.4);
+    }
+  }
+
+  // --- fit verdict --------------------------------------------------------
+  if (frameWidthMm && measurement.faceWidthMm) {
+    const ratio = frameWidthMm / measurement.faceWidthMm;
+    base.widthRatio = ratio;
+
+    if (ratio < RATIO_NARROW) {
+      base.verdict = "narrow";
+      notes.push(`This frame is ${Math.round((1 - ratio) * 100)}% narrower than the face — it will pinch at the temples.`);
+    } else if (ratio > RATIO_WIDE) {
+      base.verdict = "wide";
+      notes.push(`This frame is ${Math.round((ratio - 1) * 100)}% wider than the face — it will slide down.`);
+    } else {
+      base.verdict = "good";
+      notes.push("The frame width suits this face.");
+    }
+  }
+
+  // --- height -------------------------------------------------------------
+  // Anchors put the pupil at anchors.leftY down the asset. Moving it to
+  // PUPIL_HEIGHT_IN_LENS means shifting the frame down the nose by the
+  // difference, measured against the asset's own height.
+  const anchorY = (anchors.leftY + anchors.rightY) / 2;
+
+  // The anchor is the point of the artwork that lands on the pupil. To have the
+  // pupil sit HIGHER in the lens the artwork must move DOWN, so the shift is
+  // the anchor minus the target, not the other way round.
+  const shiftFraction = anchorY - PUPIL_HEIGHT_IN_LENS;
+
+  if (Math.abs(shiftFraction) > 0.001 && frameWidthMm && base.mmPerPixel) {
+    // Assets are drawn about 2.6 times as wide as they are tall.
+    const assetHeightPx = (frameWidthMm / base.mmPerPixel) / 2.6;
+    const offsetPx = shiftFraction * assetHeightPx;
+    base.adjustment.offsetY = offsetPx;
+    base.heightMm = offsetPx * base.mmPerPixel;
+  }
+
+  // --- tilt ---------------------------------------------------------------
+  base.adjustment.rotate = 0;
+
+  if (Math.abs(measurement.rollDeg) > 10) {
+    notes.push(`Your head is tilted ${Math.abs(Math.round(measurement.rollDeg))}° — straighten up for a truer measurement.`);
+  }
+
+  if (measurement.confidence < 0.5) {
+    notes.push("The measurement is uncertain. Better light and a straight-on photo will improve it.");
+  }
+
+  return base;
+}
+
+function clamp(value: number, low: number, high: number): number {
+  return Math.min(high, Math.max(low, value));
+}

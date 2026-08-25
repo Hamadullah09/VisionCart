@@ -1,4 +1,4 @@
-import { test, describe } from "node:test";
+import { test, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   solveTransform,
@@ -13,6 +13,9 @@ import {
   DEFAULT_ANCHORS,
   NO_ADJUSTMENT,
   IRIS_DIAMETER_MM,
+  autoFit,
+  PUPIL_HEIGHT_IN_LENS,
+  type FaceMeasurement,
   LM,
   type NormalizedLandmark,
 } from "./geometry.ts";
@@ -367,5 +370,101 @@ describe("primitives", () => {
     assert.deepEqual(DEFAULT_ANCHORS, {
       leftX: 0.29, leftY: 0.5, rightX: 0.71, rightY: 0.5, scaleAdj: 1,
     });
+  });
+});
+
+describe("automatic fit", () => {
+  /** A face measured at PD 63 mm, pupils 126 px apart: 0.5 mm per pixel. */
+  const face = (over: Partial<FaceMeasurement> = {}): FaceMeasurement => ({
+    leftPupil: { x: 400, y: 300 },
+    rightPupil: { x: 526, y: 300 },
+    pdMm: 63,
+    pdLeftMm: 31.5,
+    pdRightMm: 31.5,
+    rollDeg: 0,
+    confidence: 0.9,
+    faceWidthMm: 138,
+    ...over,
+  });
+
+  it("reports how many millimetres a pixel is worth", () => {
+    const fit = autoFit(face(), { totalWidthMm: 138 });
+    assert.ok(fit.mmPerPixel !== null);
+    assert.ok(Math.abs(fit.mmPerPixel! - 0.5) < 1e-9);
+  });
+
+  it("draws the frame at its true manufactured width", () => {
+    // Anchors span 0.42 of the asset, so the base solve would draw the asset
+    // 126 / 0.42 = 300 px wide. A 138 mm frame at 0.5 mm/px is 276 px.
+    const fit = autoFit(face(), { totalWidthMm: 138 });
+    assert.ok(Math.abs(fit.adjustment.scale - 276 / 300) < 1e-6);
+  });
+
+  it("falls back to lens and bridge when no total width is published", () => {
+    // Two 52 mm lenses and an 18 mm bridge is a 122 mm frame.
+    const fit = autoFit(face(), { lensWidthMm: 52, bridgeWidthMm: 18 });
+    assert.equal(fit.frameWidthMm, 122);
+  });
+
+  it("calls a frame that matches the face a good fit", () => {
+    const fit = autoFit(face({ faceWidthMm: 138 }), { totalWidthMm: 138 });
+    assert.equal(fit.verdict, "good");
+    assert.ok(Math.abs(fit.widthRatio! - 1) < 1e-9);
+  });
+
+  it("warns when the frame would pinch", () => {
+    const fit = autoFit(face({ faceWidthMm: 150 }), { totalWidthMm: 125 });
+    assert.equal(fit.verdict, "narrow");
+    assert.ok(fit.notes.some(n => /pinch/i.test(n)));
+  });
+
+  it("warns when the frame would slide down", () => {
+    const fit = autoFit(face({ faceWidthMm: 125 }), { totalWidthMm: 150 });
+    assert.equal(fit.verdict, "wide");
+    assert.ok(fit.notes.some(n => /slide/i.test(n)));
+  });
+
+  it("lifts the pupil above the middle of the lens", () => {
+    // Default anchors put the pupil at 0.5; a good fit puts it at 0.45, so the
+    // frame moves DOWN the nose and the pupil rides higher in the lens.
+    const fit = autoFit(face(), { totalWidthMm: 138 });
+    assert.ok(fit.adjustment.offsetY > 0, "frame should move down the nose");
+    assert.equal(fit.pupilHeightInLens, PUPIL_HEIGHT_IN_LENS);
+  });
+
+  it("never scales wildly on a bad measurement", () => {
+    // A PD reading three times too large must not treble the frame.
+    const fit = autoFit(face({ pdMm: 190 }), { totalWidthMm: 138 });
+    assert.ok(fit.adjustment.scale <= 1.4);
+    assert.ok(fit.adjustment.scale >= 0.7);
+  });
+
+  it("leaves the rotation alone because the base solve already levels the eyes", () => {
+    const fit = autoFit(face({ rollDeg: 12 }), { totalWidthMm: 138 });
+    assert.equal(fit.adjustment.rotate, 0);
+    assert.equal(fit.tiltDeg, 12);
+  });
+
+  it("asks the customer to straighten up rather than silently correcting", () => {
+    const fit = autoFit(face({ rollDeg: 14 }), { totalWidthMm: 138 });
+    assert.ok(fit.notes.some(n => /straighten up/i.test(n)));
+  });
+
+  it("says so when the measurement cannot be trusted", () => {
+    const fit = autoFit(face({ confidence: 0.2 }), { totalWidthMm: 138 });
+    assert.ok(fit.notes.some(n => /uncertain/i.test(n)));
+  });
+
+  it("degrades to a hand placement when there is no face", () => {
+    const fit = autoFit(null, { totalWidthMm: 138 });
+    assert.deepEqual(fit.adjustment, NO_ADJUSTMENT);
+    assert.equal(fit.verdict, "unknown");
+    assert.ok(fit.notes.some(n => /by hand/i.test(n)));
+  });
+
+  it("still fits when the frame publishes no measurements at all", () => {
+    const fit = autoFit(face(), null);
+    assert.equal(fit.verdict, "unknown");
+    assert.equal(fit.adjustment.scale, 1);
   });
 });

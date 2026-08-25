@@ -320,3 +320,25 @@ th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: v
    an empty coloured box above the first field — it looked like an error the
    visitor could not read. Hide it until it actually has something to say. */
 .validation-summary-valid { display: none; }
+
+/* --- try-on fit report ---------------------------------------------------- */
+.tryon-verdict {
+    margin: 0 0 10px; padding: 7px 12px; border-radius: var(--radius);
+    font-size: 14px; font-weight: 600;
+}
+.tryon-verdict.is-good   { background: #e5f4ec; color: var(--green); }
+.tryon-verdict.is-narrow,
+.tryon-verdict.is-wide   { background: var(--amber-bg); color: #8a5a1b; }
+.tryon-verdict.is-unknown { background: var(--ink-50); color: var(--ink-600); }
+
+.tryon-fit-notes {
+    list-style: none; margin: 10px 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.tryon-fit-notes li {
+    font-size: 13px; line-height: 1.5; color: var(--ink-600);
+    padding-left: 16px; position: relative;
+}
+.tryon-fit-notes li::before {
+    content: "—"; position: absolute; left: 0; color: var(--ink-500);
+}

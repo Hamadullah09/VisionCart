@@ -7,6 +7,8 @@ import {
   fitCover,
   measureFace,
   measurementAdvice,
+  autoFit,
+  type AutoFit,
   solveTransform,
   suggestSizeBand,
   type Adjustment,
@@ -66,6 +68,14 @@ const MAX_BACKING_SCALE = 2.5;
 /** Most of the window a tall portrait may claim, leaving room for the controls. */
 const MAX_STAGE_HEIGHT_FRACTION = 0.72;
 
+/** How the width verdict is worded for a customer. */
+const VERDICT_TEXT: Record<string, string> = {
+  good: "Good fit",
+  narrow: "Too narrow",
+  wide: "Too wide",
+  unknown: "Not measured",
+};
+
 /** How close a pointer must land to a marker before it grabs it. */
 const GRAB_RADIUS = 60;
 
@@ -105,6 +115,9 @@ export class TryOnStudio {
 
   /** Real pixels per logical unit. */
   private backingScale = 1;
+
+  /** The size, height and tilt worked out for the current face and frame. */
+  private fit: AutoFit | null = null;
 
   /** The logical drawing surface. Reshaped to match the photo or camera feed. */
   private logicalW = LOGICAL_LONG_EDGE;
@@ -263,6 +276,13 @@ export class TryOnStudio {
 
       button.addEventListener("click", () => {
         this.selectedId = frame.variantId;
+
+        // The fit is a property of this face AND this frame, so a new frame
+        // needs a new answer — the same face wants a different size in a
+        // 145 mm frame than in a 125 mm one.
+        this.applyAutoFit();
+        this.syncSliders();
+        this.syncMeasurements();
         this.syncChrome();
         void this.loadOverlay();
       });
@@ -473,7 +493,7 @@ export class TryOnStudio {
         this.manual = true;
       }
 
-      this.adjust = { ...NO_ADJUSTMENT };
+      this.applyAutoFit();
       this.syncSliders();
       this.syncChrome();
       this.render();
@@ -774,13 +794,44 @@ export class TryOnStudio {
     }
   }
 
+  /**
+   * Works out the size, height and tilt this face needs and applies them.
+   *
+   * Called whenever the subject or the frame changes, because the answer
+   * depends on both: the same face needs a different size in a 145 mm frame
+   * than in a 125 mm one.
+   */
+  private applyAutoFit(): void {
+    const frame = this.selected;
+
+    this.fit = autoFit(
+      this.measurement,
+      frame
+        ? {
+            lensWidthMm: frame.lensWidthMm,
+            bridgeWidthMm: frame.bridgeWidthMm,
+            templeLengthMm: frame.templeLengthMm,
+            totalWidthMm: frame.totalWidthMm,
+          }
+        : null,
+      frame?.anchors ?? DEFAULT_ANCHORS,
+    );
+
+    this.adjust = { ...this.fit.adjustment };
+  }
+
   private syncMeasurements(): void {
     const panel = this.find<HTMLElement>("[data-tryon-measurements]");
     if (!panel) return;
 
     const pd = this.measurement?.pdMm ?? null;
-    panel.hidden = pd === null;
-    if (pd === null) return;
+
+    // Shown whenever there is a subject, not only when a face was found. A
+    // customer whose photo could not be measured needs to be told that, and
+    // why — an empty panel that simply vanishes reads as the feature being
+    // broken rather than the photo being unsuitable.
+    panel.hidden = !this.hasSubject;
+    if (panel.hidden) return;
 
     const set = (name: string, value: string | null) => {
       const el = this.find<HTMLElement>(`[data-tryon-measure="${name}"]`);
@@ -791,10 +842,42 @@ export class TryOnStudio {
       el.textContent = value;
     };
 
-    set("pd", `${pd.toFixed(1)} mm`);
+    set("pd", pd === null ? null : `${pd.toFixed(1)} mm`);
     set("faceWidth", this.measurement?.faceWidthMm ? `${this.measurement.faceWidthMm.toFixed(0)} mm` : null);
     set("faceShape", this.faceShape);
     set("sizeBand", suggestSizeBand(this.measurement?.faceWidthMm ?? null));
+
+    const fit = this.fit;
+    set("frameWidth", fit?.frameWidthMm ? `${fit.frameWidthMm.toFixed(0)} mm` : null);
+    set("fitVerdict", fit && fit.widthRatio
+      ? `${VERDICT_TEXT[fit.verdict]} · ${Math.round(fit.widthRatio * 100)}% of face width`
+      : null);
+    set("fitHeight", fit && fit.heightMm
+      ? `${fit.heightMm > 0 ? "+" : ""}${fit.heightMm.toFixed(1)} mm on the nose`
+      : null);
+    // Only when a face was actually measured — "0.0 degrees, corrected" against
+    // a photo nothing was found in claims a reading that was never taken.
+    set("fitTilt", fit && this.measurement
+      ? `${fit.tiltDeg.toFixed(1)}° head tilt, corrected`
+      : null);
+
+    const verdictEl = this.find<HTMLElement>("[data-tryon-fit-verdict]");
+    if (verdictEl) {
+      verdictEl.className = `tryon-verdict is-${fit?.verdict ?? "unknown"}`;
+      verdictEl.hidden = !fit || fit.verdict === "unknown";
+    }
+
+    const notesEl = this.find<HTMLElement>("[data-tryon-fit-notes]");
+    if (notesEl) {
+      const notes = fit?.notes ?? [];
+      notesEl.innerHTML = "";
+      for (const note of notes) {
+        const li = document.createElement("li");
+        li.textContent = note;
+        notesEl.appendChild(li);
+      }
+      notesEl.hidden = notes.length === 0;
+    }
 
     this.setNotice("advice", this.hasSubject ? measurementAdvice(this.measurement) : null);
   }
