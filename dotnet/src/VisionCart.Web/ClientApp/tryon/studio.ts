@@ -1,6 +1,7 @@
 import {
   DEFAULT_ANCHORS,
   NO_ADJUSTMENT,
+  distance,
   drawFrame,
   estimateFaceShape,
   fitContain,
@@ -17,6 +18,14 @@ import {
   type Point,
 } from "./geometry.ts";
 import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
+import {
+  estimatePose,
+  yawForeshortening,
+  yawBridgeShift,
+  NEUTRAL_POSE,
+  type HeadPose,
+} from "./pose.ts";
+import { PoseSmoother, holdThroughLoss } from "./smoothing.ts";
 
 /**
  * The virtual mirror.
@@ -118,6 +127,21 @@ export class TryOnStudio {
 
   /** The size, height and tilt worked out for the current face and frame. */
   private fit: AutoFit | null = null;
+
+  /** Where the head is pointing, and how much that reading is trusted. */
+  private pose: HeadPose = NEUTRAL_POSE;
+
+  /** Damps landmark noise without lagging behind real movement. */
+  private readonly smoother = new PoseSmoother();
+
+  /** When the face was last actually found, for riding out brief losses. */
+  private lastDetectionMs = 0;
+
+  /** Multiplies the frame's opacity while a lost face fades out. */
+  private trackingOpacity = 1;
+
+  /** Latched, so the hint does not flicker on and off around the threshold. */
+  private poseHintShown = false;
 
   /** The logical drawing surface. Reshaped to match the photo or camera feed. */
   private logicalW = LOGICAL_LONG_EDGE;
@@ -368,19 +392,30 @@ export class TryOnStudio {
         ? [this.pupils.a, this.pupils.b]
         : [this.pupils.b, this.pupils.a];
 
+      // Turning the head foreshortens the frame horizontally and slides the
+      // bridge across the face, because the bridge rests on the nose and the
+      // nose is in front of the eyes. Without both, a turned head wears a
+      // frame that is visibly too wide and detached from the nose.
+      const pupilSpan = distance(left, right);
+      const shiftX = yawBridgeShift(this.pose.yawDeg) * pupilSpan;
+
       const transform = solveTransform({
         leftPupil: left,
         rightPupil: right,
         assetWidth: this.overlay.naturalWidth,
         assetHeight: this.overlay.naturalHeight,
         anchors: this.selected?.anchors ?? DEFAULT_ANCHORS,
-        adjustment: this.adjust,
+        adjustment: {
+          ...this.adjust,
+          offsetX: this.adjust.offsetX + shiftX,
+        },
       });
 
       drawFrame(ctx, this.overlay, transform, {
         width: this.overlay.naturalWidth,
         height: this.overlay.naturalHeight,
-        opacity: this.selected?.opacity ?? 1,
+        opacity: (this.selected?.opacity ?? 1) * this.trackingOpacity,
+        squeezeX: yawForeshortening(this.pose.yawDeg),
       });
     }
 
@@ -532,6 +567,9 @@ export class TryOnStudio {
       this.photo = null;
       this.hasPhoto = false;
       this.mode = "camera";
+      this.smoother.reset();
+      this.lastDetectionMs = 0;
+      this.trackingOpacity = 1;
 
       // A webcam is usually 16:9 while the default stage is 4:3, so without
       // this the feed is cropped on both sides before anyone sees it.
@@ -563,18 +601,44 @@ export class TryOnStudio {
                     x: this.logicalW - (p.x + box.x),
                     y: p.y + box.y,
                   });
+
+                  const raw = estimatePose(landmarks);
+                  const a = toCanvas(measured.leftPupil);
+                  const b = toCanvas(measured.rightPupil);
+
+                  // Mirrored preview, so a turn to their right reads as a turn
+                  // to the left on screen.
+                  const smoothed = this.smoother.smooth({
+                    leftX: a.x, leftY: a.y,
+                    rightX: b.x, rightY: b.y,
+                    yawDeg: -raw.yawDeg,
+                    pitchDeg: raw.pitchDeg,
+                  }, timestamp / 1000);
+
                   this.pupils = {
-                    a: toCanvas(measured.leftPupil),
-                    b: toCanvas(measured.rightPupil),
+                    a: { x: smoothed.leftX, y: smoothed.leftY },
+                    b: { x: smoothed.rightX, y: smoothed.rightY },
                   };
+                  this.pose = { ...raw, yawDeg: smoothed.yawDeg, pitchDeg: smoothed.pitchDeg };
                   this.measurement = measured;
+                  this.lastDetectionMs = timestamp;
+                  this.trackingOpacity = 1;
                   this.syncMeasurements();
+                  this.syncPoseHint();
                 }
               }
             } catch {
               // A dropped frame is not worth surfacing; the next one will do.
             }
           }
+        }
+
+        if (this.lastDetectionMs > 0) {
+          // A blink, a hand, a turn past the model's limit — detection drops
+          // constantly. Hiding on the first miss makes the frame strobe.
+          const held = holdThroughLoss(performance.now() - this.lastDetectionMs);
+          this.trackingOpacity = held.opacity;
+          if (!held.usePrevious) this.pupils = null;
         }
 
         this.render();
@@ -818,6 +882,31 @@ export class TryOnStudio {
     );
 
     this.adjust = { ...this.fit.adjustment };
+  }
+
+  /**
+   * Says so when the head has turned past the point a flat overlay can carry.
+   *
+   * Beyond roughly this angle the far lens would need to be genuinely occluded
+   * by the cheek, which a sprite cannot do. Admitting that and asking for a
+   * small movement is more use to a customer than silently drawing something
+   * they can see is wrong.
+   */
+  private syncPoseHint(): void {
+    if (!this.pose.isExtreme) {
+      if (this.poseHintShown) {
+        this.setNotice("fallback", null);
+        this.poseHintShown = false;
+      }
+      return;
+    }
+
+    if (this.poseHintShown) return;
+
+    this.setNotice("fallback", Math.abs(this.pose.yawDeg) > Math.abs(this.pose.pitchDeg)
+      ? "Turn a little towards the camera for a truer fit."
+      : "Level your chin towards the camera for a truer fit.");
+    this.poseHintShown = true;
   }
 
   private syncMeasurements(): void {

@@ -109,13 +109,23 @@ export function drawFrame(
   ctx: CanvasRenderingContext2D,
   image: CanvasImageSource,
   t: Transform,
-  opts: { width: number; height: number; opacity?: number },
+  opts: {
+    width: number;
+    height: number;
+    opacity?: number;
+    /**
+     * Horizontal foreshortening, 0..1. A frame is close to rigid and close to
+     * flat, so a turned head sees its width fall away while its height barely
+     * changes — which is why this squeezes one axis rather than scaling both.
+     */
+    squeezeX?: number;
+  },
 ): void {
   ctx.save();
   ctx.globalAlpha = opts.opacity ?? 1;
   ctx.translate(t.translateX, t.translateY);
   ctx.rotate(t.rotate);
-  ctx.scale(t.scale, t.scale);
+  ctx.scale(t.scale * (opts.squeezeX ?? 1), t.scale);
   ctx.translate(-t.anchorX, -t.anchorY);
   ctx.drawImage(image, 0, 0, opts.width, opts.height);
   ctx.restore();
