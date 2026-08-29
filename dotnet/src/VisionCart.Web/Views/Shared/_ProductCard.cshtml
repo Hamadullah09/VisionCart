@@ -5,8 +5,19 @@
     var store = Store.Value;
     var lead = Model.Variants.FirstOrDefault();
     var price = Model.LowestPriceMinor;
+
+    // The three numbers printed inside a real arm. A customer who already owns
+    // glasses that fit can compare these directly, which is a far better guide
+    // to size than any adjective.
+    var size = Model.LensWidthMm is { } lens && Model.BridgeWidthMm is { } bridge
+        ? $"{lens:0}–{bridge:0}" + (Model.TempleLengthMm is { } temple ? $"–{temple:0}" : "")
+        : null;
 }
-<a class="card product-card" asp-controller="Frames" asp-action="Detail" asp-route-slug="@Model.Slug">
+
+@* Not a single <a>: the card carries two actions, and a button nested inside a
+   link is invalid and unreachable by keyboard. The title link is stretched over
+   the card instead, with the try-on control raised above it. *@
+<article class="card product-card">
     <div class="shot">
         @if (Model.IsOnSale)
         {
@@ -14,24 +25,48 @@
         }
         @if (lead?.ImageUrl is { } url)
         {
-            <img src="@url" alt="@Model.Name in @lead.ColorName" loading="lazy" />
+            <img src="@url" alt="@Model.Name in @lead.ColorName" loading="lazy" decoding="async" />
+        }
+
+        @if (lead is not null)
+        {
+            <a class="product-tryon"
+               href="/try-on?variant=@lead.Id"
+               aria-label="Try @Model.Name on your face">Try it on</a>
         }
     </div>
+
     <div class="body">
         @if (Model.BrandName is { } brand)
         {
             <p class="brand-name">@brand</p>
         }
-        <h3>@Model.Name</h3>
-        <p class="small muted" style="margin:0 0 6px;">
+
+        <h3>
+            <a class="stretch" asp-controller="Frames" asp-action="Detail" asp-route-slug="@Model.Slug">
+                @Model.Name
+            </a>
+        </h3>
+
+        <p class="product-meta">
             @Humanise.Value(Model.Shape) · @Humanise.Value(Model.Material)
+            @if (size is not null)
+            {
+                <span class="product-size" title="Lens width, bridge width and arm length, in millimetres">@size</span>
+            }
         </p>
-        <div class="swatches">
+
+        <div class="swatches" aria-label="@Model.Variants.Count colour@(Model.Variants.Count == 1 ? "" : "s")">
             @foreach (var v in Model.Variants.Take(6))
             {
-                <span class="swatch" style="background:@(v.ColorHex ?? "#ccc")" title="@v.ColorName"></span>
+                <span class="swatch" style="--swatch:@(v.ColorHex ?? "#ccc")" title="@v.ColorName"></span>
+            }
+            @if (Model.Variants.Count > 6)
+            {
+                <span class="swatch-more">+@(Model.Variants.Count - 6)</span>
             }
         </div>
+
         <p class="price">
             @Money.Format(price, store.Currency, store.CurrencySymbol)
             @if (Model.CompareAtMinor is { } was && was > price)
@@ -40,4 +75,4 @@
             }
         </p>
     </div>
-</a>
+</article>

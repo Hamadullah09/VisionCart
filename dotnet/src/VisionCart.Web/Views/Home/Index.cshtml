@@ -7,19 +7,45 @@
     var store = Store.Value;
 }
 
-<div class="hero" style="margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding-left:20px;padding-right:20px;">
-    <div class="wrap">
-        <p class="eyebrow">Prescription eyewear, fitted properly.</p>
-        <h1>See how they look before you buy them.</h1>
-        <p>
-            Upload a photo or open your camera, and every frame in our range lands on your
-            face in the right size — with your pupillary distance measured while you browse.
-        </p>
-        <div class="hero-actions">
-            <a class="btn btn-primary" href="/try-on">Start virtual try-on</a>
-            <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Browse all frames</a>
+@{
+    // Real product in the hero rather than an illustration: the fastest way to
+    // answer "what does this shop sell?" is to show three of them.
+    var heroFrames = Model.Featured
+        .Where(f => f.Variants.Any(v => v.ImageUrl is not null))
+        .Take(3)
+        .ToList();
+}
+
+<div class="hero full-bleed">
+    <div class="wrap hero-inner">
+        <div class="hero-copy">
+            <p class="eyebrow">Prescription eyewear, fitted properly</p>
+            <h1>See how they look before you buy them.</h1>
+            <p>
+                Open your camera or upload a photo. Every frame lands on your face at the
+                right size, and we measure your pupillary distance while you browse.
+            </p>
+            <div class="hero-actions">
+                <a class="btn btn-primary" href="/try-on">Try frames on</a>
+                <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Browse all frames</a>
+            </div>
+            <p class="note">Your photo stays on your device unless you choose to save it.</p>
         </div>
-        <p class="note">Your photo never leaves your device unless you choose to save it.</p>
+
+        @if (heroFrames.Count > 0)
+        {
+            <div class="hero-frames @(heroFrames.Count == 3 ? "is-trio" : "")">
+                @foreach (var frame in heroFrames)
+                {
+                    var shot = frame.Variants.First(v => v.ImageUrl is not null);
+                    <a class="hero-frame" asp-controller="Frames" asp-action="Detail" asp-route-slug="@frame.Slug">
+                        <img src="@shot.ImageUrl" alt="@frame.Name in @shot.ColorName" />
+                        <p class="name">@frame.Name</p>
+                        <p class="price">@Money.Format(frame.LowestPriceMinor, Store.Value.Currency, Store.Value.CurrencySymbol)</p>
+                    </a>
+                }
+            </div>
+        }
     </div>
 </div>
 

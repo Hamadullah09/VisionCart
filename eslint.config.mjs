@@ -15,6 +15,12 @@ const eslintConfig = defineConfig([
     // Generated and vendored assets we don't author:
     "public/wasm/**", // MediaPipe runtime, copied by `npm run tryon:assets`
     "src/generated/**",
+
+    // The ASP.NET port. It has its own toolchain and its own vendored copy of
+    // the MediaPipe runtime; linting it here reported 2,429 problems that
+    // belong to neither project and drowned out anything real.
+    "dotnet/**",
+    "_backup_nextjs_*/**",
   ]),
 ]);
 
