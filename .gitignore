@@ -6,6 +6,11 @@
 .env
 .env*
 
+# Build-time tooling. Listing these folder by folder meant each new one had to
+# be remembered, and one was not — a whole dependency tree reached the remote
+# before anybody noticed.
+node_modules/
+
 # ---------------------------------------------------------------------------
 # The application
 # ---------------------------------------------------------------------------
@@ -24,8 +29,6 @@
 appsettings.Development.json
 
 # Build-time tooling. Node is never needed to run or deploy the application.
-/dotnet/src/VisionCart.Web/node_modules/
-/dotnet/tools/screenshots/node_modules/
 
 # Written at runtime
 /dotnet/src/VisionCart.Web/wwwroot/uploads/*
@@ -58,4 +61,3 @@ USER-MANUAL.log
 #   cd dotnet/tools/videoguide && VISIONCART_PASSWORD=... node record.mjs
 /dotnet/docs/videoguide/*.webm
 /dotnet/tools/videoguide/.recordings/
-/dotnet/tools/videoguide/node_modules/
