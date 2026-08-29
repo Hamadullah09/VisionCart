@@ -32,7 +32,18 @@ else
             {
                 <tr>
                     <td>@p.Name<br /><span class="small muted">@p.BannerText</span></td>
-                    <td>@(p.Code is null ? Html.Raw("<span class=\"small muted\">auto</span>") : Html.Raw($"<code>{p.Code}</code>"))</td>
+                    @* Razor encodes these; Html.Raw with an interpolated code would
+                       inject whatever an administrator had typed into the markup. *@
+                    <td>
+                        @if (p.Code is null)
+                        {
+                            <span class="small muted">auto</span>
+                        }
+                        else
+                        {
+                            <code>@p.Code</code>
+                        }
+                    </td>
                     <td class="small">@PromotionKinds.Labels.GetValueOrDefault(p.Kind, Humanise.Value(p.Kind))</td>
                     <td class="small">
                         @(p.Kind == PromotionKinds.PercentOff
