@@ -1,51 +1,73 @@
-<!-- BEGIN:nextjs-agent-rules -->
-
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
-
 # VisionCart — conventions
 
-Prescription eyewear shop. Read `README.md` first; it explains the try-on
-geometry, the provider adapters and the patient-data rules.
+Prescription eyewear shop, on ASP.NET Core 10 and SQL Server. Read
+`dotnet/README.md` first; it explains how to run it. `dotnet/docs/` covers the
+try-on geometry, the provider adapters and the patient-data rules.
+
+The application lives entirely in `dotnet/`. The Next.js original it was ported
+from has been removed — it is still in git history and in the backup beside the
+repository if you need to consult it.
 
 ## Non-negotiables
 
 - **Money is an integer of minor units** (paisa/cents) everywhere. Staff type
-  major units in forms; convert once at the edge with `toMinor`/`fromMinor`.
-  Never do float arithmetic on a price.
-- **Prices are decided only in `src/lib/pricing.ts`.** Components display; they
-  never compute. The cart is re-priced from the database on every read so a
-  tampered client payload cannot change what is charged.
+  major units in forms; convert once at the edge with `Money.ToMinor` /
+  `Money.FromMinor`. Never do floating-point arithmetic on a price. The
+  DbContext refuses to build a model where a `*Minor` column is not an `int`.
+- **Prices are decided only in `Application/Pricing/PricingService.cs`.** Views
+  display; they never compute. The cart is re-priced from the database on every
+  read so a tampered client payload cannot change what is charged.
 - **Prescriptions are immutable once used.** Create a new version; never edit a
   prescription attached to a past order. Order lines keep their own snapshot.
-- **Diopter inputs are dropdowns**, stepping 0.25 D, from `src/lib/constants.ts`.
-  A free-text field here becomes a lab remake.
-- **Every mutation of a patient record, price or order calls `audit()`** — but
-  never put clinical values in the audit detail.
-- **The schema stays portable** across SQLite, Postgres and MySQL: no enums, no
-  arrays, no native JSON. Constrained strings are validated against
-  `src/lib/constants.ts`; JSON is a stringified column.
+- **Diopter inputs are dropdowns**, stepping 0.25 D, from
+  `Domain/Constants/VisionCartConstants.cs`. A free-text field here becomes a
+  lab remake.
+- **Every mutation of a patient record, price or order calls `IAuditService`** —
+  but never put clinical values in the audit detail.
+- **The schema stays portable** across SQL Server, Postgres and MySQL: no
+  enums, no arrays, no native JSON. Constrained strings are validated against
+  the constants file; JSON is a stringified column.
 
 ## Where things go
 
-- Mutations are **server actions** in `src/app/actions/`. Route handlers in
-  `src/app/api/` are only for multipart uploads, CSV and webhooks.
-- Staff-only server actions start with the `staff()` guard; pages use
-  `requireStaff()` / `requireAdmin()`.
-- New payment or shipping providers are adapters in `src/lib/payments.ts` /
-  `src/lib/shipping.ts`. Both must degrade safely when their key is absent.
+| Layer | Holds |
+| --- | --- |
+| `VisionCart.Domain` | Entities, constants, `Money`, `Cuid`. No dependencies. |
+| `VisionCart.Application` | Services. All business rules live here. |
+| `VisionCart.Infrastructure` | EF Core, storage, email, payment and shipping adapters. |
+| `VisionCart.Web` | Controllers, Razor views, the try-on client. |
+
+- Staff-only controllers derive from `AdminControllerBase`, which carries the
+  `StaffOnly` policy. Administrator-only actions add `AdminOnly` explicitly.
+- New payment or shipping providers are adapters in `Infrastructure/Payments`
+  and `Infrastructure/Shipping`. Both must degrade safely when their key is
+  absent.
 
 ## Try-on
 
-`src/lib/tryon.ts` is pure — no DOM, no server imports — so it stays testable.
-If you change `DEFAULT_ANCHORS`, change the matching geometry constants in
-`scripts/generate-frame-assets.mjs` too; they are two halves of one contract.
+`ClientApp/tryon/geometry.ts`, `pose.ts` and `smoothing.ts` are pure — no DOM,
+no network — so they stay testable without a camera. Run them with
+`node --test ClientApp/tryon/*.test.ts`.
 
-Still-photo rendering draws synchronously from an effect. Do not move it back
-to `requestAnimationFrame`: rAF is suspended in a background tab and the canvas
+If you change `DEFAULT_ANCHORS`, change the matching geometry in
+`tools/assets/generate-frame-assets.mjs` too; they are two halves of one
+contract, and the artwork is generated from it.
+
+The customer's face never leaves the browser. The MediaPipe model and its
+WebAssembly runtime are served from our own origin rather than a CDN precisely
+so that stays true, and the Content-Security-Policy names no external origin —
+which is also what blocks MediaPipe's own telemetry.
+
+Still-photo rendering draws synchronously from an effect. Do not move it back to
+`requestAnimationFrame`: rAF is suspended in a background tab and the canvas
 would stay blank.
+
+## Node
+
+Node is a **build-time dependency only** — never required to run or deploy.
+
+| Where | For |
+| --- | --- |
+| `src/VisionCart.Web` | esbuild, bundles the try-on client |
+| `tools/assets` | regenerates frame artwork and fetches the MediaPipe runtime |
+| `tools/screenshots` | captures the figures in the user manual |
