@@ -1,0 +1,326 @@
+@using Microsoft.Extensions.Options
+@using VisionCart.Application.Catalogue
+@model FrameWorkspaceViewModel
+@inject IOptions<StoreOptions> Store
+@{
+    var f = Model.Frame;
+    ViewData["Title"] = f.Name;
+    var store = Store.Value;
+
+    string Money2(int? minor) =>
+        minor is { } m ? Money.Format(m, store.Currency, store.CurrencySymbol) : "—";
+
+    string Mm(double? v) => v is { } d ? $"{d:0.#} mm" : "—";
+
+    var sizeCode = f is { LensWidthMm: { } lw, BridgeWidthMm: { } bw, TempleLengthMm: { } tl }
+        ? $"{lw:0}□{bw:0}-{tl:0}"
+        : null;
+
+    var features = (f.Features ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToList();
+
+    var lead = f.Variants.FirstOrDefault(v => v.TryOnImageUrl is not null) ?? f.Variants.FirstOrDefault();
+
+    // Margin on the frame alone, from the trade price we last paid. Integer
+    // minor units throughout — the percentage is the only division here.
+    var marginPct = f.LastCostMinor is { } cost && cost > 0
+        ? (double)(f.BasePriceMinor - cost) / f.BasePriceMinor * 100
+        : (double?)null;
+}
+
+<nav class="admin-crumbs" aria-label="Breadcrumb">
+    <a asp-action="Index">Frames</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">@f.Name</span>
+</nav>
+
+<div class="admin-page-head">
+    <div>
+        <h1>@f.Name</h1>
+        <p class="frame-meta">
+            <code>@f.Sku</code>
+            <span class="chip">@Humanise.Value(f.Status)</span>
+            @if (f.PromotionGrade is { } grade)
+            {
+                <span class="chip chip-grade" title="How this practice grades the frame for promotion">Grade @grade</span>
+            }
+            @if (Model.IsOutOfStock)
+            {
+                <span class="tryon-state is-blocked">Out of stock</span>
+            }
+            else if (Model.IsLowStock)
+            {
+                <span class="tryon-state is-warning">@Model.TotalStock in stock, running low</span>
+            }
+            else
+            {
+                <span class="tryon-state is-ready">@Model.TotalStock in stock</span>
+            }
+        </p>
+    </div>
+
+    <div class="admin-row-actions">
+        <a class="btn btn-primary btn-small" asp-action="Edit" asp-route-id="@f.Id">Edit</a>
+        <a class="btn btn-outline btn-small" href="/frames/@f.Slug" target="_blank" rel="noopener">View in shop &#8599;</a>
+        @if (lead?.TryOnImageUrl is not null)
+        {
+            <a class="btn btn-outline btn-small" href="/try-on?variant=@lead.Id" target="_blank" rel="noopener">Try it on &#8599;</a>
+        }
+    </div>
+</div>
+
+<div class="workspace">
+    <div class="workspace-main">
+
+        <section class="card">
+            <h2 class="calibrate-heading">Overview</h2>
+            <dl class="calibrate-measures">
+                <div><dt>Brand</dt><dd>@(f.Brand?.Name ?? "—")</dd></div>
+                <div><dt>Gender</dt><dd>@Humanise.Value(f.Gender)</dd></div>
+                <div><dt>Collections</dt><dd>@(f.Categories.Count == 0 ? "—" : $"{f.Categories.Count} assigned")</dd></div>
+                <div><dt>Promotion grade</dt><dd>@(f.PromotionGrade ?? "—")</dd></div>
+                <div><dt>Suits face shapes</dt><dd>@(string.IsNullOrWhiteSpace(f.FaceShapes) ? "—" : string.Join(", ", f.FaceShapes.Split(',').Select(Humanise.Value)))</dd></div>
+                <div><dt>Sold without lenses</dt><dd>@(f.AllowFrameOnly ? "Yes" : "No")</dd></div>
+                <div><dt>Prescription required</dt><dd>@(f.RequiresPrescription ? "Yes" : "No")</dd></div>
+            </dl>
+            @if (f.Description is { } about)
+            {
+                <p class="workspace-blurb">@about</p>
+            }
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Frame</h2>
+            @if (sizeCode is not null)
+            {
+                <p class="size-code">@sizeCode</p>
+            }
+            <dl class="calibrate-measures">
+                <div><dt>Shape</dt><dd>@Humanise.Value(f.Shape)</dd></div>
+                <div><dt>Rim type</dt><dd>@Humanise.Value(f.RimType)</dd></div>
+                <div><dt>Material</dt><dd>@Humanise.Value(f.Material)</dd></div>
+                <div><dt>Overall width</dt><dd>@Mm(f.TotalWidthMm)</dd></div>
+                <div><dt>Bridge</dt><dd>@Mm(f.BridgeWidthMm)</dd></div>
+                <div><dt>Arm length</dt><dd>@Mm(f.TempleLengthMm)</dd></div>
+                <div><dt>Weight</dt><dd>@(f.WeightGrams is { } g ? $"{g:0.#} g" : "—")</dd></div>
+                <div><dt>Size band</dt><dd>@(f.SizeBand is null ? "—" : Humanise.Value(f.SizeBand))</dd></div>
+            </dl>
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Lens</h2>
+            <dl class="calibrate-measures">
+                <div><dt>Lens width</dt><dd>@Mm(f.LensWidthMm)</dd></div>
+                <div><dt>Lens height</dt><dd>@Mm(f.LensHeightMm)</dd></div>
+                <div>
+                    <dt title="Distance between the two lens optical centres — lens width plus bridge">Lens centres</dt>
+                    <dd>@Mm(f.LensWidthMm + f.BridgeWidthMm)</dd>
+                </div>
+            </dl>
+            <p class="hint">
+                These are what the virtual try-on draws with: the frame is sized by its overall
+                width, seated by its lens height, and decentration comes from the lens centres.
+            </p>
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Fitting features</h2>
+            @if (features.Count == 0)
+            {
+                <p class="hint">None recorded.</p>
+            }
+            else
+            {
+                <ul class="feature-list">
+                    @foreach (var code in features)
+                    {
+                        <li>
+                            <strong>@Humanise.Value(code)</strong>
+                            @if (FrameFeatures.Help.TryGetValue(code, out var help))
+                            {
+                                <span>@help</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Colourways, stock and where to find them</h2>
+
+            @if (f.Variants.Count == 0)
+            {
+                <p class="hint">No colourways yet. Add one from the <a asp-action="Edit" asp-route-id="@f.Id">edit page</a>.</p>
+            }
+            else
+            {
+                <div class="admin-table admin-table-flush">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Colour</th>
+                                <th scope="col">SKU</th>
+                                <th scope="col" class="num">Stock</th>
+                                <th scope="col">Location</th>
+                                <th scope="col">Try-on</th>
+                                <th scope="col"><span class="sr-only">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var v in f.Variants.OrderBy(v => v.Position))
+                        {
+                            var report = Model.Readiness.GetValueOrDefault(v.Id);
+                            <tr class="@(v.IsActive ? "" : "is-retired")">
+                                <td>
+                                    <div class="admin-product">
+                                        @if (v.TryOnImageUrl is { } art)
+                                        {
+                                            <img src="@art" alt="" loading="lazy" width="56" />
+                                        }
+                                        <div>
+                                            <strong>@v.ColorName</strong>
+                                            @if (!v.IsActive)
+                                            {
+                                                <span class="small muted">Hidden from the shop</span>
+                                            }
+                                            else if (v.PriceMinor is { } over)
+                                            {
+                                                <span class="small muted">@Money2(over) override</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><code>@v.Sku</code></td>
+                                <td class="num">
+                                    @if (v.StockQty <= 0)
+                                    {
+                                        <span class="tryon-state is-blocked">0</span>
+                                    }
+                                    else if (v.StockQty <= v.LowStockAt)
+                                    {
+                                        <span class="tryon-state is-warning">@v.StockQty</span>
+                                    }
+                                    else
+                                    {
+                                        @v.StockQty
+                                    }
+                                </td>
+                                <td class="small">@(v.StockLocation ?? "Not placed")</td>
+                                <td class="small">
+                                    @if (report is null)
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                    else if (!report.CanFitPhysically)
+                                    {
+                                        <span class="tryon-state is-blocked">Incomplete</span>
+                                    }
+                                    else if (report.HasWarnings)
+                                    {
+                                        <span class="tryon-state is-warning">Check</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="tryon-state is-ready">Ready</span>
+                                    }
+                                </td>
+                                <td class="admin-row-actions">
+                                    <a class="btn btn-quiet btn-small"
+                                       asp-action="Calibrate" asp-route-id="@f.Id" asp-route-variantId="@v.Id">Calibrate</a>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+
+    <aside class="workspace-side">
+        <section class="card">
+            <h2 class="calibrate-heading">Price and cost</h2>
+            <dl class="calibrate-measures">
+                <div><dt>Retail</dt><dd>@Money2(f.BasePriceMinor)</dd></div>
+                <div><dt>Was</dt><dd>@Money2(f.CompareAtMinor)</dd></div>
+                <div><dt>Cost to us</dt><dd>@Money2(f.CostMinor)</dd></div>
+                <div><dt>Last paid</dt><dd>@Money2(f.LastCostMinor)</dd></div>
+                @if (marginPct is { } margin)
+                {
+                    <div><dt>Margin on the frame</dt><dd>@margin.ToString("0.#")%</dd></div>
+                }
+            </dl>
+            <p class="hint">Frame only. Lenses are priced separately at the till.</p>
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Vendor</h2>
+            @if (f.Vendor is { } vendor)
+            {
+                <dl class="calibrate-measures">
+                    <div>
+                        <dt>Supplier</dt>
+                        <dd><a asp-controller="Vendors" asp-action="Edit" asp-route-id="@vendor.Id">@vendor.Name</a></dd>
+                    </div>
+                    <div><dt>Account code</dt><dd>@(vendor.Code ?? "—")</dd></div>
+                    <div><dt>Their code for this</dt><dd>@(f.VendorProductCode ?? "—")</dd></div>
+                    <div><dt>Contact</dt><dd>@(vendor.ContactName ?? "—")</dd></div>
+                    <div><dt>Phone</dt><dd>@(vendor.Phone ?? "—")</dd></div>
+                    <div><dt>Lead time</dt><dd>@(vendor.LeadTimeDays is { } d ? $"{d} working days" : "—")</dd></div>
+                </dl>
+                @if (!vendor.IsActive)
+                {
+                    <p class="hint">This vendor is retired. The stock is still sellable, but there is no reorder route.</p>
+                }
+            }
+            else
+            {
+                <p class="hint">
+                    No vendor recorded, so there is nothing to reorder against.
+                    <a asp-action="Edit" asp-route-id="@f.Id">Set one</a>.
+                </p>
+            }
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Images</h2>
+            @{
+                var images = f.Variants.SelectMany(v => v.Images.Select(i => new { v.ColorName, i.Url, i.Role })).ToList();
+            }
+            @if (images.Count == 0)
+            {
+                <p class="hint">No images yet.</p>
+            }
+            else
+            {
+                <div class="workspace-images">
+                    @foreach (var img in images.Take(12))
+                    {
+                        <figure>
+                            <img src="@img.Url" alt="@f.Name in @img.ColorName" loading="lazy" />
+                            <figcaption>@img.ColorName · @Humanise.Value(img.Role)</figcaption>
+                        </figure>
+                    }
+                </div>
+                @if (images.Count > 12)
+                {
+                    <p class="hint">and @(images.Count - 12) more.</p>
+                }
+            }
+        </section>
+
+        <section class="card">
+            <h2 class="calibrate-heading">Search listing</h2>
+            <dl class="calibrate-measures">
+                <div><dt>URL</dt><dd><code>/frames/@f.Slug</code></dd></div>
+                <div><dt>Title</dt><dd>@(f.MetaTitle ?? "—")</dd></div>
+            </dl>
+            @if (f.MetaDesc is { } desc)
+            {
+                <p class="hint">@desc</p>
+            }
+        </section>
+    </aside>
+</div>

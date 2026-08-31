@@ -163,6 +163,230 @@
         "silver",
         "gold"
       ]
+    },
+    {
+      "name": "Pip",
+      "shape": "rectangle",
+      "rimType": "full_rim",
+      "lensWidthMm": 44,
+      "bridgeWidthMm": 16,
+      "templeLengthMm": 125,
+      "lensHeightMm": 32,
+      "totalWidthMm": 118,
+      "colors": [
+        "navy",
+        "black",
+        "rose"
+      ]
+    },
+    {
+      "name": "Bramble",
+      "shape": "round",
+      "rimType": "full_rim",
+      "lensWidthMm": 42,
+      "bridgeWidthMm": 17,
+      "templeLengthMm": 125,
+      "lensHeightMm": 39,
+      "totalWidthMm": 115,
+      "colors": [
+        "tortoise",
+        "gold",
+        "crystal"
+      ]
+    },
+    {
+      "name": "Otter",
+      "shape": "square",
+      "rimType": "full_rim",
+      "lensWidthMm": 46,
+      "bridgeWidthMm": 16,
+      "templeLengthMm": 130,
+      "lensHeightMm": 37,
+      "totalWidthMm": 120,
+      "colors": [
+        "black",
+        "olive",
+        "crystal"
+      ]
+    },
+    {
+      "name": "Finch",
+      "shape": "oval",
+      "rimType": "full_rim",
+      "lensWidthMm": 43,
+      "bridgeWidthMm": 16,
+      "templeLengthMm": 125,
+      "lensHeightMm": 31,
+      "totalWidthMm": 113,
+      "colors": [
+        "rose",
+        "silver"
+      ]
+    },
+    {
+      "name": "Cobble",
+      "shape": "wayfarer",
+      "rimType": "full_rim",
+      "lensWidthMm": 45,
+      "bridgeWidthMm": 17,
+      "templeLengthMm": 130,
+      "lensHeightMm": 36,
+      "totalWidthMm": 119,
+      "colors": [
+        "black",
+        "navy",
+        "tortoise"
+      ]
+    },
+    {
+      "name": "Marisa",
+      "shape": "cat_eye",
+      "rimType": "full_rim",
+      "lensWidthMm": 51,
+      "bridgeWidthMm": 17,
+      "templeLengthMm": 140,
+      "lensHeightMm": 36,
+      "totalWidthMm": 131,
+      "colors": [
+        "tortoise",
+        "rose",
+        "black"
+      ]
+    },
+    {
+      "name": "Saffron",
+      "shape": "round",
+      "rimType": "semi_rimless",
+      "lensWidthMm": 48,
+      "bridgeWidthMm": 20,
+      "templeLengthMm": 140,
+      "lensHeightMm": 45,
+      "totalWidthMm": 132,
+      "colors": [
+        "gold",
+        "silver"
+      ]
+    },
+    {
+      "name": "Indigo",
+      "shape": "geometric",
+      "rimType": "full_rim",
+      "lensWidthMm": 52,
+      "bridgeWidthMm": 18,
+      "templeLengthMm": 140,
+      "lensHeightMm": 41,
+      "totalWidthMm": 134,
+      "colors": [
+        "navy",
+        "crystal",
+        "olive"
+      ]
+    },
+    {
+      "name": "Vela",
+      "shape": "oval",
+      "rimType": "full_rim",
+      "lensWidthMm": 49,
+      "bridgeWidthMm": 19,
+      "templeLengthMm": 140,
+      "lensHeightMm": 33,
+      "totalWidthMm": 130,
+      "colors": [
+        "rose",
+        "gold",
+        "silver"
+      ]
+    },
+    {
+      "name": "Ridge",
+      "shape": "square",
+      "rimType": "full_rim",
+      "lensWidthMm": 56,
+      "bridgeWidthMm": 18,
+      "templeLengthMm": 148,
+      "lensHeightMm": 46,
+      "totalWidthMm": 146,
+      "colors": [
+        "black",
+        "olive",
+        "navy"
+      ]
+    },
+    {
+      "name": "Fell",
+      "shape": "rectangle",
+      "rimType": "semi_rimless",
+      "lensWidthMm": 54,
+      "bridgeWidthMm": 17,
+      "templeLengthMm": 148,
+      "lensHeightMm": 38,
+      "totalWidthMm": 141,
+      "colors": [
+        "silver",
+        "black"
+      ]
+    },
+    {
+      "name": "Barlow",
+      "shape": "browline",
+      "rimType": "full_rim",
+      "lensWidthMm": 53,
+      "bridgeWidthMm": 18,
+      "templeLengthMm": 145,
+      "lensHeightMm": 41,
+      "totalWidthMm": 141,
+      "colors": [
+        "tortoise",
+        "black",
+        "gold"
+      ]
+    },
+    {
+      "name": "Tarn",
+      "shape": "round",
+      "rimType": "full_rim",
+      "lensWidthMm": 50,
+      "bridgeWidthMm": 22,
+      "templeLengthMm": 145,
+      "lensHeightMm": 47,
+      "totalWidthMm": 138,
+      "colors": [
+        "gold",
+        "silver",
+        "black"
+      ]
+    },
+    {
+      "name": "Dune",
+      "shape": "wayfarer",
+      "rimType": "full_rim",
+      "lensWidthMm": 56,
+      "bridgeWidthMm": 17,
+      "templeLengthMm": 145,
+      "lensHeightMm": 44,
+      "totalWidthMm": 145,
+      "colors": [
+        "tortoise",
+        "black",
+        "olive"
+      ],
+      "tint": "#4a3a26"
+    },
+    {
+      "name": "Solstice",
+      "shape": "oval",
+      "rimType": "full_rim",
+      "lensWidthMm": 57,
+      "bridgeWidthMm": 16,
+      "templeLengthMm": 140,
+      "lensHeightMm": 45,
+      "totalWidthMm": 145,
+      "colors": [
+        "gold",
+        "rose",
+        "silver"
+      ],
+      "tint": "#3a3f4a"
     }
   ]
 }

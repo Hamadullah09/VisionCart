@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SkiaSharp;
+using VisionCart.Infrastructure.Persistence;
 
 namespace VisionCart.IntegrationTests.Http;
 
@@ -596,5 +599,177 @@ public class HttpSignOutTests(VisionCartApp app)
             app.Admin, "/logout", new Dictionary<string, string>());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+}
+
+/// <summary>
+/// The product workspace and the stock tabs, over HTTP.
+///
+/// A back office is judged on whether the answer it gives is the true one, so
+/// these check the numbers rather than the markup: that a stock tab really
+/// narrows the list, that a vendor's frame count is not quietly zero, and that
+/// everything the practice records about a frame reaches one page.
+/// </summary>
+[Collection("http")]
+public class HttpProductWorkspaceTests(VisionCartApp app)
+{
+    private static int RowCount(string html)
+    {
+        var body = html.Split("<tbody>").ElementAtOrDefault(1)?.Split("</tbody>")[0] ?? "";
+        return Regex.Matches(body, "<tr").Count;
+    }
+
+    private async Task<string> AnyFrameIdAsync()
+    {
+        var list = await app.Admin.GetStringAsync("/admin/frames");
+        var id = Regex.Match(list, @"/admin/frames/([a-z0-9]{20,})").Groups[1].Value;
+        Assert.False(string.IsNullOrEmpty(id), "the frame list showed no frames");
+        return id;
+    }
+
+    [Fact]
+    public async Task The_stock_tabs_actually_narrow_the_list()
+    {
+        var all = RowCount(await app.Admin.GetStringAsync("/admin/frames"));
+        var inStock = RowCount(await app.Admin.GetStringAsync("/admin/frames?stock=in"));
+        var outOfStock = RowCount(await app.Admin.GetStringAsync("/admin/frames?stock=out"));
+
+        Assert.True(all > 0, "no frames at all");
+
+        // Every frame is either sellable or it is not, so the two halves have to
+        // add up. A filter that quietly matched everything would pass a
+        // "returns rows" assertion and fail this one.
+        Assert.Equal(all, inStock + outOfStock);
+        Assert.True(inStock > 0, "nothing is in stock, which cannot be right");
+
+        // Both sides have to be non-empty for this to prove anything: a filter
+        // that matched everything would still satisfy the sum above.
+        Assert.True(outOfStock > 0,
+            "no frame is out of stock, so the filter has nothing to demonstrate");
+        Assert.True(inStock < all, "the in-stock filter did not narrow the list at all");
+    }
+
+    [Fact]
+    public async Task A_stock_tab_keeps_the_search_that_is_already_applied()
+    {
+        var html = await app.Admin.GetStringAsync("/admin/frames?stock=in&q=ravi");
+
+        Assert.Contains("value=\"ravi\"", html);
+        Assert.Contains("stock=in", html);
+        Assert.Equal(1, RowCount(html));
+    }
+
+    [Fact]
+    public async Task Everything_the_practice_records_about_a_frame_is_on_one_page()
+    {
+        var html = await app.Admin.GetStringAsync($"/admin/frames/{await AnyFrameIdAsync()}/detail");
+
+        // The sections a dispenser or a buyer actually needs, all reachable
+        // without opening a modal that shows half of them.
+        foreach (var heading in new[]
+                 {
+                     "Overview", "Frame", "Lens", "Fitting features",
+                     "Colourways, stock and where to find them",
+                     "Price and cost", "Vendor", "Images",
+                 })
+        {
+            Assert.Contains(heading, html);
+        }
+
+        // And the figures themselves, not just the headings above them.
+        Assert.Contains("Lens centres", html);
+        Assert.Contains("Their code for this", html);
+        Assert.Contains("Lead time", html);
+        Assert.Matches(@"Aisle\s*\d+", html);
+    }
+
+    [Fact]
+    public async Task The_lens_centre_distance_is_the_lens_plus_the_bridge()
+    {
+        // Not a stored column — computed, and the number the try-on works
+        // decentration out from. Worth pinning where a reader can see it.
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var frame = await db.Frames.AsNoTracking()
+            .FirstAsync(f => f.LensWidthMm != null && f.BridgeWidthMm != null);
+
+        var html = await app.Admin.GetStringAsync($"/admin/frames/{frame.Id}/detail");
+        var expected = frame.LensWidthMm!.Value + frame.BridgeWidthMm!.Value;
+
+        Assert.Contains($"{expected:0.#} mm", html);
+    }
+
+    [Fact]
+    public async Task The_vendor_list_counts_the_frames_it_supplies()
+    {
+        var html = await app.Admin.GetStringAsync("/admin/vendors");
+
+        Assert.Contains("Opticore", html);
+
+        // The defect this catches: the count was read off a navigation property
+        // the query never loaded, so every vendor reported zero frames while
+        // the page looked entirely correct.
+        var counts = Regex.Matches(html, @"<td class=""num"">(\d+)</td>")
+            .Select(m => int.Parse(m.Groups[1].Value))
+            .ToList();
+
+        Assert.NotEmpty(counts);
+        Assert.True(counts.Any(c => c > 0),
+            "every vendor reported zero frames, which means the count is not being loaded");
+    }
+
+    [Fact]
+    public async Task A_vendor_can_be_saved_and_read_back()
+    {
+        var token = await app.AntiforgeryTokenAsync(app.Admin, "/admin/vendors/new");
+
+        var created = await VisionCartApp.PostFormAsync(app.Admin, "/admin/vendors/save",
+            new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token,
+                ["Name"] = "ZZ Test Optical",
+                ["Code"] = "zz-test",
+                ["ContactName"] = "Trade desk",
+                ["LeadTimeDays"] = "4",
+                ["IsActive"] = "true",
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
+
+        var list = await app.Admin.GetStringAsync("/admin/vendors");
+        Assert.Contains("ZZ Test Optical", list);
+
+        // A duplicate code must be refused, or two vendors answer to one account.
+        var duplicateToken = await app.AntiforgeryTokenAsync(app.Admin, "/admin/vendors/new");
+        var duplicate = await VisionCartApp.PostFormAsync(app.Admin, "/admin/vendors/save",
+            new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = duplicateToken,
+                ["Name"] = "ZZ Another Optical",
+                ["Code"] = "zz-test",
+                ["IsActive"] = "true",
+            });
+
+        Assert.Equal(HttpStatusCode.Redirect, duplicate.StatusCode);
+        Assert.DoesNotContain("ZZ Another Optical", await app.Admin.GetStringAsync("/admin/vendors"));
+
+        // Tidy up: this suite runs against a database a developer also browses.
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var stray = await db.Vendors.Where(v => v.Name.StartsWith("ZZ ")).ToListAsync();
+        db.Vendors.RemoveRange(stray);
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Anonymous_visitors_cannot_reach_the_workspace_or_the_vendors()
+    {
+        foreach (var path in new[] { "/admin/vendors", $"/admin/frames/{await AnyFrameIdAsync()}/detail" })
+        {
+            var response = await app.Anonymous.GetAsync(path);
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            Assert.Contains("/login", response.Headers.Location?.OriginalString ?? "");
+        }
     }
 }

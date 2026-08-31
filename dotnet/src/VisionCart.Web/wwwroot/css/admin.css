@@ -284,3 +284,78 @@ body.admin { background: var(--paper-sunk); }
 /* The identity strip under a frame's name: what it is, and whether the mirror
    can actually show it. */
 .frame-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 0; }
+
+/* --- Product workspace -----------------------------------------------------
+   Everything about one frame on one page. A modal can only ever show part of a
+   product, and it cannot be linked to, printed, or left open beside a
+   supplier's catalogue while an order is raised. */
+.workspace { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 1100px) { .workspace { grid-template-columns: minmax(0, 1fr); } }
+
+.workspace-main,
+.workspace-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.workspace-blurb { margin: 14px 0 0; font-size: 13.5px; color: #3E4A4E; line-height: 1.6; }
+
+.size-code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 19px; letter-spacing: .04em; margin: 0 0 12px;
+}
+
+/* A feature is only useful to a dispenser if they can see what it means. */
+.feature-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.feature-list li { font-size: 13px; line-height: 1.5; }
+.feature-list strong { display: block; font-weight: 600; text-transform: capitalize; }
+.feature-list span { color: #6B635C; }
+
+.workspace-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+.workspace-images figure { margin: 0; }
+.workspace-images img {
+    width: 100%; height: auto; display: block;
+    background: #F2EEE8; border: 1px solid #E7E2DA; border-radius: 6px;
+    mix-blend-mode: multiply;
+}
+.workspace-images figcaption { font-size: 10.5px; color: #6B635C; margin-top: 4px; line-height: 1.35; }
+
+/* A table already inside a card should not draw a second border around itself. */
+.admin-table-flush { border: 0; margin: 0; }
+.admin-table-flush table { margin: 0; }
+
+tr.is-retired { opacity: .55; }
+
+.chip-grade { font-variant-numeric: tabular-nums; }
+
+/* --- Stock tabs ------------------------------------------------------------
+   Which frames are on the shelf is the question a back office asks most, so it
+   is a row of tabs rather than another dropdown to open. */
+.stock-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px; }
+.stock-tabs a {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; text-decoration: none;
+    color: #3E4A4E; border: 1px solid #E7E2DA; background: #fff;
+}
+.stock-tabs a:hover { border-color: #D6CEC2; }
+.stock-tabs a.is-current { background: #1C1917; border-color: #1C1917; color: #fff; }
+.stock-tabs a.is-current .stock-tab-count { background: rgba(255,255,255,.2); color: #fff; }
+.stock-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; padding: 0 6px; height: 19px; border-radius: 999px;
+    background: #F2EEE8; color: #6B635C;
+    font-size: 11px; font-variant-numeric: tabular-nums;
+}
+
+/* Frames a vendor supplies, on the vendor's own page. */
+.vendor-frames { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.vendor-frames li { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+
+/* Fitting features: a tick box plus what it actually means, so nobody has to
+   guess whether "low bridge fit" is the thing they want. */
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 12px; }
+.feature-grid .checkline { align-items: flex-start; }
+.feature-grid strong { display: block; font-weight: 600; font-size: 13px; text-transform: capitalize; }
+.feature-grid .hint { display: block; margin: 2px 0 0; }
+
+.location-heading { font-size: 13px; margin: 16px 0 8px; }
+.form-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 760px) { .form-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

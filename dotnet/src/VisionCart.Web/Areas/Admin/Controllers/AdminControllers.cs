@@ -169,20 +169,122 @@ public class PatientsController(
         Back(await patients.RejectAsync(prescriptionId, reason, ct), nameof(Detail), new { id });
 }
 
+/// <summary>
+/// Suppliers. Separate from brands on purpose: a brand is what the customer
+/// reads on the arm, a vendor is who a purchase order goes to.
+/// </summary>
+[Route("admin/vendors")]
+public class VendorsController(ICatalogueAdminService catalogue) : AdminControllerBase
+{
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken ct) =>
+        View(new VendorListViewModel { Vendors = await catalogue.ListVendorsAsync(false, ct) });
+
+    [HttpGet("new")]
+    public IActionResult New() => View("Edit", new VendorEditViewModel());
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Edit(string id, CancellationToken ct)
+    {
+        var vendor = await catalogue.GetVendorAsync(id, ct);
+        if (vendor is null) return NotFound();
+
+        return View(new VendorEditViewModel
+        {
+            Vendor = vendor,
+            Frames = [.. vendor.Frames.OrderBy(f => f.Name)],
+            Details = new VendorDetails
+            {
+                Name = vendor.Name,
+                Code = vendor.Code,
+                ContactName = vendor.ContactName,
+                Email = vendor.Email,
+                Phone = vendor.Phone,
+                Address = vendor.Address,
+                LeadTimeDays = vendor.LeadTimeDays,
+                Notes = vendor.Notes,
+                IsActive = vendor.IsActive,
+            },
+        });
+    }
+
+    [HttpPost("save")]
+    public async Task<IActionResult> Save(
+        string? id, [FromForm] VendorDetails details, CancellationToken ct)
+    {
+        var result = await catalogue.SaveVendorAsync(id, details, ct);
+
+        if (!result.Ok)
+        {
+            TempData["AdminError"] = result.Error;
+            return RedirectToAction(id is null ? nameof(New) : nameof(Edit), new { id });
+        }
+
+        TempData["AdminOk"] = "Vendor saved.";
+        return RedirectToAction(nameof(Edit), new { id = result.Value });
+    }
+
+    [HttpPost("{id}/retire")]
+    public async Task<IActionResult> Retire(string id, CancellationToken ct) =>
+        Back(await catalogue.RetireVendorAsync(id, ct), nameof(Index));
+}
+
 [Route("admin/frames")]
 public class FramesController(
     ICatalogueAdminService catalogue,
     IApplicationDbContext db) : AdminControllerBase
 {
     [HttpGet("")]
-    public async Task<IActionResult> Index([FromQuery] string? q, [FromQuery] string? status,
+    public async Task<IActionResult> Index(
+        [FromQuery] string? q, [FromQuery] string? status, [FromQuery] string? stock,
         [FromQuery] int page = 1, CancellationToken ct = default)
     {
+        var filter = stock switch
+        {
+            "in" => StockFilter.InStock,
+            "out" => StockFilter.OutOfStock,
+            "low" => StockFilter.Low,
+            _ => StockFilter.Any,
+        };
+
+        var results = await catalogue.ListFramesAsync(q, status, page, filter, ct);
+
         return View(new FrameListViewModel
         {
-            Results = await catalogue.ListFramesAsync(q, status, page, ct),
+            Results = results,
             Q = q,
             Status = status,
+            Stock = stock ?? "any",
+            Readiness = results.Items.ToDictionary(
+                f => f.Id,
+                f => f.Variants.Count == 0
+                    ? new TryOnReadiness.Report(false, [], null, null, null, null)
+                    : f.Variants
+                        .Select(v => TryOnReadiness.Inspect(f, v))
+                        .OrderBy(r => r.CanFitPhysically).ThenBy(r => !r.HasWarnings)
+                        .First()),
+        });
+    }
+
+    /// <summary>
+    /// Everything about one product on one page.
+    ///
+    /// A modal can only ever show part of a frame, and it cannot be linked to,
+    /// printed or left open beside a supplier's catalogue. This is the page an
+    /// order is raised from, so it holds the lot: what it is, how it is made,
+    /// what it costs, where the stock is and who it came from.
+    /// </summary>
+    [HttpGet("{id}/detail")]
+    public async Task<IActionResult> Detail(string id, CancellationToken ct)
+    {
+        var frame = await catalogue.GetFrameAsync(id, ct);
+        if (frame is null) return NotFound();
+
+        return View(new FrameWorkspaceViewModel
+        {
+            Frame = frame,
+            Readiness = frame.Variants.ToDictionary(
+                v => v.Id, v => TryOnReadiness.Inspect(frame, v)),
         });
     }
 
@@ -279,6 +381,7 @@ public class FramesController(
         {
             Frame = frame,
             Brands = await db.Brands.AsNoTracking().OrderBy(b => b.Name).ToListAsync(ct),
+            Vendors = await catalogue.ListVendorsAsync(activeOnly: false, ct),
             Categories = await db.Categories.AsNoTracking().OrderBy(c => c.Position).ToListAsync(ct),
             Details = frame is null ? new FrameDetails() : FrameEditViewModel.From(frame),
             SelectedCategoryIds = frame?.Categories.Select(c => c.CategoryId).ToList() ?? [],

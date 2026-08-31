@@ -15,6 +15,37 @@ public class Brand
     public ICollection<Frame> Frames { get; set; } = [];
 }
 
+/// <summary>
+/// Who a frame is bought from.
+///
+/// Separate from <see cref="Brand"/> on purpose: a brand is what the customer
+/// sees on the arm, a vendor is who the practice raises a purchase order with.
+/// One vendor commonly supplies several brands, and the same brand can arrive
+/// through more than one distributor.
+/// </summary>
+public class Vendor
+{
+    public string Id { get; set; } = Cuid.NewId();
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Short account code, as it appears on an invoice.</summary>
+    public string? Code { get; set; }
+
+    public string? ContactName { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? Address { get; set; }
+
+    /// <summary>Working days from order to delivery, for reordering.</summary>
+    public int? LeadTimeDays { get; set; }
+
+    public string? Notes { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public ICollection<Frame> Frames { get; set; } = [];
+}
+
 public class Category
 {
     public string Id { get; set; } = Cuid.NewId();
@@ -62,6 +93,34 @@ public class Frame
 
     /// <summary>Face shapes this frame flatters, comma separated.</summary>
     public string? FaceShapes { get; set; }
+
+    /// <summary>
+    /// Fitting features, comma separated and validated against
+    /// <see cref="Domain.Constants.FrameFeatures"/> — adjustable nose pads, a
+    /// low bridge fit, spring hinges and so on.
+    ///
+    /// These are what a dispenser reaches for when a frame nearly fits: a low
+    /// bridge fit suits a face the standard bridge slides down, adjustable pads
+    /// let the same frame sit right on two different noses. Stored as a
+    /// constrained string rather than an enum or an array so the schema stays
+    /// portable across SQL Server, Postgres and MySQL.
+    /// </summary>
+    public string? Features { get; set; }
+
+    // --- purchasing -------------------------------------------------------
+    // Who it comes from, what they call it, and what it last cost. Kept beside
+    // the frame because reordering starts from the product, not the ledger.
+    public string? VendorId { get; set; }
+    public Vendor? Vendor { get; set; }
+
+    /// <summary>The vendor's own code for this frame, for raising an order.</summary>
+    public string? VendorProductCode { get; set; }
+
+    /// <summary>What the last delivery cost, in minor units. Never a decimal.</summary>
+    public int? LastCostMinor { get; set; }
+
+    /// <summary>Promotional grade the practice sorts its stock into: A, B or C.</summary>
+    public string? PromotionGrade { get; set; }
 
     // Standard eyewear sizing in millimetres (e.g. 52 [] 18 - 140)
     public double? LensWidthMm { get; set; }
@@ -126,6 +185,26 @@ public class FrameVariant
 
     public int StockQty { get; set; }
     public int LowStockAt { get; set; } = 3;
+
+    // --- where this colourway physically sits ------------------------------
+    // On the colourway rather than the frame, because that is what is counted
+    // and picked: two colours of one frame live in two different bins.
+    public string? Aisle { get; set; }
+    public string? Shelf { get; set; }
+    public string? ShelfRow { get; set; }
+    public string? Bin { get; set; }
+
+    /// <summary>Aisle 19 · shelf F · row 4 · bin 6, or null when unplaced.</summary>
+    public string? StockLocation =>
+        new[] { Aisle, Shelf, ShelfRow, Bin }.Any(p => !string.IsNullOrWhiteSpace(p))
+            ? string.Join(" · ", new[]
+              {
+                  string.IsNullOrWhiteSpace(Aisle) ? null : $"Aisle {Aisle}",
+                  string.IsNullOrWhiteSpace(Shelf) ? null : $"Shelf {Shelf}",
+                  string.IsNullOrWhiteSpace(ShelfRow) ? null : $"Row {ShelfRow}",
+                  string.IsNullOrWhiteSpace(Bin) ? null : $"Bin {Bin}",
+              }.Where(p => p is not null))
+            : null;
     public bool IsActive { get; set; } = true;
     public int Position { get; set; }
 

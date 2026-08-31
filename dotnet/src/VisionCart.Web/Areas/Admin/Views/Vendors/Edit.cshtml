@@ -1,0 +1,141 @@
+@model VendorEditViewModel
+@{
+    var isNew = Model.Vendor is null;
+    ViewData["Title"] = isNew ? "New vendor" : Model.Vendor!.Name;
+    var d = Model.Details;
+}
+
+<nav class="admin-crumbs" aria-label="Breadcrumb">
+    <a asp-controller="Frames" asp-action="Index">Frames</a>
+    <span aria-hidden="true">/</span>
+    <a asp-action="Index">Vendors</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">@(isNew ? "New" : Model.Vendor!.Name)</span>
+</nav>
+
+<div class="panel-head">
+    <div>
+        <h1>@(isNew ? "New vendor" : Model.Vendor!.Name)</h1>
+        @if (!isNew)
+        {
+            <p class="frame-meta">
+                @if (Model.Vendor!.Code is { } code)
+                {
+                    <code>@code</code>
+                }
+                @if (Model.Vendor.IsActive)
+                {
+                    <span class="tryon-state is-ready">Active</span>
+                }
+                else
+                {
+                    <span class="tryon-state is-warning">Retired</span>
+                }
+                <span class="chip">@Model.Frames.Count frame@(Model.Frames.Count == 1 ? "" : "s")</span>
+            </p>
+        }
+    </div>
+    @if (!isNew && Model.Vendor!.IsActive)
+    {
+        <form method="post" asp-action="Retire" asp-route-id="@Model.Vendor.Id">
+            <button class="btn btn-outline btn-small" type="submit">Retire</button>
+        </form>
+    }
+</div>
+
+<div class="admin-two-col">
+    <form method="post" asp-action="Save" asp-route-id="@Model.Vendor?.Id">
+        <div class="panel">
+            <h2>Details</h2>
+            <div class="form-grid">
+                <div class="full">
+                    <label for="Name">Vendor name</label>
+                    <input class="field" id="Name" name="Name" value="@d.Name" required autofocus />
+                </div>
+                <div>
+                    <label for="Code">Account code</label>
+                    <input class="field" id="Code" name="Code" value="@d.Code" />
+                    <p class="hint">As it appears on their invoice. Must be unique.</p>
+                </div>
+                <div>
+                    <label for="LeadTimeDays">Lead time (working days)</label>
+                    <input class="field" id="LeadTimeDays" name="LeadTimeDays" type="number"
+                           min="0" max="365" value="@d.LeadTimeDays" />
+                    <p class="hint">Order to delivery. Used when deciding what to reorder.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Contact</h2>
+            <div class="form-grid">
+                <div>
+                    <label for="ContactName">Who to ask for</label>
+                    <input class="field" id="ContactName" name="ContactName" value="@d.ContactName" />
+                </div>
+                <div>
+                    <label for="Phone">Phone</label>
+                    <input class="field" id="Phone" name="Phone" type="tel" value="@d.Phone" />
+                </div>
+                <div class="full">
+                    <label for="Email">Email</label>
+                    <input class="field" id="Email" name="Email" type="email" value="@d.Email" />
+                </div>
+                <div class="full">
+                    <label for="Address">Address</label>
+                    <input class="field" id="Address" name="Address" value="@d.Address" />
+                </div>
+                <div class="full">
+                    <label for="Notes">Notes</label>
+                    <textarea class="field" id="Notes" name="Notes" rows="4">@d.Notes</textarea>
+                    <p class="hint">Delivery days, minimum order, anything the next person needs to know.</p>
+                </div>
+                <div class="full">
+                    <label class="checkline">
+                        <input type="checkbox" name="IsActive" value="true" checked="@d.IsActive" />
+                        <span>Offer this vendor when setting up a frame</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" type="submit">Save vendor</button>
+    </form>
+
+    <div>
+        <div class="panel">
+            <h2>Frames from this vendor</h2>
+            @if (Model.Frames.Count == 0)
+            {
+                <p class="hint">
+                    None yet. Set the vendor on a frame's edit page and it will appear here.
+                </p>
+            }
+            else
+            {
+                <ul class="vendor-frames">
+                    @foreach (var frame in Model.Frames)
+                    {
+                        <li>
+                            <a asp-controller="Frames" asp-action="Detail" asp-route-id="@frame.Id">@frame.Name</a>
+                            <span class="muted small">
+                                <code>@frame.Sku</code>
+                                @if (frame.VendorProductCode is { } vpc)
+                                {
+                                    <text>· their code @vpc</text>
+                                }
+                            </span>
+                        </li>
+                    }
+                </ul>
+            }
+            @if (!isNew && !Model.Vendor!.IsActive)
+            {
+                <p class="hint">
+                    Retiring a vendor leaves its frames alone &mdash; the stock is still on the
+                    shelf and still sellable. Only the reorder route has closed.
+                </p>
+            }
+        </div>
+    </div>
+</div>

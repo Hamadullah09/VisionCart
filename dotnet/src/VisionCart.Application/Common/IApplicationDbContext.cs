@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<Address> Addresses { get; }
 
     DbSet<Brand> Brands { get; }
+    DbSet<Vendor> Vendors { get; }
     DbSet<Category> Categories { get; }
     DbSet<FrameCategory> FrameCategories { get; }
     DbSet<Frame> Frames { get; }

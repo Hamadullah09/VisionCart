@@ -103,9 +103,11 @@ public class SchemaMigrationTests : IAsyncLifetime
             JOIN sys.tables t ON t.object_id = c.object_id
             WHERE t.is_ms_shipped = 0 AND c.name LIKE '%Minor'
             """);
-        // 24 money columns across 10 tables. Asserted exactly so that adding or
-        // dropping one is a deliberate, visible decision rather than a silent drift.
-        Assert.Equal(24, moneyColumns);
+        // 25 money columns across 10 tables. Asserted exactly so that adding or
+        // dropping one is a deliberate, visible decision rather than a silent
+        // drift. The twenty-fifth is Frame.LastCostMinor - what the last
+        // delivery of a frame cost, added with the vendor record.
+        Assert.Equal(25, moneyColumns);
     }
 
     [Fact]

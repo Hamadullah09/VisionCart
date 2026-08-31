@@ -59,6 +59,52 @@ public static class RimTypes
     public static readonly IReadOnlyList<string> All = [FullRim, "semi_rimless", "rimless"];
 }
 
+/// <summary>
+/// Fitting features a dispenser reaches for when a frame nearly fits.
+///
+/// Constrained strings rather than an enum, so the schema stays portable and a
+/// new feature is a data change rather than a migration.
+/// </summary>
+public static class FrameFeatures
+{
+    public const string AdjustableNosePads = "adjustable_nose_pads";
+    public const string IntegratedNosePads = "integrated_nose_pads";
+    public const string LowBridgeFit = "low_bridge_fit";
+    public const string SpringHinges = "spring_hinges";
+    public const string Flexible = "flexible";
+    public const string Lightweight = "lightweight";
+    public const string Hypoallergenic = "hypoallergenic";
+    public const string AdjustableTemples = "adjustable_temples";
+
+    public static readonly IReadOnlyList<string> All =
+    [
+        AdjustableNosePads, IntegratedNosePads, LowBridgeFit, SpringHinges,
+        Flexible, Lightweight, Hypoallergenic, AdjustableTemples,
+    ];
+
+    /// <summary>What each one means to somebody choosing a frame.</summary>
+    public static readonly IReadOnlyDictionary<string, string> Help =
+        new Dictionary<string, string>
+        {
+            [AdjustableNosePads] = "Metal pads a dispenser can bend to sit right on your nose.",
+            [IntegratedNosePads] = "Moulded into the frame — nothing to adjust, nothing to snap off.",
+            [LowBridgeFit] = "Built for a lower nose bridge, so the frame stops sliding down.",
+            [SpringHinges] = "Arms that flex outward, so the frame survives being taken off one-handed.",
+            [Flexible] = "Bends a long way and comes back. Good with children.",
+            [Lightweight] = "Under about 20 grams — you stop noticing it.",
+            [Hypoallergenic] = "No nickel. For skin that reacts to ordinary metal frames.",
+            [AdjustableTemples] = "Arms that can be shortened or curved to the ear.",
+        };
+}
+
+/// <summary>
+/// How a practice grades its stock for promotion: A moves, C does not.
+/// </summary>
+public static class PromotionGrades
+{
+    public static readonly IReadOnlyList<string> All = ["A", "B", "C"];
+}
+
 public static class Genders
 {
     public const string Unisex = "unisex";

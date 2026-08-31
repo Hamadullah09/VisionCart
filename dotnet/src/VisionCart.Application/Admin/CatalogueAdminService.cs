@@ -21,6 +21,15 @@ public sealed class FrameDetails
     public string RimType { get; set; } = RimTypes.FullRim;
     public string Gender { get; set; } = Genders.Unisex;
     public string? FaceShapes { get; set; }
+    // --- purchasing and fitting -------------------------------------------
+    public string? VendorId { get; set; }
+    public string? VendorProductCode { get; set; }
+    public decimal? LastCost { get; set; }
+    public string? PromotionGrade { get; set; }
+
+    /// <summary>Fitting features, from the tick boxes on the frame form.</summary>
+    public List<string> FeatureCodes { get; set; } = [];
+
     public double? LensWidthMm { get; set; }
     public double? BridgeWidthMm { get; set; }
     public double? TempleLengthMm { get; set; }
@@ -52,6 +61,56 @@ public sealed class VariantDetails
     public int LowStockAt { get; set; } = 3;
     public int Position { get; set; }
     public bool IsActive { get; set; } = true;
+
+    // Where this colourway physically sits. Free text, because practices label
+    // their bays "F", "3A" and "back-left" and refusing their own labels helps
+    // nobody find anything.
+    public string? Aisle { get; set; }
+    public string? Shelf { get; set; }
+    public string? ShelfRow { get; set; }
+    public string? Bin { get; set; }
+}
+
+/// <summary>
+/// A vendor as the list shows it, with the number of frames bought from it.
+///
+/// A projection rather than the entity: counting <c>Vendor.Frames</c> on a
+/// list of entities either loads every frame to count them or, if nobody
+/// remembered the Include, quietly reports zero for all of them.
+/// </summary>
+public sealed class VendorRow
+{
+    public string Id { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string? Code { get; init; }
+    public string? ContactName { get; init; }
+    public string? Phone { get; init; }
+    public int? LeadTimeDays { get; init; }
+    public bool IsActive { get; init; }
+    public int FrameCount { get; init; }
+}
+
+/// <summary>A supplier record, as the back office edits it.</summary>
+public sealed class VendorDetails
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Code { get; set; }
+    public string? ContactName { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? Address { get; set; }
+    public int? LeadTimeDays { get; set; }
+    public string? Notes { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>Which frames a stock filter is asking for.</summary>
+public enum StockFilter
+{
+    Any,
+    InStock,
+    OutOfStock,
+    Low,
 }
 
 /// <summary>
@@ -106,9 +165,15 @@ public sealed class LensOptionDetails
 public interface ICatalogueAdminService
 {
     Task<PagedResult<Frame>> ListFramesAsync(string? q, string? status, int page,
+        StockFilter stock = StockFilter.Any,
         CancellationToken ct = default);
 
     Task<Frame?> GetFrameAsync(string id, CancellationToken ct = default);
+
+    Task<IReadOnlyList<VendorRow>> ListVendorsAsync(bool activeOnly = false, CancellationToken ct = default);
+    Task<Vendor?> GetVendorAsync(string id, CancellationToken ct = default);
+    Task<ActionResult<string>> SaveVendorAsync(string? id, VendorDetails details, CancellationToken ct = default);
+    Task<ActionResult> RetireVendorAsync(string id, CancellationToken ct = default);
     Task<ActionResult<string>> SaveFrameAsync(string? id, FrameDetails details, CancellationToken ct = default);
     Task<ActionResult> ArchiveFrameAsync(string id, CancellationToken ct = default);
 
@@ -138,10 +203,12 @@ public sealed class CatalogueAdminService(
     private readonly string _currency = store.Value.Currency;
 
     public async Task<PagedResult<Frame>> ListFramesAsync(
-        string? q, string? status, int page, CancellationToken ct = default)
+        string? q, string? status, int page,
+        StockFilter stock = StockFilter.Any, CancellationToken ct = default)
     {
         var query = db.Frames.AsNoTracking()
             .Include(f => f.Brand)
+            .Include(f => f.Vendor)
             .Include(f => f.Variants)
             .AsQueryable();
 
@@ -155,6 +222,18 @@ public sealed class CatalogueAdminService(
         }
 
         if (!string.IsNullOrEmpty(status)) query = query.Where(f => f.Status == status);
+
+        // Stock is held per colourway, so a frame counts as in stock when any
+        // of its live colourways does. Filtering on the sum would call a frame
+        // available while the only colour anyone wants is gone.
+        query = stock switch
+        {
+            StockFilter.InStock => query.Where(f => f.Variants.Any(v => v.IsActive && v.StockQty > 0)),
+            StockFilter.OutOfStock => query.Where(f => !f.Variants.Any(v => v.IsActive && v.StockQty > 0)),
+            StockFilter.Low => query.Where(f => f.Variants.Any(v =>
+                v.IsActive && v.StockQty > 0 && v.StockQty <= v.LowStockAt)),
+            _ => query,
+        };
 
         var total = await query.CountAsync(ct);
         const int perPage = 25;
@@ -171,9 +250,87 @@ public sealed class CatalogueAdminService(
     public async Task<Frame?> GetFrameAsync(string id, CancellationToken ct = default) =>
         await db.Frames
             .Include(f => f.Brand)
+            .Include(f => f.Vendor)
             .Include(f => f.Categories)
             .Include(f => f.Variants.OrderBy(v => v.Position)).ThenInclude(v => v.Images)
             .FirstOrDefaultAsync(f => f.Id == id, ct);
+
+    // --- vendors -----------------------------------------------------------
+
+    public async Task<IReadOnlyList<VendorRow>> ListVendorsAsync(
+        bool activeOnly = false, CancellationToken ct = default) =>
+        await db.Vendors.AsNoTracking()
+            .Where(v => !activeOnly || v.IsActive)
+            .OrderBy(v => v.Name)
+            .Select(v => new VendorRow
+            {
+                Id = v.Id,
+                Name = v.Name,
+                Code = v.Code,
+                ContactName = v.ContactName,
+                Phone = v.Phone,
+                LeadTimeDays = v.LeadTimeDays,
+                IsActive = v.IsActive,
+                FrameCount = v.Frames.Count,
+            })
+            .ToListAsync(ct);
+
+    public async Task<Vendor?> GetVendorAsync(string id, CancellationToken ct = default) =>
+        await db.Vendors.Include(v => v.Frames).FirstOrDefaultAsync(v => v.Id == id, ct);
+
+    public async Task<ActionResult<string>> SaveVendorAsync(
+        string? id, VendorDetails d, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(d.Name))
+            return ActionResult<string>.Fail("Give the vendor a name.");
+
+        var vendor = id is null
+            ? new Vendor()
+            : await db.Vendors.FirstOrDefaultAsync(v => v.Id == id, ct);
+
+        if (vendor is null) return ActionResult<string>.Fail("That vendor no longer exists.");
+
+        var name = d.Name.Trim();
+        var code = Blank(d.Code)?.Trim().ToLowerInvariant();
+
+        if (await db.Vendors.AnyAsync(v => v.Id != vendor.Id && v.Name == name, ct))
+            return ActionResult<string>.Fail($"There is already a vendor called {name}.");
+
+        if (code is not null && await db.Vendors.AnyAsync(v => v.Id != vendor.Id && v.Code == code, ct))
+            return ActionResult<string>.Fail($"The code {code} belongs to another vendor.");
+
+        if (d.LeadTimeDays is < 0 or > 365)
+            return ActionResult<string>.Fail("Lead time should be between 0 and 365 days.");
+
+        vendor.Name = name;
+        vendor.Code = code;
+        vendor.ContactName = Blank(d.ContactName);
+        vendor.Email = Blank(d.Email);
+        vendor.Phone = Blank(d.Phone);
+        vendor.Address = Blank(d.Address);
+        vendor.LeadTimeDays = d.LeadTimeDays;
+        vendor.Notes = Blank(d.Notes);
+        vendor.IsActive = d.IsActive;
+
+        if (id is null) db.Vendors.Add(vendor);
+        await db.SaveChangesAsync(ct);
+
+        return ActionResult<string>.Success(vendor.Id);
+    }
+
+    /// <summary>
+    /// Retires a vendor without touching its frames. The stock is still on the
+    /// shelf and still sellable; only the reorder route has closed.
+    /// </summary>
+    public async Task<ActionResult> RetireVendorAsync(string id, CancellationToken ct = default)
+    {
+        var vendor = await db.Vendors.FirstOrDefaultAsync(v => v.Id == id, ct);
+        if (vendor is null) return ActionResult.Fail("That vendor no longer exists.");
+
+        vendor.IsActive = false;
+        await db.SaveChangesAsync(ct);
+        return ActionResult.Success();
+    }
 
     public async Task<ActionResult<string>> SaveFrameAsync(
         string? id, FrameDetails d, CancellationToken ct = default)
@@ -202,6 +359,24 @@ public sealed class CatalogueAdminService(
         frame.RimType = d.RimType;
         frame.Gender = d.Gender;
         frame.FaceShapes = Blank(d.FaceShapes);
+        // Purchasing. Cost arrives in major units from a form and is converted
+        // exactly once, here, like every other price on the way in.
+        frame.VendorId = Blank(d.VendorId);
+        frame.VendorProductCode = Blank(d.VendorProductCode)?.ToUpperInvariant();
+        frame.LastCostMinor = d.LastCost is { } lastCost and > 0 ? Money.ToMinor(lastCost, _currency) : null;
+
+        frame.PromotionGrade = PromotionGrades.All.Contains(d.PromotionGrade ?? "")
+            ? d.PromotionGrade
+            : null;
+
+        // Only codes the domain knows. A typo in a form field must not become a
+        // feature the product page then tries to explain.
+        var features = d.FeatureCodes
+            .Where(c => FrameFeatures.All.Contains(c))
+            .Distinct()
+            .ToList();
+        frame.Features = features.Count > 0 ? string.Join(",", features) : null;
+
         frame.LensWidthMm = d.LensWidthMm;
         frame.BridgeWidthMm = d.BridgeWidthMm;
         frame.TempleLengthMm = d.TempleLengthMm;
@@ -299,6 +474,10 @@ public sealed class CatalogueAdminService(
         variant.PriceMinor = d.PriceOverride is { } p ? Money.ToMinor(p, _currency) : null;
         variant.StockQty = Math.Max(0, d.StockQty);
         variant.LowStockAt = Math.Max(0, d.LowStockAt);
+        variant.Aisle = Blank(d.Aisle);
+        variant.Shelf = Blank(d.Shelf);
+        variant.ShelfRow = Blank(d.ShelfRow);
+        variant.Bin = Blank(d.Bin);
         variant.Position = d.Position;
         variant.IsActive = d.IsActive;
 

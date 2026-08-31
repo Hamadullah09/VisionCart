@@ -35,6 +35,13 @@ public sealed class FrameListViewModel
     public PagedResult<Frame> Results { get; init; } = new();
     public string? Q { get; init; }
     public string? Status { get; init; }
+
+    /// <summary>any | in | out | low — the tab across the top of the list.</summary>
+    public string Stock { get; init; } = "any";
+
+    /// <summary>Try-on readiness per frame, so a broken one shows in the list.</summary>
+    public IReadOnlyDictionary<string, TryOnReadiness.Report> Readiness { get; init; } =
+        new Dictionary<string, TryOnReadiness.Report>();
 }
 
 /// <summary>
@@ -47,11 +54,44 @@ public sealed class FrameCalibrationViewModel
     public TryOnReadiness.Report Readiness { get; init; } = null!;
 }
 
+/// <summary>
+/// A frame as the back office reads it: everything about one product on one
+/// page, rather than a modal that shows some of it.
+/// </summary>
+public sealed class FrameWorkspaceViewModel
+{
+    public Frame Frame { get; init; } = null!;
+
+    /// <summary>Try-on readiness per colourway, keyed by variant id.</summary>
+    public IReadOnlyDictionary<string, TryOnReadiness.Report> Readiness { get; init; } =
+        new Dictionary<string, TryOnReadiness.Report>();
+
+    public int TotalStock => Frame.Variants.Sum(v => v.StockQty);
+    public bool IsOutOfStock => !Frame.Variants.Any(v => v.IsActive && v.StockQty > 0);
+    public bool IsLowStock => Frame.Variants.Any(v => v.IsActive && v.StockQty > 0 && v.StockQty <= v.LowStockAt);
+}
+
+public sealed class VendorListViewModel
+{
+    public IReadOnlyList<VendorRow> Vendors { get; init; } = [];
+}
+
+public sealed class VendorEditViewModel
+{
+    public Vendor? Vendor { get; init; }
+    public VendorDetails Details { get; set; } = new();
+
+    /// <summary>Frames currently bought from this vendor.</summary>
+    public IReadOnlyList<Frame> Frames { get; init; } = [];
+}
+
 public sealed class FrameEditViewModel
 {
     public Frame? Frame { get; init; }
     public FrameDetails Details { get; set; } = new();
     public IReadOnlyList<Brand> Brands { get; init; } = [];
+    /// <summary>Only what the picker needs: a name, an id and whether it is live.</summary>
+    public IReadOnlyList<VendorRow> Vendors { get; init; } = [];
     public IReadOnlyList<Category> Categories { get; init; } = [];
     public IReadOnlyList<string> SelectedCategoryIds { get; init; } = [];
 
@@ -83,6 +123,16 @@ public sealed class FrameEditViewModel
         Price = Money.FromMinor(f.BasePriceMinor, "PKR"),
         CompareAt = f.CompareAtMinor is { } c ? Money.FromMinor(c, "PKR") : null,
         Cost = f.CostMinor is { } cost ? Money.FromMinor(cost, "PKR") : null,
+
+        // Without these the form would post back empty values and silently
+        // clear a frame's vendor and features on the next save.
+        VendorId = f.VendorId,
+        VendorProductCode = f.VendorProductCode,
+        LastCost = f.LastCostMinor is { } last ? Money.FromMinor(last, "PKR") : null,
+        PromotionGrade = f.PromotionGrade,
+        FeatureCodes = [.. (f.Features ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
+
         AllowFrameOnly = f.AllowFrameOnly,
         RequiresPrescription = f.RequiresPrescription,
         IsFeatured = f.IsFeatured,

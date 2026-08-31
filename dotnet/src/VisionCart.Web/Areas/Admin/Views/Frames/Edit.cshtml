@@ -41,7 +41,8 @@
     @if (!isNew)
     {
         <div class="admin-row-actions">
-            <a class="btn btn-outline btn-small" href="/frames/@Model.Frame!.Slug" target="_blank" rel="noopener">View in shop &#8599;</a>
+            <a class="btn btn-outline btn-small" asp-action="Detail" asp-route-id="@Model.Frame!.Id">All details</a>
+            <a class="btn btn-outline btn-small" href="/frames/@Model.Frame.Slug" target="_blank" rel="noopener">View in shop &#8599;</a>
             @if (mirrorReady is not null)
             {
                 <a class="btn btn-outline btn-small" href="/try-on?variant=@mirrorReady.Id" target="_blank" rel="noopener">Try it on &#8599;</a>
@@ -151,6 +152,30 @@
             </div>
 
             <div class="panel">
+                <h2>Fitting features</h2>
+                <p class="hint" style="margin-top:0;">
+                    What a dispenser reaches for when a frame nearly fits. These appear on the
+                    product page with an explanation, so only tick what is actually true.
+                </p>
+                <div class="feature-grid">
+                    @{
+                        var chosen = d.FeatureCodes ?? [];
+                    }
+                    @foreach (var code in FrameFeatures.All)
+                    {
+                        <label class="checkline">
+                            <input type="checkbox" name="FeatureCodes" value="@code"
+                                   checked="@chosen.Contains(code)" />
+                            <span>
+                                <strong>@Humanise.Value(code)</strong>
+                                <span class="hint">@FrameFeatures.Help.GetValueOrDefault(code)</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="panel">
                 <h2>Measurements (mm)</h2>
                 <p class="hint" style="margin-top:0;">
                     These are not spec-sheet decoration. The virtual try-on draws this frame at
@@ -170,6 +195,51 @@
         </div>
 
         <div>
+            <div class="panel">
+                <h2>Buying</h2>
+                <p class="hint" style="margin-top:0;">
+                    Where this frame comes from, so a reorder can start from the product rather
+                    than the ledger.
+                </p>
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="VendorId">Vendor</label>
+                        <select id="VendorId" name="VendorId">
+                            <option value="">No vendor</option>
+                            @foreach (var vendor in Model.Vendors)
+                            {
+                                <option value="@vendor.Id" selected="@(d.VendorId == vendor.Id)">
+                                    @vendor.Name@(vendor.IsActive ? "" : " (retired)")
+                                </option>
+                            }
+                        </select>
+                        <p class="hint"><a asp-controller="Vendors" asp-action="Index">Manage vendors</a></p>
+                    </div>
+                    <div>
+                        <label for="VendorProductCode">Their code for it</label>
+                        <input class="field" id="VendorProductCode" name="VendorProductCode"
+                               value="@d.VendorProductCode" />
+                    </div>
+                    <div>
+                        <label for="LastCost">Last paid</label>
+                        <input class="field" id="LastCost" name="LastCost" inputmode="decimal"
+                               value="@d.LastCost" />
+                        <p class="hint">What the last delivery cost, per frame.</p>
+                    </div>
+                    <div class="full">
+                        <label for="PromotionGrade">Promotion grade</label>
+                        <select id="PromotionGrade" name="PromotionGrade">
+                            <option value="">Not graded</option>
+                            @foreach (var grade in PromotionGrades.All)
+                            {
+                                <option value="@grade" selected="@(d.PromotionGrade == grade)">@grade</option>
+                            }
+                        </select>
+                        <p class="hint">How this practice sorts its stock: A moves, C does not.</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="panel">
                 <h2>Price &amp; rules</h2>
                 <div class="form-grid">
@@ -276,6 +346,14 @@
                             <div><label>Sort order</label><input class="field" name="Position" type="number" value="@variant.Position" /></div>
                             <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked="@variant.IsActive" /><span>Show in the shop</span></label>
                         </div>
+
+                        <h4 class="location-heading">Where it sits</h4>
+                        <div class="form-grid four">
+                            <div><label>Aisle</label><input class="field" name="Aisle" value="@variant.Aisle" /></div>
+                            <div><label>Shelf</label><input class="field" name="Shelf" value="@variant.Shelf" /></div>
+                            <div><label>Row</label><input class="field" name="ShelfRow" value="@variant.ShelfRow" /></div>
+                            <div><label>Bin</label><input class="field" name="Bin" value="@variant.Bin" /></div>
+                        </div>
                         <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save colourway</button>
                     </form>
 
@@ -336,6 +414,14 @@
                         <div><label>Warn at</label><input class="field" name="LowStockAt" type="number" value="3" /></div>
                         <div><label>Sort order</label><input class="field" name="Position" type="number" value="0" /></div>
                         <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked /><span>Show in the shop</span></label>
+                    </div>
+
+                    <h4 class="location-heading">Where it sits</h4>
+                    <div class="form-grid four">
+                        <div><label>Aisle</label><input class="field" name="Aisle" /></div>
+                        <div><label>Shelf</label><input class="field" name="Shelf" /></div>
+                        <div><label>Row</label><input class="field" name="ShelfRow" /></div>
+                        <div><label>Bin</label><input class="field" name="Bin" /></div>
                     </div>
                     <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add colourway</button>
                 </form>

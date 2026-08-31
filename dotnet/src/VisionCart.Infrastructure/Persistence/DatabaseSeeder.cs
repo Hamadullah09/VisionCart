@@ -33,7 +33,8 @@ public sealed class DatabaseSeeder(
         await SeedLensOptionsAsync(ct);
         var categories = await SeedCategoriesAsync(ct);
         var brands = await SeedBrandsAsync(ct);
-        await SeedCatalogueAsync(brands, categories, webRootPath, ct);
+        var vendors = await SeedVendorsAsync(ct);
+        await SeedCatalogueAsync(brands, vendors, categories, webRootPath, ct);
         await SeedShippingAsync(ct);
         await SeedPromotionsAsync(ct);
         await SeedSettingsAsync(ct);
@@ -206,6 +207,42 @@ public sealed class DatabaseSeeder(
     }
 
     /// <summary>
+    /// The distributors the practice buys from.
+    ///
+    /// Distinct from brands: a brand is what a customer reads on the arm, a
+    /// vendor is who an order goes to. One vendor carries several brands, and
+    /// a brand often arrives through more than one of them.
+    /// </summary>
+    private async Task<List<Vendor>> SeedVendorsAsync(CancellationToken ct)
+    {
+        var seed = new (string Name, string Code, string Contact, string Phone, int Lead)[]
+        {
+            ("Opticore Distribution", "opticore", "Sales desk", "+92 21 0000001", 7),
+            ("Northgate Optical", "northgate", "Account manager", "+92 42 0000002", 10),
+            ("Lumen Eyewear Supply", "lumen", "Trade counter", "+92 21 0000003", 5),
+            ("Karachi Optical House", "koh", "Wholesale", "+92 21 0000004", 3),
+        };
+
+        foreach (var v in seed)
+        {
+            if (await db.Vendors.AnyAsync(x => x.Code == v.Code, ct)) continue;
+
+            db.Vendors.Add(new Vendor
+            {
+                Name = v.Name,
+                Code = v.Code,
+                ContactName = v.Contact,
+                Email = "orders@example.com",
+                Phone = v.Phone,
+                LeadTimeDays = v.Lead,
+                IsActive = true,
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        return await db.Vendors.ToListAsync(ct);
+    }
+    /// <summary>
     /// Deterministic per-model commercial details so re-seeding doesn't shuffle
     /// the shop.
     ///
@@ -217,30 +254,97 @@ public sealed class DatabaseSeeder(
     private sealed record FrameModel(
         string Name, string Shape, string Brand, int Price, int? CompareAt, string Material,
         string Gender, string FaceShapes, int Weight,
-        string[] Categories, bool Featured, string Description);
+        string[] Categories, bool Featured, string Description,
+        string[]? Features = null, string PromotionGrade = "B", string Vendor = "opticore");
 
     private static readonly FrameModel[] Models =
     [
+        // --- the original line ----------------------------------------------
         new("Ravi", "rectangle", "meridian", 6500, null, "acetate", "unisex", "round,oval,heart", 24,
-            ["eyeglasses"], true, "A straightforward rectangle that suits almost everyone. Deep enough for progressives."),
+            ["eyeglasses"], true, "A straightforward rectangle that suits almost everyone. Deep enough for progressives.",
+            [FrameFeatures.IntegratedNosePads, FrameFeatures.SpringHinges], "A", "opticore"),
         new("Noor", "round", "aster", 8900, 10500, "titanium", "unisex", "square,oblong,diamond", 16,
-            ["eyeglasses"], true, "Light enough to forget you're wearing them. Softens a strong jaw."),
+            ["eyeglasses"], true, "Light enough to forget you are wearing them. Softens a strong jaw.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight, FrameFeatures.Hypoallergenic], "A", "northgate"),
         new("Zara", "cat_eye", "juno", 7400, null, "acetate", "women", "round,square,oval", 22,
-            ["eyeglasses"], true, "An upswept corner that lifts the whole face. Not shy."),
+            ["eyeglasses"], true, "An upswept corner that lifts the whole face. Not shy.",
+            [FrameFeatures.IntegratedNosePads], "A", "lumen"),
         new("Falcon", "aviator", "kestrel", 9800, 12000, "metal", "men", "square,oval,heart", 28,
-            ["sunglasses"], true, "The teardrop, done properly. Comes tinted; add polarisation for driving."),
+            ["sunglasses"], true, "The teardrop, done properly. Comes tinted; add polarisation for driving.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.AdjustableTemples], "A", "northgate"),
         new("Harbour", "wayfarer", "kestrel", 7200, null, "acetate", "unisex", "round,oval,diamond", 26,
-            ["eyeglasses", "sunglasses"], false, "Thick acetate with a wide brow — the frame everyone recognises."),
+            ["eyeglasses", "sunglasses"], false, "Thick acetate with a wide brow \u2014 the frame everyone recognises.",
+            [FrameFeatures.IntegratedNosePads], "B", "lumen"),
         new("Atlas", "square", "meridian", 6900, null, "tr90", "men", "round,oval", 20,
-            ["eyeglasses", "blue-light"], false, "Bigger, flexible and hard to break. Good for screen days."),
+            ["eyeglasses", "blue-light"], false, "Bigger, flexible and hard to break. Good for screen days.",
+            [FrameFeatures.Flexible, FrameFeatures.Lightweight, FrameFeatures.SpringHinges], "B", "opticore"),
         new("Lyra", "oval", "aster", 8200, null, "stainless", "women", "square,oblong,heart", 15,
-            ["eyeglasses", "reading"], false, "Semi-rimless and barely there. Reads as jewellery more than eyewear."),
+            ["eyeglasses", "reading"], false, "Semi-rimless and barely there. Reads as jewellery more than eyewear.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight], "B", "northgate"),
         new("Vector", "geometric", "kestrel", 8600, null, "metal", "unisex", "round,oval", 19,
-            ["eyeglasses"], false, "A hexagon that stops just short of being a costume."),
+            ["eyeglasses"], false, "A hexagon that stops just short of being a costume.",
+            [FrameFeatures.AdjustableNosePads], "C", "lumen"),
         new("Clark", "browline", "meridian", 7800, null, "mixed", "men", "oval,round,diamond", 23,
-            ["eyeglasses"], false, "Heavy brow, light rim. Structure without weight."),
+            ["eyeglasses"], false, "Heavy brow, light rim. Structure without weight.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.SpringHinges], "B", "opticore"),
         new("Wren", "rectangle", "juno", 9600, null, "titanium", "unisex", "round,heart,diamond", 12,
-            ["eyeglasses"], false, "Rimless and 12 grams. Nothing between you and the world."),
+            ["eyeglasses"], false, "Rimless and 12 grams. Nothing between you and the world.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight, FrameFeatures.Hypoallergenic], "B", "northgate"),
+
+        // --- children ---------------------------------------------------------
+        // Genuinely smaller frames rather than shrunken adult ones: a 44 mm lens,
+        // a short arm, and the features that survive a school bag.
+        new("Pip", "rectangle", "juno", 3500, null, "tr90", "kids", "round,oval", 14,
+            ["kids", "eyeglasses"], true, "Bends nearly in half and springs back. For the child who sits on them.",
+            [FrameFeatures.Flexible, FrameFeatures.SpringHinges, FrameFeatures.Lightweight], "A", "koh"),
+        new("Bramble", "round", "juno", 3800, null, "acetate", "kids", "square,heart", 16,
+            ["kids", "eyeglasses"], false, "A proper round lens in a small size. Deep enough to grow into.",
+            [FrameFeatures.IntegratedNosePads, FrameFeatures.SpringHinges], "B", "koh"),
+        new("Otter", "square", "meridian", 4200, null, "tr90", "kids", "round,oval", 15,
+            ["kids", "eyeglasses", "blue-light"], false, "Squared off and unfussy. Survives being cleaned on a jumper.",
+            [FrameFeatures.Flexible, FrameFeatures.SpringHinges, FrameFeatures.LowBridgeFit], "B", "koh"),
+        new("Finch", "oval", "juno", 3400, null, "stainless", "kids", "square,oblong", 11,
+            ["kids", "eyeglasses"], false, "The smallest frame we fit, and the lightest. For a first pair.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight, FrameFeatures.Hypoallergenic], "C", "koh"),
+        new("Cobble", "wayfarer", "kestrel", 4600, null, "acetate", "kids", "round,oval,heart", 18,
+            ["kids", "eyeglasses"], false, "A grown-up shape, made small. Teenagers stop arguing about these.",
+            [FrameFeatures.IntegratedNosePads, FrameFeatures.SpringHinges], "B", "koh"),
+
+        // --- women -------------------------------------------------------------
+        new("Marisa", "cat_eye", "juno", 7900, 9200, "acetate", "women", "round,square,oval", 21,
+            ["eyeglasses"], true, "A softer cat eye than most \u2014 the lift without the drama.",
+            [FrameFeatures.IntegratedNosePads, FrameFeatures.SpringHinges], "A", "lumen"),
+        new("Saffron", "round", "aster", 9400, null, "titanium", "women", "square,oblong,diamond", 14,
+            ["eyeglasses"], false, "Semi-rimless and round, in brushed titanium. Almost nothing on the face.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight, FrameFeatures.Hypoallergenic], "B", "northgate"),
+        new("Indigo", "geometric", "meridian", 8100, null, "acetate", "women", "round,oval,heart", 20,
+            ["eyeglasses", "blue-light"], false, "Angular without being severe. Deep enough for progressives.",
+            [FrameFeatures.IntegratedNosePads], "B", "opticore"),
+        new("Vela", "oval", "aster", 8800, null, "stainless", "women", "square,oblong,heart", 13,
+            ["eyeglasses", "reading"], false, "A shallow oval that stays out of the way of your eyebrows.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight], "C", "northgate"),
+
+        // --- men ----------------------------------------------------------------
+        new("Ridge", "square", "kestrel", 8400, null, "acetate", "men", "round,oval", 29,
+            ["eyeglasses"], true, "A big, square frame for a wide face. Nothing apologetic about it.",
+            [FrameFeatures.IntegratedNosePads, FrameFeatures.SpringHinges], "A", "lumen"),
+        new("Fell", "rectangle", "aster", 10200, null, "titanium", "men", "round,oval,diamond", 15,
+            ["eyeglasses"], false, "Semi-rimless titanium. The frame you forget you put on.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.Lightweight, FrameFeatures.Hypoallergenic], "B", "northgate"),
+        new("Barlow", "browline", "meridian", 8300, null, "mixed", "men", "oval,round,diamond", 24,
+            ["eyeglasses"], false, "A heavier brow than Clark, and a deeper lens with it.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.SpringHinges], "B", "opticore"),
+        new("Tarn", "round", "kestrel", 7600, null, "metal", "men", "square,oblong", 18,
+            ["eyeglasses"], false, "A wide bridge and a full round lens. Built for a low nose bridge.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.LowBridgeFit], "C", "lumen"),
+
+        // --- sunglasses ----------------------------------------------------------
+        new("Dune", "wayfarer", "kestrel", 9100, 11000, "acetate", "unisex", "round,oval,heart", 27,
+            ["sunglasses"], true, "A wide tinted wayfarer. Add polarisation if you drive into the sun.",
+            [FrameFeatures.IntegratedNosePads], "A", "lumen"),
+        new("Solstice", "oval", "meridian", 8700, null, "metal", "unisex", "square,oblong", 22,
+            ["sunglasses"], false, "A long oval lens that covers properly at the edges.",
+            [FrameFeatures.AdjustableNosePads, FrameFeatures.AdjustableTemples], "B", "opticore"),
     ];
 
     /// <summary>
@@ -284,7 +388,8 @@ public sealed class DatabaseSeeder(
     }
 
     private async Task SeedCatalogueAsync(
-        List<Brand> brands, List<Category> categories, string webRootPath, CancellationToken ct)
+        List<Brand> brands, List<Vendor> vendors, List<Category> categories,
+        string webRootPath, CancellationToken ct)
     {
         var manifestPath = Path.Combine(webRootPath, "frames", "manifest.json");
         if (!File.Exists(manifestPath))
@@ -299,6 +404,9 @@ public sealed class DatabaseSeeder(
             await File.ReadAllTextAsync(manifestPath, ct)) ?? [];
 
         var brandBySlug = brands.ToDictionary(b => b.Slug, b => b.Id, StringComparer.Ordinal);
+        var vendorByCode = vendors
+            .Where(v => v.Code is not null)
+            .ToDictionary(v => v.Code!, v => v.Id, StringComparer.Ordinal);
         var catBySlug = categories.ToDictionary(c => c.Slug, c => c.Id, StringComparer.Ordinal);
 
         for (var i = 0; i < Models.Length; i++)
@@ -344,6 +452,14 @@ public sealed class DatabaseSeeder(
             frame.LensHeightMm = drawn.LensHeightMm;
             frame.TotalWidthMm = drawn.TotalWidthMm;
             frame.WeightGrams = model.Weight;
+            frame.Features = model.Features is { Length: > 0 } feat ? string.Join(",", feat) : null;
+            frame.PromotionGrade = model.PromotionGrade;
+            frame.VendorId = vendorByCode.GetValueOrDefault(model.Vendor);
+
+            // A plausible trade price, and the vendor's own code for the frame.
+            // Both are what a reorder starts from.
+            frame.VendorProductCode = $"{model.Vendor.ToUpperInvariant()[..3]}-{model.Name.ToUpperInvariant()}";
+            frame.LastCostMinor = R((int)Math.Round(model.Price * 0.4));
             frame.SizeBand = drawn.TotalWidthMm < 130 ? SizeBands.Narrow
                            : drawn.TotalWidthMm > 143 ? SizeBands.Wide
                            : SizeBands.Medium;
@@ -384,7 +500,26 @@ public sealed class DatabaseSeeder(
 
                 variant.ColorName = asset.ColorLabel;
                 variant.ColorHex = asset.ColorHex;
-                variant.StockQty = variant.StockQty > 0 ? variant.StockQty : 3 + (j * 4) % 12;
+                // A spread a shop would actually have: mostly healthy, some
+                // running low, a few sold out. The old formula started every
+                // frame at exactly the low-stock threshold, which made the
+                // "running low" filter match all of them and prove nothing.
+                // Never overwrites a count somebody is relying on.
+                // A frame counts as out of stock only when every colourway is
+                // gone, so a spread that never empties one entirely leaves the
+                // "out of stock" filter permanently showing nothing. Every
+                // eighth frame is therefore fully out, as a discontinued or
+                // awaited line would be.
+                variant.StockQty = variant.StockQty > 0
+                    ? variant.StockQty
+                    : i % 8 == 3 ? 0 : 1 + (i * 5 + j * 3) % 16;
+
+                // Somewhere to actually find it. Derived from the frame's own
+                // position so a re-seed puts everything back where it was.
+                variant.Aisle ??= (1 + i % 12).ToString();
+                variant.Shelf ??= ((char)('A' + i % 6)).ToString();
+                variant.ShelfRow ??= (1 + j % 4).ToString();
+                variant.Bin ??= (1 + (i * 3 + j) % 20).ToString();
                 variant.Position = j;
                 variant.IsActive = true;
                 variant.TryOnImageUrl = asset.Url;

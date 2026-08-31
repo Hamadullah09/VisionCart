@@ -5,6 +5,19 @@
 @{
     ViewData["Title"] = "Frames";
     var store = Store.Value;
+
+    // The tabs keep whatever search and status are already applied, so
+    // narrowing by stock does not silently throw the rest away.
+    string Tab(string stock) =>
+        Url.Action("Index", new { q = Model.Q, status = Model.Status, stock = stock == "any" ? null : stock })!;
+
+    var tabs = new (string Key, string Label)[]
+    {
+        ("any", "All"),
+        ("in", "In stock"),
+        ("low", "Running low"),
+        ("out", "Out of stock"),
+    };
 }
 
 <div class="panel-head">
@@ -12,13 +25,27 @@
         <h1>Frames</h1>
         <p class="muted">@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s")</p>
     </div>
-    <a class="btn btn-primary" asp-action="New">New frame</a>
+    <div class="admin-row-actions">
+        <a class="btn btn-outline" asp-controller="Vendors" asp-action="Index">Vendors</a>
+        <a class="btn btn-primary" asp-action="New">New frame</a>
+    </div>
 </div>
 
+@* Which frames are on the shelf is the question a back office asks most often,
+   so it is a row of tabs rather than another dropdown to open. *@
+<nav class="stock-tabs" aria-label="Filter by stock">
+    @foreach (var (key, label) in tabs)
+    {
+        <a href="@Tab(key)" class="@(Model.Stock == key ? "is-current" : "")"
+           aria-current="@(Model.Stock == key ? "page" : null)">@label</a>
+    }
+</nav>
+
 <form method="get" class="filter-bar">
+    <input type="hidden" name="stock" value="@(Model.Stock == "any" ? null : Model.Stock)" />
     <div>
         <label for="q">Search</label>
-        <input class="field" type="text" id="q" name="q" value="@Model.Q" placeholder="Name or SKU" />
+        <input class="field" type="search" id="q" name="q" value="@Model.Q" placeholder="Name, SKU or colourway SKU" />
     </div>
     <div>
         <label for="status">Status</label>
@@ -36,7 +63,15 @@
 
 @if (Model.Results.Items.Count == 0)
 {
-    <p class="alert alert-info">No frames match that search.</p>
+    <p class="alert alert-info">
+        @(Model.Stock switch
+        {
+            "out" => "Nothing is out of stock.",
+            "low" => "Nothing is running low.",
+            "in" => "Nothing is in stock.",
+            _ => "No frames match that search.",
+        })
+    </p>
 }
 else
 {
@@ -47,32 +82,31 @@ else
         <table>
             <thead>
                 <tr>
-                    <th>Frame</th>
-                    <th>SKU</th>
-                    <th class="num">Price</th>
-                    <th class="num">Stock</th>
-                    <th>Try-on</th>
-                    <th>Status</th>
-                    <th><span class="sr-only">Actions</span></th>
+                    <th scope="col">Frame</th>
+                    <th scope="col">SKU</th>
+                    <th scope="col">Category</th>
+                    <th scope="col" class="num">Price</th>
+                    <th scope="col" class="num">Stock</th>
+                    <th scope="col">Try-on</th>
+                    <th scope="col">Status</th>
+                    <th scope="col"><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var frame in Model.Results.Items)
             {
-                var stock = frame.Variants.Sum(v => v.StockQty);
-                var reports = frame.Variants.Select(v => TryOnReadiness.Inspect(frame, v)).ToList();
-                var blocked = reports.Count(r => !r.CanFitPhysically);
-                var warned = reports.Count(r => r.CanFitPhysically && r.HasWarnings);
-                var lead = frame.Variants
-                    .OrderBy(v => v.Position)
-                    .FirstOrDefault(v => v.TryOnImageUrl != null);
+                var live = frame.Variants.Where(v => v.IsActive).ToList();
+                var stock = live.Sum(v => v.StockQty);
+                var low = live.Any(v => v.StockQty > 0 && v.StockQty <= v.LowStockAt);
+                var report = Model.Readiness.GetValueOrDefault(frame.Id);
+                var lead = frame.Variants.OrderBy(v => v.Position).FirstOrDefault(v => v.TryOnImageUrl != null);
 
                 <tr>
                     <td>
                         <div class="admin-product">
                             @if (lead?.TryOnImageUrl is { } art)
                             {
-                                <img src="@art" alt="" loading="lazy" width="56" height="24" />
+                                <img src="@art" alt="" loading="lazy" width="56" />
                             }
                             <div>
                                 <strong>@frame.Name</strong>
@@ -84,20 +118,40 @@ else
                         </div>
                     </td>
                     <td><code>@frame.Sku</code></td>
+                    <td class="small">
+                        @Humanise.Value(frame.Gender)
+                        @if (frame.Shape is { } shape)
+                        {
+                            <span class="muted">· @Humanise.Value(shape)</span>
+                        }
+                    </td>
                     <td class="num">@Money.Format(frame.BasePriceMinor, store.Currency, store.CurrencySymbol)</td>
-                    <td class="num">@stock</td>
+                    <td class="num">
+                        @if (stock <= 0)
+                        {
+                            <span class="tryon-state is-blocked">0</span>
+                        }
+                        else if (low)
+                        {
+                            <span class="tryon-state is-warning">@stock</span>
+                        }
+                        else
+                        {
+                            @stock
+                        }
+                    </td>
                     <td>
-                        @if (frame.Variants.Count == 0)
+                        @if (report is null || frame.Variants.Count == 0)
                         {
                             <span class="tryon-state is-blocked">No colourways</span>
                         }
-                        else if (blocked > 0)
+                        else if (!report.CanFitPhysically)
                         {
-                            <span class="tryon-state is-blocked">@blocked of @frame.Variants.Count incomplete</span>
+                            <span class="tryon-state is-blocked">Incomplete</span>
                         }
-                        else if (warned > 0)
+                        else if (report.HasWarnings)
                         {
-                            <span class="tryon-state is-warning">@warned need attention</span>
+                            <span class="tryon-state is-warning">Needs attention</span>
                         }
                         else
                         {
@@ -106,9 +160,8 @@ else
                     </td>
                     <td><span class="chip">@Humanise.Value(frame.Status)</span></td>
                     <td class="admin-row-actions">
-                        <a class="btn btn-outline btn-small" asp-action="Edit" asp-route-id="@frame.Id">Edit</a>
-                        <a class="btn btn-quiet btn-small" asp-controller="Frames" asp-action="Detail"
-                           asp-area="" asp-route-slug="@frame.Slug" target="_blank" rel="noopener">View</a>
+                        <a class="btn btn-outline btn-small" asp-action="Detail" asp-route-id="@frame.Id">Details</a>
+                        <a class="btn btn-quiet btn-small" asp-action="Edit" asp-route-id="@frame.Id">Edit</a>
                     </td>
                 </tr>
             }
@@ -118,15 +171,17 @@ else
 
     @if (Model.Results.Pages > 1)
     {
-        <nav class="pager">
+        <nav class="pager" aria-label="Pagination">
             @if (Model.Results.HasPrevious)
             {
-                <a class="btn btn-outline btn-small" href="@Url.Action("Index", new { q = Model.Q, status = Model.Status, page = Model.Results.Page - 1 })">← Previous</a>
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = Model.Q, status = Model.Status, stock = Model.Stock == "any" ? null : Model.Stock, page = Model.Results.Page - 1 })">&larr; Previous</a>
             }
             <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
             @if (Model.Results.HasNext)
             {
-                <a class="btn btn-outline btn-small" href="@Url.Action("Index", new { q = Model.Q, status = Model.Status, page = Model.Results.Page + 1 })">Next →</a>
+                <a class="btn btn-outline btn-small"
+                   href="@Url.Action("Index", new { q = Model.Q, status = Model.Status, stock = Model.Stock == "any" ? null : Model.Stock, page = Model.Results.Page + 1 })">Next &rarr;</a>
             }
         </nav>
     }

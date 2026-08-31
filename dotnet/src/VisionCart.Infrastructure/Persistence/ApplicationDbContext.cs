@@ -28,6 +28,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     // --- Catalogue ---------------------------------------------------------
     public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<Vendor> Vendors => Set<Vendor>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<FrameCategory> FrameCategories => Set<FrameCategory>();
     public DbSet<Frame> Frames => Set<Frame>();

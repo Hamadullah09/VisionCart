@@ -82,6 +82,7 @@ public class FrameConfiguration : IEntityTypeConfiguration<Frame>
         b.Property(x => x.Slug).HasMaxLength(Len.Code).IsRequired();
         b.Property(x => x.Name).HasMaxLength(Len.Name).IsRequired();
         b.Property(x => x.BrandId).HasMaxLength(Len.Id);
+        b.Property(x => x.VendorId).HasMaxLength(Len.Id);
         b.Property(x => x.Shape).HasMaxLength(Len.Status);
         b.Property(x => x.Material).HasMaxLength(Len.Status);
         b.Property(x => x.RimType).HasMaxLength(Len.Status).IsRequired();
@@ -93,6 +94,9 @@ public class FrameConfiguration : IEntityTypeConfiguration<Frame>
         b.Property(x => x.MetaDesc).HasMaxLength(Len.ShortText);
         b.Property(x => x.Description).HasColumnType("nvarchar(max)");
         b.Property(x => x.SearchText).HasMaxLength(1024);
+        b.Property(x => x.Features).HasMaxLength(Len.CommaList);
+        b.Property(x => x.VendorProductCode).HasMaxLength(Len.Code);
+        b.Property(x => x.PromotionGrade).HasMaxLength(Len.Status);
 
         b.HasIndex(x => x.Sku).IsUnique();
         b.HasIndex(x => x.Slug).IsUnique();
@@ -105,9 +109,18 @@ public class FrameConfiguration : IEntityTypeConfiguration<Frame>
         b.HasIndex(x => new { x.Status, x.BasePriceMinor });
         b.HasIndex(x => x.SearchText);
 
+        b.HasIndex(x => x.VendorId);
+
         b.HasOne(x => x.Brand)
             .WithMany(x => x.Frames)
             .HasForeignKey(x => x.BrandId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Retiring a vendor must not take its frames with it — the stock is
+        // still on the shelf and still sellable.
+        b.HasOne(x => x.Vendor)
+            .WithMany(x => x.Frames)
+            .HasForeignKey(x => x.VendorId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }
@@ -126,7 +139,16 @@ public class FrameVariantConfiguration : IEntityTypeConfiguration<FrameVariant>
         b.Property(x => x.Barcode).HasMaxLength(Len.Code);
         b.Property(x => x.TryOnImageUrl).HasMaxLength(Len.Url);
 
+        // Where this colourway physically sits. Short free text rather than
+        // numbers: practices label bays "F", "3A", "back-left" and everything
+        // in between, and refusing their own labels helps nobody.
+        b.Property(x => x.Aisle).HasMaxLength(32);
+        b.Property(x => x.Shelf).HasMaxLength(32);
+        b.Property(x => x.ShelfRow).HasMaxLength(32);
+        b.Property(x => x.Bin).HasMaxLength(32);
+
         b.Ignore(x => x.IsTryOnReady);
+        b.Ignore(x => x.StockLocation);
 
         b.HasIndex(x => x.Sku).IsUnique();
         b.HasIndex(x => new { x.FrameId, x.IsActive });
@@ -159,6 +181,28 @@ public class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
             .WithMany(v => v.Images)
             .HasForeignKey(x => x.VariantId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class VendorConfiguration : IEntityTypeConfiguration<Vendor>
+{
+    public void Configure(EntityTypeBuilder<Vendor> b)
+    {
+        b.ToTable("Vendor");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasMaxLength(Len.Id);
+        b.Property(x => x.Name).HasMaxLength(Len.Name).IsRequired();
+        b.Property(x => x.Code).HasMaxLength(Len.Code);
+        b.Property(x => x.ContactName).HasMaxLength(Len.Name);
+        b.Property(x => x.Email).HasMaxLength(Len.Email);
+        b.Property(x => x.Phone).HasMaxLength(Len.Phone);
+        b.Property(x => x.Address).HasMaxLength(Len.ShortText);
+        b.Property(x => x.Notes).HasColumnType("nvarchar(max)");
+
+        b.HasIndex(x => x.Name).IsUnique();
+
+        // Filtered, because a code is optional and several vendors may have none.
+        b.HasIndex(x => x.Code).IsUnique().HasFilter("[Code] IS NOT NULL");
     }
 }
 

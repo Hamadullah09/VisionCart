@@ -1,0 +1,78 @@
+@model VendorListViewModel
+@{
+    ViewData["Title"] = "Vendors";
+    var live = Model.Vendors.Count(v => v.IsActive);
+}
+
+<nav class="admin-crumbs" aria-label="Breadcrumb">
+    <a asp-controller="Frames" asp-action="Index">Frames</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">Vendors</span>
+</nav>
+
+<div class="panel-head">
+    <div>
+        <h1>Vendors</h1>
+        <p class="muted">
+            @live active@(Model.Vendors.Count > live ? $", {Model.Vendors.Count - live} retired" : "").
+            Who a purchase order goes to &mdash; not the brand on the arm.
+        </p>
+    </div>
+    <a class="btn btn-primary" asp-action="New">New vendor</a>
+</div>
+
+@if (Model.Vendors.Count == 0)
+{
+    <p class="alert alert-info">
+        No vendors yet. Add one and you can record where each frame is bought from.
+    </p>
+}
+else
+{
+    <div class="admin-table">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Vendor</th>
+                    <th scope="col">Code</th>
+                    <th scope="col">Contact</th>
+                    <th scope="col" class="num">Lead time</th>
+                    <th scope="col" class="num">Frames</th>
+                    <th scope="col">Status</th>
+                    <th scope="col"><span class="sr-only">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var v in Model.Vendors)
+            {
+                <tr class="@(v.IsActive ? "" : "is-retired")">
+                    <td><strong>@v.Name</strong></td>
+                    <td>@(v.Code is null ? "—" : Html.Raw($"<code>{Html.Encode(v.Code)}</code>"))</td>
+                    <td class="small">
+                        @(v.ContactName ?? "—")
+                        @if (v.Phone is { } phone)
+                        {
+                            <span class="muted">· @phone</span>
+                        }
+                    </td>
+                    <td class="num">@(v.LeadTimeDays is { } d ? $"{d} days" : "—")</td>
+                    <td class="num">@v.FrameCount</td>
+                    <td>
+                        @if (v.IsActive)
+                        {
+                            <span class="tryon-state is-ready">Active</span>
+                        }
+                        else
+                        {
+                            <span class="tryon-state is-warning">Retired</span>
+                        }
+                    </td>
+                    <td class="admin-row-actions">
+                        <a class="btn btn-outline btn-small" asp-action="Edit" asp-route-id="@v.Id">Edit</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
