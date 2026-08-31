@@ -45,10 +45,22 @@ public class TryOnController(
         var storePhotos = await settings.GetBoolAsync(SettingKeys.TryOnStoreCustomerPhotos, ct);
         var cameraEnabled = await settings.GetBoolAsync(SettingKeys.TryOnCameraEnabled, ct);
 
+        // A PD an optician has already recorded saves the customer typing it
+        // again — and is a better number than anything a webcam will produce.
+        double? knownPd = null;
+        if (currentUser.IsAuthenticated)
+        {
+            knownPd = await db.Patients.AsNoTracking()
+                .Where(p => p.UserId == currentUser.UserId)
+                .Select(p => p.PdMm)
+                .FirstOrDefaultAsync(ct);
+        }
+
         return View(new TryOnViewModel
         {
             Frames = frames,
             InitialVariantId = variant,
+            KnownPdMm = knownPd,
             // Saving needs BOTH a signed-in customer and the store setting on.
             CanSave = currentUser.IsAuthenticated && storePhotos,
             CameraEnabled = cameraEnabled,

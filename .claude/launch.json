@@ -13,16 +13,6 @@
       ],
       "port": 5217,
       "autoPort": false
-    },
-    {
-      "name": "visioncart-legacy",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev"
-      ],
-      "port": 3000,
-      "autoPort": true
     }
   ]
 }

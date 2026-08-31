@@ -57,6 +57,13 @@ public sealed class TryOnViewModel
 {
     public IReadOnlyList<TryOnFrame> Frames { get; init; } = [];
     public string? InitialVariantId { get; init; }
+
+    /// <summary>
+    /// A PD already recorded on this customer's file, so they need not type it
+    /// twice. Only ever pre-fills the field — it is still theirs to change.
+    /// </summary>
+    public double? KnownPdMm { get; init; }
+
     public bool CanSave { get; init; }
     public bool CameraEnabled { get; init; }
     public string AntiforgeryToken { get; init; } = string.Empty;

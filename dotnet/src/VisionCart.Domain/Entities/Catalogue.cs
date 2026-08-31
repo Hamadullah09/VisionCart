@@ -130,15 +130,32 @@ public class FrameVariant
     public int Position { get; set; }
 
     // --- Virtual try-on overlay calibration -------------------------------
-    // A front-on PNG with transparency. The two anchors are the points in that
-    // image where the wearer's pupils must land, expressed 0..1 of image size.
-    // Everything else (scale, rotation, position) is solved from the detected
-    // pupils, so a correctly anchored asset needs no per-face tuning.
+    // A front-on PNG with transparency, plus six numbers saying where the frame
+    // is inside it. All are fractions of the image, 0..1.
+    //
+    // The anchors are the optical centres of the two lenses. The bounds say
+    // which part of the picture is the frame FRONT and which part is the lens
+    // aperture — without them the renderer cannot tell frame from padding, so
+    // it cannot draw the frame at its recorded width in millimetres, which is
+    // the whole basis of the fit. Everything else (scale, rotation, position)
+    // is solved from the wearer's PD and the detected landmarks.
     public string? TryOnImageUrl { get; set; }
     public double AnchorLeftX { get; set; } = 0.29;
     public double AnchorLeftY { get; set; } = 0.50;
     public double AnchorRightX { get; set; } = 0.71;
     public double AnchorRightY { get; set; } = 0.50;
+
+    /// <summary>Left edge of the frame front — where the hinge is, not the lens.</summary>
+    public double? TryOnFrontLeftX { get; set; }
+    public double? TryOnFrontRightX { get; set; }
+
+    /// <summary>Top and bottom of the lens aperture — what LensHeightMm measures.</summary>
+    public double? TryOnLensTopY { get; set; }
+    public double? TryOnLensBottomY { get; set; }
+
+    /// <summary>Natural pixel size of the overlay, so the fit can be checked server-side.</summary>
+    public int? TryOnImageWidth { get; set; }
+    public int? TryOnImageHeight { get; set; }
 
     /// <summary>Multiplier applied after auto-fit, for assets with generous padding.</summary>
     public double TryOnScaleAdj { get; set; } = 1.0;

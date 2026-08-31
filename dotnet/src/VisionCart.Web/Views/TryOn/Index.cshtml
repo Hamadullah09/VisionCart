@@ -3,7 +3,7 @@
 @model TryOnViewModel
 @inject IOptions<StoreOptions> Store
 @{
-    ViewData["Title"] = "Virtual try-on";
+    ViewData["Title"] = "Try frames on";
     var store = Store.Value;
 
     // Everything the canvas needs, in the shape the client module expects.
@@ -23,6 +23,7 @@
             overlayUrl = f.TryOnImageUrl,
             thumbUrl = f.ThumbUrl,
             priceText = Money.Format(f.PriceMinor, store.Currency, store.CurrencySymbol),
+            // The two lens optical centres, as fractions of the artwork.
             anchors = new
             {
                 leftX = f.AnchorLeftX,
@@ -32,12 +33,20 @@
                 scaleAdj = f.TryOnScaleAdj,
             },
             opacity = f.TryOnOpacity,
+            // The millimetres that decide how large it is drawn.
             lensWidthMm = f.LensWidthMm,
             bridgeWidthMm = f.BridgeWidthMm,
+            lensHeightMm = f.LensHeightMm,
             templeLengthMm = f.TempleLengthMm,
             totalWidthMm = f.TotalWidthMm,
+            // Which part of the picture is frame, and which is padding.
+            frontLeftX = f.FrontLeftX,
+            frontRightX = f.FrontRightX,
+            lensTopY = f.LensTopY,
+            lensBottomY = f.LensBottomY,
         }),
         initialVariantId = Model.InitialVariantId,
+        knownPdMm = Model.KnownPdMm,
         canSave = Model.CanSave,
         cameraEnabled = Model.CameraEnabled,
         // Served from this application, never a CDN. That is the whole privacy
@@ -50,24 +59,22 @@
     };
 }
 
-<header style="max-width:70ch;margin-bottom:24px;">
-    <div class="tryon-head">
-    <h1>Virtual try-on</h1>
-    <p>See how a frame sits on your own face. Nothing is uploaded.</p>
+<div class="tryon-head">
+    <h1>Try frames on</h1>
+    <p>Tell us how far apart your eyes are, then take a photo. We draw each frame at the size it is actually made in, so you can see what will fit.</p>
 </div>
-</header>
 
 @if (Model.Frames.Count == 0)
 {
     <p class="alert alert-info">
-        None of our frames have try-on artwork yet. Staff can add it from a frame's colourway page.
+        None of our frames are set up for try-on yet. Staff can add the artwork and measurements from a frame's colourway page.
     </p>
     <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse the frames</a>
 }
 else
 {
     <div class="tryon" data-tryon-root>
-        <div>
+        <div class="tryon-main">
             <div class="tryon-stage">
                 <canvas data-tryon-canvas width="900" height="675" aria-label="Virtual try-on preview"></canvas>
                 <video data-tryon-video playsinline muted hidden></video>
@@ -84,8 +91,8 @@ else
                     <input type="file" accept="image/*" data-tryon-file hidden />
                 </label>
                 <button type="button" class="btn btn-outline" data-tryon-camera hidden>Use my camera</button>
-                <button type="button" class="btn btn-outline" data-tryon-manual hidden>Adjust eye points</button>
-                <button type="button" class="btn btn-outline" data-tryon-guides hidden>Show guides</button>
+                <button type="button" class="btn btn-quiet" data-tryon-manual hidden>Move the eye points</button>
+                <button type="button" class="btn btn-quiet" data-tryon-guides hidden>Show guides</button>
             </div>
 
             <p class="alert alert-error" data-tryon-notice="error" role="alert" hidden></p>
@@ -93,15 +100,46 @@ else
             <p class="alert alert-warn" data-tryon-notice="fallback" hidden></p>
             <p class="alert alert-info" data-tryon-notice="advice" hidden></p>
 
-            <p class="small muted">
-                Your photo and camera feed stay on this device. Nothing is uploaded unless you
+            <p class="small muted tryon-privacy">
+                Your photo and camera feed stay on this device. Nothing is sent to us unless you
                 press &ldquo;Save to my file&rdquo;.
             </p>
         </div>
 
         <aside class="tryon-panel">
-            @* The frame and the verdict on it sit together at the top: the
-               question a customer is actually asking is "does this one suit
+            @* First, because nothing can be drawn to size without it. *@
+            <div class="card tryon-pd">
+                <h2 class="tryon-heading">Your PD</h2>
+
+                <div class="tryon-pd-row">
+                    <label class="tryon-pd-field">
+                        <span class="sr-only">Pupillary distance in millimetres</span>
+                        <input type="number" inputmode="decimal" step="0.5" min="40" max="85"
+                               placeholder="62" data-tryon-pd aria-describedby="pd-help" />
+                        <span aria-hidden="true">mm</span>
+                    </label>
+                    <button type="button" class="btn btn-quiet btn-sm" data-tryon-pd-unknown>
+                        I don&rsquo;t know it
+                    </button>
+                </div>
+
+                <p class="tryon-pd-message" data-tryon-pd-message hidden></p>
+                <p class="tryon-pd-agreement" data-tryon-pd-agreement hidden></p>
+
+                <p class="small muted" id="pd-help">
+                    Your PD is the distance between the centres of your pupils. It is on your
+                    prescription, or any optician will measure it in a minute.
+                    <a asp-controller="Guides" asp-action="Pd">How to find it</a>
+                </p>
+
+                <p class="alert alert-warn tryon-needs-pd" data-tryon-needs-pd hidden>
+                    Enter your PD above, or press &ldquo;I don&rsquo;t know it&rdquo; and we will
+                    estimate it from your photo.
+                </p>
+            </div>
+
+            @* The frame and the verdict on it, together and above the fold:
+               the question a customer is actually asking is "does this one suit
                me?", and it used to be answered below thirty thumbnails. *@
             <div class="card tryon-chosen">
                 <p class="brand-name" data-tryon-selected="brand"></p>
@@ -114,8 +152,26 @@ else
                 <a class="btn btn-primary btn-block" data-tryon-choose href="#">Choose lenses</a>
             </div>
 
-            <div class="card" style="padding:16px;" data-tryon-measurements hidden>
-                <h4 class="tryon-heading" style="margin-top:0;">Your measurements</h4>
+            <div class="card tryon-measurements" data-tryon-measurements hidden>
+                <h2 class="tryon-heading">How this frame fits you</h2>
+
+                <dl class="tryon-measures">
+                    <div data-tryon-measure-row>
+                        <dt>Frame width</dt><dd data-tryon-measure="frameWidth"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Lens size</dt><dd data-tryon-measure="lensSize"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Against your face</dt><dd data-tryon-measure="fitVerdict"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt title="How far the frame's lens centres sit from your pupils. Your lenses are ground to match.">Decentration</dt>
+                        <dd data-tryon-measure="decentration"></dd>
+                    </div>
+                </dl>
+
+                <h3 class="tryon-heading tryon-heading-sub">Measured from your photo</h3>
                 <dl class="tryon-measures">
                     <div data-tryon-measure-row>
                         <dt>Pupillary distance</dt><dd data-tryon-measure="pd"></dd>
@@ -124,38 +180,61 @@ else
                         <dt>Face width</dt><dd data-tryon-measure="faceWidth"></dd>
                     </div>
                     <div data-tryon-measure-row>
-                        <dt>Face shape</dt><dd data-tryon-measure="faceShape" style="text-transform:capitalize;"></dd>
+                        <dt>Face shape</dt><dd data-tryon-measure="faceShape" class="capitalise"></dd>
                     </div>
                     <div data-tryon-measure-row>
-                        <dt>Suggested size</dt><dd data-tryon-measure="sizeBand" style="text-transform:capitalize;"></dd>
+                        <dt>Suggested size</dt><dd data-tryon-measure="sizeBand" class="capitalise"></dd>
+                    </div>
+                    <div data-tryon-measure-row>
+                        <dt>Head tilt</dt><dd data-tryon-measure="fitTilt"></dd>
                     </div>
                 </dl>
 
-                <h4 class="tryon-heading">How this frame fits you</h4>
-                <p class="tryon-verdict is-unknown" data-tryon-fit-verdict hidden></p>
-                <dl class="tryon-measures">
-                    <div data-tryon-measure-row>
-                        <dt>Frame width</dt><dd data-tryon-measure="frameWidth"></dd>
-                    </div>
-                    <div data-tryon-measure-row>
-                        <dt>Size against your face</dt><dd data-tryon-measure="fitVerdict"></dd>
-                    </div>
-                    <div data-tryon-measure-row>
-                        <dt>Height</dt><dd data-tryon-measure="fitHeight"></dd>
-                    </div>
-                    <div data-tryon-measure-row>
-                        <dt>Tilt</dt><dd data-tryon-measure="fitTilt"></dd>
-                    </div>
-                </dl>
                 <ul class="tryon-fit-notes" data-tryon-fit-notes hidden></ul>
 
-                <p class="small muted" style="margin:10px 0 0;">
-                    Size, height and tilt are measured from your photo and set for
-                    you — there is nothing to adjust. The reading is accurate to
-                    about &plusmn;2&nbsp;mm, and our optician confirms it before your
-                    lenses are cut.
+                <p class="small muted tryon-caveat">
+                    These are estimates from a photograph, not a clinical measurement.
+                    Our optician checks them before your lenses are cut.
                 </p>
             </div>
+
+            <details class="card tryon-adjust" data-tryon-adjust hidden>
+                <summary>
+                    Adjust the fit
+                    <span class="tryon-fit-mode is-auto" data-tryon-fit-mode>Automatic fit</span>
+                </summary>
+
+                <p class="small muted">
+                    The placement is worked out from your PD and the frame&rsquo;s measurements.
+                    Nudge it here if it looks off — the measurements above stay as measured.
+                </p>
+
+                <div class="tryon-nudges">
+                    <div class="tryon-nudge-group" role="group" aria-label="Move the frame">
+                        <span class="tryon-nudge-label">Move</span>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="up" aria-label="Move up">&uarr;</button>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="down" aria-label="Move down">&darr;</button>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="left" aria-label="Move left">&larr;</button>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="right" aria-label="Move right">&rarr;</button>
+                    </div>
+
+                    <div class="tryon-nudge-group" role="group" aria-label="Resize the frame">
+                        <span class="tryon-nudge-label">Size</span>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="smaller" aria-label="Make smaller">&minus;</button>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="bigger" aria-label="Make bigger">+</button>
+                    </div>
+
+                    <div class="tryon-nudge-group" role="group" aria-label="Rotate the frame">
+                        <span class="tryon-nudge-label">Tilt</span>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="tilt-left" aria-label="Tilt left">&#8630;</button>
+                        <button type="button" class="btn btn-quiet btn-icon" data-tryon-nudge="tilt-right" aria-label="Tilt right">&#8631;</button>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-outline btn-sm" data-tryon-reset disabled>
+                    Back to the automatic fit
+                </button>
+            </details>
 
             <div class="tryon-controls" data-tryon-actions hidden>
                 <button type="button" class="btn btn-outline" data-tryon-download>Download photo</button>
@@ -163,7 +242,7 @@ else
             </div>
 
             <div class="tryon-picker">
-                <h4 class="tryon-heading">Try another frame (@Model.Frames.Count)</h4>
+                <h2 class="tryon-heading">Try another frame <span class="muted">(@Model.Frames.Count)</span></h2>
                 <div class="tryon-thumbs" data-tryon-frames></div>
             </div>
         </aside>

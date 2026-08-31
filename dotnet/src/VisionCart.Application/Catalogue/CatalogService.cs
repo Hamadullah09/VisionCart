@@ -95,13 +95,21 @@ public sealed class TryOnFrame
     public double TryOnOpacity { get; init; }
 
     // Physical dimensions, millimetres. The mirror needs these to draw a frame
-    // at its true size against a measured face rather than merely landing its
-    // lens centres on the pupils — a frame can sit on the pupils correctly and
-    // still be far too wide for the wearer.
+    // at its true size against the wearer's own PD rather than merely landing
+    // its lens centres on the pupils — a frame can sit on the pupils correctly
+    // and still be far too wide for the wearer.
     public double? LensWidthMm { get; init; }
     public double? BridgeWidthMm { get; init; }
     public double? TempleLengthMm { get; init; }
+    public double? LensHeightMm { get; init; }
     public double? TotalWidthMm { get; init; }
+
+    // Where the frame sits inside its own artwork. Without these the renderer
+    // cannot tell frame from padding, so it cannot draw the frame to size.
+    public double? FrontLeftX { get; init; }
+    public double? FrontRightX { get; init; }
+    public double? LensTopY { get; init; }
+    public double? LensBottomY { get; init; }
 }
 
 public interface ICatalogService
@@ -293,7 +301,12 @@ public sealed class CatalogService(IApplicationDbContext db) : ICatalogService
                 LensWidthMm = v.Frame.LensWidthMm,
                 BridgeWidthMm = v.Frame.BridgeWidthMm,
                 TempleLengthMm = v.Frame.TempleLengthMm,
+                LensHeightMm = v.Frame.LensHeightMm,
                 TotalWidthMm = v.Frame.TotalWidthMm,
+                FrontLeftX = v.TryOnFrontLeftX,
+                FrontRightX = v.TryOnFrontRightX,
+                LensTopY = v.TryOnLensTopY,
+                LensBottomY = v.TryOnLensBottomY,
                 FrameName = v.Frame.Name,
                 ColorName = v.ColorName,
                 ColorHex = v.ColorHex,

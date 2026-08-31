@@ -691,21 +691,6 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 /* The panel beside the mirror: frame details, the picker, the fit report. */
 .tryon-panel { display: flex; flex-direction: column; gap: var(--space-4); }
 
-/* A slider is a label wrapping a range input, so it opts out of the caption
-   treatment and lays its own caption above the track. */
-.tryon-slider { display: block; margin-bottom: var(--space-4); }
-.tryon-slider > span {
-    display: block;
-    font-size: var(--text-label);
-    font-weight: 600;
-    letter-spacing: .09em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-    margin-bottom: var(--space-2);
-}
-.tryon-slider input[type="range"] { width: 100%; accent-color: var(--accent); }
-
-.tryon-reset { margin-top: var(--space-1); }
 
 /* --- account -------------------------------------------------------------- */
 .account-nav { display: flex; gap: var(--space-2); flex-wrap: wrap; margin: 18px 0 30px; }
@@ -856,4 +841,114 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
     overflow-y: auto;
     padding-right: var(--space-1);
     scrollbar-width: thin;
+}
+
+
+/* Text for a screen reader only. Not `display: none` and not `visibility:
+   hidden` — both remove it from the accessibility tree, which is the one thing
+   this is for. */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* --- Try-on: the PD, the fit report and manual adjustment ------------------
+   The PD is the first thing on the panel because it is the number every other
+   figure on the page is derived from: without it nothing can be drawn to size,
+   and a customer who does not understand that will read an estimated fit as a
+   measured one. */
+.tryon-main { min-width: 0; }
+
+.tryon-pd { padding: var(--space-4); }
+.tryon-pd .tryon-heading { margin-top: 0; }
+
+.tryon-pd-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+.tryon-pd-field {
+    display: inline-flex; align-items: baseline; gap: var(--space-1);
+    border: 1px solid var(--rule-strong); border-radius: var(--radius);
+    background: var(--surface); padding: var(--space-2) var(--space-3);
+}
+.tryon-pd-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.tryon-pd-field input {
+    width: 4.5ch; border: 0; padding: 0; background: none;
+    font: inherit; font-size: var(--text-lead); font-weight: 700;
+    font-variant-numeric: tabular-nums; color: inherit;
+}
+.tryon-pd-field input:focus { outline: none; }
+.tryon-pd-field input[aria-invalid="true"] { color: var(--bad); }
+.tryon-pd-field span { font-size: var(--text-small); color: var(--ink-3); }
+
+/* Numeric spinners inside a bare field read as a bug rather than a control. */
+.tryon-pd-field input::-webkit-outer-spin-button,
+.tryon-pd-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tryon-pd-field input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+.tryon-pd-message,
+.tryon-pd-agreement {
+    margin: var(--space-3) 0 0; padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius); font-size: var(--text-caption); line-height: 1.5;
+}
+.tryon-pd-message.is-warn { background: var(--warn-wash); color: var(--warn); }
+.tryon-pd-message.is-error { background: var(--bad-wash); color: var(--bad); }
+.tryon-pd-agreement.is-agrees { background: var(--good-wash); color: var(--good); }
+.tryon-pd-agreement.is-differs { background: var(--warn-wash); color: var(--warn); }
+.tryon-pd-agreement.is-unknown { display: none; }
+
+.tryon-needs-pd { margin: var(--space-3) 0 0; }
+
+.tryon-measurements { padding: var(--space-4); }
+.tryon-measurements .tryon-heading:first-child { margin-top: 0; }
+.tryon-heading-sub { margin-top: var(--space-5); }
+.tryon-caveat { margin: var(--space-3) 0 0; }
+.tryon-privacy { margin-top: var(--space-3); }
+.capitalise { text-transform: capitalize; }
+
+/* Manual adjustment is a fallback, so it is folded away — and it says plainly
+   which of the two placements is on screen. */
+.tryon-adjust { padding: var(--space-3) var(--space-4); }
+.tryon-adjust > summary {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    cursor: pointer; font-weight: 600; font-size: var(--text-small);
+    padding: var(--space-1) 0;
+}
+.tryon-adjust > summary::-webkit-details-marker { display: none; }
+.tryon-adjust[open] > summary { margin-bottom: var(--space-2); }
+
+.tryon-fit-mode {
+    font-size: var(--text-caption); font-weight: 600; letter-spacing: .02em;
+    padding: 3px var(--space-2); border-radius: 999px;
+}
+.tryon-fit-mode.is-auto   { background: var(--good-wash); color: var(--good); }
+.tryon-fit-mode.is-manual { background: var(--warn-wash); color: var(--warn); }
+
+.tryon-nudges { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0; }
+.tryon-nudge-group { display: flex; align-items: center; gap: var(--space-1); }
+.tryon-nudge-label {
+    width: 4.5em; flex: none;
+    font-size: var(--text-caption); color: var(--ink-3);
+}
+
+.btn-icon {
+    min-width: 34px; padding: var(--space-1) var(--space-2);
+    font-size: var(--text-small); line-height: 1.2;
+}
+.btn-sm { padding: var(--space-1) var(--space-3); font-size: var(--text-caption); }
+
+.btn-quiet {
+    background: none; border: 1px solid var(--rule); color: var(--ink-2);
+}
+.btn-quiet:hover:not(:disabled) { border-color: var(--rule-strong); background: var(--paper-sunk); }
+.btn-quiet:disabled { opacity: .45; cursor: default; }
+
+/* Below the breakpoint the panel stacks under the mirror, so the PD card and
+   the verdict must still arrive before the thirty thumbnails do. */
+@media (max-width: 1000px) {
+    .tryon-panel { gap: var(--space-3); }
+    .tryon-picker .tryon-thumbs { max-height: none; }
 }

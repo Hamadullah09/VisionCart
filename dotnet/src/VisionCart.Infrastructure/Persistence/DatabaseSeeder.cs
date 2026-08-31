@@ -205,39 +205,55 @@ public sealed class DatabaseSeeder(
         return await db.Brands.ToListAsync(ct);
     }
 
-    /// <summary>Deterministic per-model details so re-seeding doesn't shuffle the shop.</summary>
+    /// <summary>
+    /// Deterministic per-model commercial details so re-seeding doesn't shuffle
+    /// the shop.
+    ///
+    /// The physical measurements are deliberately absent: they belong with the
+    /// artwork, which is drawn to them, and are read back from the manifest.
+    /// Holding them in two places is how a picture and a spec sheet come to
+    /// describe different frames.
+    /// </summary>
     private sealed record FrameModel(
         string Name, string Shape, string Brand, int Price, int? CompareAt, string Material,
-        string Gender, string FaceShapes, int Lens, int Bridge, int Temple, int Total, int Weight,
+        string Gender, string FaceShapes, int Weight,
         string[] Categories, bool Featured, string Description);
 
     private static readonly FrameModel[] Models =
     [
-        new("Ravi", "rectangle", "meridian", 6500, null, "acetate", "unisex", "round,oval,heart", 52, 18, 140, 138, 24,
+        new("Ravi", "rectangle", "meridian", 6500, null, "acetate", "unisex", "round,oval,heart", 24,
             ["eyeglasses"], true, "A straightforward rectangle that suits almost everyone. Deep enough for progressives."),
-        new("Noor", "round", "aster", 8900, 10500, "titanium", "unisex", "square,oblong,diamond", 47, 21, 145, 133, 16,
+        new("Noor", "round", "aster", 8900, 10500, "titanium", "unisex", "square,oblong,diamond", 16,
             ["eyeglasses"], true, "Light enough to forget you're wearing them. Softens a strong jaw."),
-        new("Zara", "cat_eye", "juno", 7400, null, "acetate", "women", "round,square,oval", 53, 16, 140, 136, 22,
+        new("Zara", "cat_eye", "juno", 7400, null, "acetate", "women", "round,square,oval", 22,
             ["eyeglasses"], true, "An upswept corner that lifts the whole face. Not shy."),
-        new("Falcon", "aviator", "kestrel", 9800, 12000, "metal", "men", "square,oval,heart", 58, 14, 140, 144, 28,
+        new("Falcon", "aviator", "kestrel", 9800, 12000, "metal", "men", "square,oval,heart", 28,
             ["sunglasses"], true, "The teardrop, done properly. Comes tinted; add polarisation for driving."),
-        new("Harbour", "wayfarer", "kestrel", 7200, null, "acetate", "unisex", "round,oval,diamond", 54, 18, 145, 142, 26,
+        new("Harbour", "wayfarer", "kestrel", 7200, null, "acetate", "unisex", "round,oval,diamond", 26,
             ["eyeglasses", "sunglasses"], false, "Thick acetate with a wide brow — the frame everyone recognises."),
-        new("Atlas", "square", "meridian", 6900, null, "tr90", "men", "round,oval", 55, 17, 145, 145, 20,
+        new("Atlas", "square", "meridian", 6900, null, "tr90", "men", "round,oval", 20,
             ["eyeglasses", "blue-light"], false, "Bigger, flexible and hard to break. Good for screen days."),
-        new("Lyra", "oval", "aster", 8200, null, "stainless", "women", "square,oblong,heart", 51, 19, 140, 134, 15,
+        new("Lyra", "oval", "aster", 8200, null, "stainless", "women", "square,oblong,heart", 15,
             ["eyeglasses", "reading"], false, "Semi-rimless and barely there. Reads as jewellery more than eyewear."),
-        new("Vector", "geometric", "kestrel", 8600, null, "metal", "unisex", "round,oval", 50, 20, 145, 137, 19,
+        new("Vector", "geometric", "kestrel", 8600, null, "metal", "unisex", "round,oval", 19,
             ["eyeglasses"], false, "A hexagon that stops just short of being a costume."),
-        new("Clark", "browline", "meridian", 7800, null, "mixed", "men", "oval,round,diamond", 52, 19, 145, 140, 23,
+        new("Clark", "browline", "meridian", 7800, null, "mixed", "men", "oval,round,diamond", 23,
             ["eyeglasses"], false, "Heavy brow, light rim. Structure without weight."),
-        new("Wren", "rectangle", "juno", 9600, null, "titanium", "unisex", "round,heart,diamond", 49, 20, 140, 130, 12,
+        new("Wren", "rectangle", "juno", 9600, null, "titanium", "unisex", "round,heart,diamond", 12,
             ["eyeglasses"], false, "Rimless and 12 grams. Nothing between you and the world."),
     ];
 
+    /// <summary>
+    /// One generated artwork file, as the generator described it.
+    ///
+    /// It carries the millimetres it drew to and the calibration it drew them
+    /// at, so the picture and the product record cannot disagree about where
+    /// the lenses are.
+    /// </summary>
     private sealed class FrameAsset
     {
         [JsonPropertyName("key")] public string Key { get; set; } = string.Empty;
+        [JsonPropertyName("frame")] public string Frame { get; set; } = string.Empty;
         [JsonPropertyName("shape")] public string Shape { get; set; } = string.Empty;
         [JsonPropertyName("rimType")] public string RimType { get; set; } = "full_rim";
         [JsonPropertyName("color")] public string Color { get; set; } = string.Empty;
@@ -245,6 +261,26 @@ public sealed class DatabaseSeeder(
         [JsonPropertyName("colorHex")] public string ColorHex { get; set; } = "#000000";
         [JsonPropertyName("tinted")] public bool Tinted { get; set; }
         [JsonPropertyName("url")] public string Url { get; set; } = string.Empty;
+        [JsonPropertyName("imageWidth")] public int ImageWidth { get; set; }
+        [JsonPropertyName("imageHeight")] public int ImageHeight { get; set; }
+        [JsonPropertyName("lensWidthMm")] public double LensWidthMm { get; set; }
+        [JsonPropertyName("bridgeWidthMm")] public double BridgeWidthMm { get; set; }
+        [JsonPropertyName("templeLengthMm")] public double TempleLengthMm { get; set; }
+        [JsonPropertyName("lensHeightMm")] public double LensHeightMm { get; set; }
+        [JsonPropertyName("totalWidthMm")] public double TotalWidthMm { get; set; }
+        [JsonPropertyName("calibration")] public FrameAssetCalibration? Calibration { get; set; }
+    }
+
+    private sealed class FrameAssetCalibration
+    {
+        [JsonPropertyName("leftLensCenterX")] public double LeftLensCenterX { get; set; }
+        [JsonPropertyName("leftLensCenterY")] public double LeftLensCenterY { get; set; }
+        [JsonPropertyName("rightLensCenterX")] public double RightLensCenterX { get; set; }
+        [JsonPropertyName("rightLensCenterY")] public double RightLensCenterY { get; set; }
+        [JsonPropertyName("frontLeftX")] public double FrontLeftX { get; set; }
+        [JsonPropertyName("frontRightX")] public double FrontRightX { get; set; }
+        [JsonPropertyName("lensTopY")] public double LensTopY { get; set; }
+        [JsonPropertyName("lensBottomY")] public double LensBottomY { get; set; }
     }
 
     private async Task SeedCatalogueAsync(
@@ -270,16 +306,21 @@ public sealed class DatabaseSeeder(
             var model = Models[i];
             var sku = $"VC-{model.Name.ToUpperInvariant()[..Math.Min(4, model.Name.Length)]}";
 
-            // Rimless and semi-rimless artwork is keyed differently in the manifest.
-            var wantRimless = model.Name == "Wren";
+            // The generator names each asset after the frame it drew, so the
+            // colourways of one frame are exactly the assets that claim it.
             var matching = assets
-                .Where(a => a.Shape == model.Shape
-                            && (wantRimless
-                                ? a.Key.Contains("rimless", StringComparison.Ordinal)
-                                : !a.Key.Contains("rimless", StringComparison.Ordinal)))
+                .Where(a => string.Equals(a.Frame, model.Name, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
-            if (matching.Count == 0) continue;
+            if (matching.Count == 0)
+            {
+                logger.LogWarning(
+                    "No try-on artwork found for {Frame}; it will not be seeded. Run the frame generator.",
+                    model.Name);
+                continue;
+            }
+
+            var drawn = matching[0];
 
             var frame = await db.Frames.FirstOrDefaultAsync(f => f.Sku == sku, ct);
             if (frame is null)
@@ -293,17 +334,18 @@ public sealed class DatabaseSeeder(
             frame.Description = model.Description;
             frame.Shape = model.Shape;
             frame.Material = model.Material;
-            frame.RimType = matching[0].RimType;
+            frame.RimType = drawn.RimType;
             frame.Gender = model.Gender;
             frame.FaceShapes = model.FaceShapes;
-            frame.LensWidthMm = model.Lens;
-            frame.BridgeWidthMm = model.Bridge;
-            frame.TempleLengthMm = model.Temple;
-            frame.LensHeightMm = Math.Round(model.Lens * 0.72);
-            frame.TotalWidthMm = model.Total;
+            // Straight from the artwork, which was drawn to these figures.
+            frame.LensWidthMm = drawn.LensWidthMm;
+            frame.BridgeWidthMm = drawn.BridgeWidthMm;
+            frame.TempleLengthMm = drawn.TempleLengthMm;
+            frame.LensHeightMm = drawn.LensHeightMm;
+            frame.TotalWidthMm = drawn.TotalWidthMm;
             frame.WeightGrams = model.Weight;
-            frame.SizeBand = model.Total < 130 ? SizeBands.Narrow
-                           : model.Total > 143 ? SizeBands.Wide
+            frame.SizeBand = drawn.TotalWidthMm < 130 ? SizeBands.Narrow
+                           : drawn.TotalWidthMm > 143 ? SizeBands.Wide
                            : SizeBands.Medium;
             frame.BasePriceMinor = R(model.Price);
             frame.CompareAtMinor = model.CompareAt is { } c ? R(c) : null;
@@ -347,21 +389,48 @@ public sealed class DatabaseSeeder(
                 variant.IsActive = true;
                 variant.TryOnImageUrl = asset.Url;
                 variant.TryOnOpacity = asset.Tinted ? 0.85 : 1.0;
+                variant.TryOnImageWidth = asset.ImageWidth;
+                variant.TryOnImageHeight = asset.ImageHeight;
+
+                // Exact by construction: the generator computed these from the
+                // same millimetres it drew the picture at.
+                if (asset.Calibration is { } cal)
+                {
+                    variant.AnchorLeftX = cal.LeftLensCenterX;
+                    variant.AnchorLeftY = cal.LeftLensCenterY;
+                    variant.AnchorRightX = cal.RightLensCenterX;
+                    variant.AnchorRightY = cal.RightLensCenterY;
+                    variant.TryOnFrontLeftX = cal.FrontLeftX;
+                    variant.TryOnFrontRightX = cal.FrontRightX;
+                    variant.TryOnLensTopY = cal.LensTopY;
+                    variant.TryOnLensBottomY = cal.LensBottomY;
+                }
 
                 await db.SaveChangesAsync(ct);
 
-                if (!await db.ProductImages.AnyAsync(p => p.VariantId == variant.Id, ct))
+                // Updated rather than only inserted: regenerated artwork changes
+                // the filename, and a row left pointing at the old one is a
+                // broken image on every product card in the shop.
+                var primary = await db.ProductImages
+                    .FirstOrDefaultAsync(p => p.VariantId == variant.Id
+                                              && p.Role == ProductImageRoles.Primary, ct);
+
+                if (primary is null)
                 {
-                    db.ProductImages.Add(new ProductImage
+                    primary = new ProductImage
                     {
                         VariantId = variant.Id,
-                        Url = asset.Url,
-                        ThumbUrl = asset.Url,
-                        Alt = $"{model.Name} in {asset.ColorLabel}",
                         Role = ProductImageRoles.Primary,
                         Position = 0,
-                    });
+                    };
+                    db.ProductImages.Add(primary);
                 }
+
+                primary.Url = asset.Url;
+                primary.ThumbUrl = asset.Url;
+                primary.Alt = $"{model.Name} in {asset.ColorLabel}";
+                primary.Width = asset.ImageWidth;
+                primary.Height = asset.ImageHeight;
             }
 
             await db.SaveChangesAsync(ct);

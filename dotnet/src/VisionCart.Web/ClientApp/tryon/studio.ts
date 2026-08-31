@@ -1,16 +1,11 @@
 import {
-  DEFAULT_ANCHORS,
   NO_ADJUSTMENT,
-  distance,
   drawFrame,
   estimateFaceShape,
   fitContain,
   fitCover,
   measureFace,
   measurementAdvice,
-  autoFit,
-  type AutoFit,
-  solveTransform,
   suggestSizeBand,
   type Adjustment,
   type FaceMeasurement,
@@ -18,14 +13,16 @@ import {
   type FaceSilhouette,
   type Point,
 } from "./geometry.ts";
-import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
 import {
-  estimatePose,
-  yawForeshortening,
-  yawBridgeShift,
-  NEUTRAL_POSE,
-  type HeadPose,
-} from "./pose.ts";
+  solveFit,
+  calibrationFrom,
+  checkPd,
+  comparePd,
+  type FrameCalibration,
+  type FrameFit,
+} from "./fit.ts";
+import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
+import { estimatePose, NEUTRAL_POSE, type HeadPose } from "./pose.ts";
 import { PoseSmoother, holdThroughLoss } from "./smoothing.ts";
 
 /**
@@ -102,11 +99,26 @@ export interface TryOnFrameData {
   priceText: string;
   anchors: FrameAnchors;
   opacity: number;
+
+  /** Millimetres, from the frame record. These decide how big it is drawn. */
+  lensWidthMm: number | null;
+  bridgeWidthMm: number | null;
+  lensHeightMm: number | null;
+  templeLengthMm: number | null;
+  totalWidthMm: number | null;
+
+  /** Where the frame sits inside its own artwork, 0..1. Null until calibrated. */
+  frontLeftX: number | null;
+  frontRightX: number | null;
+  lensTopY: number | null;
+  lensBottomY: number | null;
 }
 
 export interface StudioConfig {
   frames: TryOnFrameData[];
   initialVariantId?: string;
+  /** A PD already on the customer's file, so they need not type it twice. */
+  knownPdMm?: number | null;
   /** Saving needs both a signed-in customer and the store setting enabled. */
   canSave: boolean;
   cameraEnabled: boolean;
@@ -126,8 +138,18 @@ export class TryOnStudio {
   /** Real pixels per logical unit. */
   private backingScale = 1;
 
-  /** The size, height and tilt worked out for the current face and frame. */
-  private fit: AutoFit | null = null;
+  /** The solved placement, and everything the fit panel reports. */
+  private fit: FrameFit | null = null;
+
+  /**
+   * The wearer's pupillary distance, and where it came from.
+   *
+   * This is the single number that gives the photograph a scale. Without it
+   * nothing can be drawn to size, so the studio falls back to the camera's own
+   * estimate and says which it used — it never presents an estimate as though
+   * the customer had supplied it.
+   */
+  private enteredPdMm: number | null = null;
 
   /** Where the head is pointing, and how much that reading is trusted. */
   private pose: HeadPose = NEUTRAL_POSE;
@@ -163,6 +185,12 @@ export class TryOnStudio {
    * The fit, as computed. Not a user preference: size, height and tilt are
    * measured from the face, and a slider over them only lets a customer drag
    * away from a correct fit and then judge the frame on a wrong rendering.
+   */
+  /**
+   * The customer's own nudge, applied on top of the automatic fit.
+   *
+   * Kept separate from the solve rather than folded into it, so "reset" is
+   * exact and the reported millimetres never drift with a nudge.
    */
   private adjust: Adjustment = { ...NO_ADJUSTMENT };
   private manual = false;
@@ -230,6 +258,9 @@ export class TryOnStudio {
   }
 
   private bindControls(): void {
+    this.bindPd();
+    this.bindAdjust();
+
     this.find<HTMLInputElement>("[data-tryon-file]")?.addEventListener("change", event => {
       const input = event.currentTarget as HTMLInputElement;
       const file = input.files?.[0];
@@ -275,6 +306,104 @@ export class TryOnStudio {
     this.canvas.addEventListener("pointercancel", () => { this.dragging = null; });
   }
 
+  /**
+   * The pupillary distance the whole fit hangs on.
+   *
+   * Validated as it is typed, but never refused outright: an unusual PD is
+   * still someone's PD, so an out-of-the-ordinary figure is queried and then
+   * used. Only a number no pair of eyes could produce is rejected.
+   */
+  private bindPd(): void {
+    const input = this.find<HTMLInputElement>("[data-tryon-pd]");
+    if (!input) return;
+
+    if (this.config.knownPdMm) {
+      input.value = String(this.config.knownPdMm);
+      this.enteredPdMm = this.config.knownPdMm;
+    }
+
+    const apply = (): void => {
+      const raw = input.value.trim();
+      const value = raw === "" ? null : Number(raw);
+      const check = checkPd(value);
+
+      this.enteredPdMm = check.ok ? value : null;
+
+      const message = this.find<HTMLElement>("[data-tryon-pd-message]");
+      if (message) {
+        message.textContent = check.message ?? "";
+        message.className = `tryon-pd-message is-${check.ok ? "warn" : "error"}`;
+        message.hidden = check.message === null;
+      }
+
+      input.setAttribute("aria-invalid", check.ok || raw === "" ? "false" : "true");
+      this.refresh();
+    };
+
+    input.addEventListener("input", apply);
+    input.addEventListener("change", apply);
+
+    // "I don't know it" — fall back to the camera's own estimate, labelled.
+    this.find<HTMLButtonElement>("[data-tryon-pd-unknown]")?.addEventListener("click", () => {
+      input.value = "";
+      this.enteredPdMm = null;
+      const message = this.find<HTMLElement>("[data-tryon-pd-message]");
+      if (message) message.hidden = true;
+      this.refresh();
+    });
+
+    if (this.enteredPdMm !== null) apply();
+  }
+
+  /**
+   * Manual adjustment, behind a disclosure.
+   *
+   * Automatic placement is the default and is what the reported millimetres
+   * describe; this only ever moves the picture. Nothing here is expressed in
+   * pixels or matrices to the customer — the controls are nudges, and the panel
+   * says plainly whether they are looking at the automatic fit or their own.
+   */
+  private bindAdjust(): void {
+    const nudge = (dx: number, dy: number): void => {
+      this.adjust = { ...this.adjust, offsetX: this.adjust.offsetX + dx, offsetY: this.adjust.offsetY + dy };
+      this.afterAdjust();
+    };
+
+    const step = 4;
+    const moves: Record<string, [number, number]> = {
+      up: [0, -step], down: [0, step], left: [-step, 0], right: [step, 0],
+    };
+
+    for (const [name, [dx, dy]] of Object.entries(moves)) {
+      this.find<HTMLButtonElement>(`[data-tryon-nudge="${name}"]`)
+        ?.addEventListener("click", () => nudge(dx, dy));
+    }
+
+    for (const [name, factor] of [["bigger", 1.02], ["smaller", 1 / 1.02]] as const) {
+      this.find<HTMLButtonElement>(`[data-tryon-nudge="${name}"]`)?.addEventListener("click", () => {
+        this.adjust = { ...this.adjust, scale: clampNudge(this.adjust.scale * factor) };
+        this.afterAdjust();
+      });
+    }
+
+    for (const [name, radians] of [["tilt-left", -0.012], ["tilt-right", 0.012]] as const) {
+      this.find<HTMLButtonElement>(`[data-tryon-nudge="${name}"]`)?.addEventListener("click", () => {
+        this.adjust = { ...this.adjust, rotate: this.adjust.rotate + radians };
+        this.afterAdjust();
+      });
+    }
+
+    this.find<HTMLButtonElement>("[data-tryon-reset]")?.addEventListener("click", () => {
+      this.adjust = { ...NO_ADJUSTMENT };
+      this.afterAdjust();
+    });
+  }
+
+  private afterAdjust(): void {
+    this.syncFitMode();
+    this.refresh();
+  }
+
   private renderFramePicker(): void {
     const list = this.find<HTMLElement>("[data-tryon-frames]");
     if (!list) return;
@@ -302,9 +431,8 @@ export class TryOnStudio {
 
         // The fit is a property of this face AND this frame, so a new frame
         // needs a new answer — the same face wants a different size in a
-        // 145 mm frame than in a 125 mm one.
-        this.applyAutoFit();
-        this.syncMeasurements();
+        // 145 mm frame than in a 125 mm one. loadOverlay redraws once the new
+        // artwork is in, and the redraw is what re-solves it.
         this.syncChrome();
         void this.loadOverlay();
       });
@@ -344,6 +472,12 @@ export class TryOnStudio {
    * customer touched a control after switching back. The camera path below keeps
    * its own rAF loop, where frame-rate pacing is the whole point.
    */
+  /** Redraw, then bring the fit panel into line with what was drawn. */
+  private refresh(): void {
+    this.render();
+    this.syncMeasurements();
+  }
+
   private render(): void {
     const ctx = this.ctx;
 
@@ -383,43 +517,21 @@ export class TryOnStudio {
       return;
     }
 
-    // 2. The frame
-    if (this.overlay && this.pupils) {
-      // Order by x so the artwork never lands mirrored, whatever the source.
-      const [left, right] = this.pupils.a.x <= this.pupils.b.x
-        ? [this.pupils.a, this.pupils.b]
-        : [this.pupils.b, this.pupils.a];
+    // 2. The frame, drawn at the size it is actually made in
+    const fit = this.solveCurrentFit();
 
-      // Turning the head foreshortens the frame horizontally and slides the
-      // bridge across the face, because the bridge rests on the nose and the
-      // nose is in front of the eyes. Without both, a turned head wears a
-      // frame that is visibly too wide and detached from the nose.
-      const pupilSpan = distance(left, right);
-      const shiftX = yawBridgeShift(this.pose.yawDeg) * pupilSpan;
-
-      const transform = solveTransform({
-        leftPupil: left,
-        rightPupil: right,
-        assetWidth: this.overlay.naturalWidth,
-        assetHeight: this.overlay.naturalHeight,
-        anchors: this.selected?.anchors ?? DEFAULT_ANCHORS,
-        adjustment: {
-          ...this.adjust,
-          offsetX: this.adjust.offsetX + shiftX,
-        },
-      });
-
+    if (this.overlay && fit) {
       if (!this.scratch) this.scratch = document.createElement("canvas");
       if (this.scratch.width !== this.canvas.width || this.scratch.height !== this.canvas.height) {
         this.scratch.width = this.canvas.width;
         this.scratch.height = this.canvas.height;
       }
 
-      drawFrame(ctx, this.overlay, transform, {
+      drawFrame(ctx, this.overlay, fit.transform, {
         width: this.overlay.naturalWidth,
         height: this.overlay.naturalHeight,
         opacity: (this.selected?.opacity ?? 1) * this.trackingOpacity,
-        squeezeX: yawForeshortening(this.pose.yawDeg),
+        squeezeX: fit.squeezeX,
         shadow: true,
         silhouette: this.silhouette,
         scratch: this.scratch,
@@ -462,7 +574,7 @@ export class TryOnStudio {
 
     if (!frame?.overlayUrl) {
       this.overlay = null;
-      this.render();
+      this.refresh();
       return;
     }
 
@@ -477,7 +589,10 @@ export class TryOnStudio {
       this.setNotice("error", `Couldn't load the try-on image for ${frame.name}.`);
     }
 
-    this.render();
+    // refresh, not render: the fit is re-solved by the draw, and the panel has
+    // to be re-read from it afterwards. Reporting before the solve left every
+    // figure describing the frame the customer had just clicked away from.
+    this.refresh();
   }
 
   // --- photo upload -------------------------------------------------------
@@ -540,9 +655,8 @@ export class TryOnStudio {
         this.manual = true;
       }
 
-      this.applyAutoFit();
       this.syncChrome();
-      this.render();
+      this.refresh();
     } catch {
       this.setNotice("error", "That file could not be opened as an image.");
     } finally {
@@ -594,6 +708,7 @@ export class TryOnStudio {
 
       const loop = (): void => {
         if (!this.stream) return;
+        let detected = false;
 
         if (this.detector?.status === "ready" && this.video.readyState >= 2) {
           const timestamp = performance.now();
@@ -641,12 +756,7 @@ export class TryOnStudio {
                   this.lastDetectionMs = timestamp;
                   this.trackingOpacity = 1;
 
-                  // The live path never ran the fit, so the panel stayed empty
-                  // and the frame kept the base solve instead of its true
-                  // manufactured size against the measured face.
-                  this.applyAutoFit();
-                  this.syncMeasurements();
-                  this.syncPoseHint();
+                  detected = true;
                 }
               }
             } catch {
@@ -664,6 +774,14 @@ export class TryOnStudio {
         }
 
         this.render();
+
+        // After the draw, so the panel reports the fit that was just painted
+        // rather than the one before it.
+        if (detected) {
+          this.syncMeasurements();
+          this.syncPoseHint();
+        }
+
         this.rafHandle = requestAnimationFrame(loop);
       };
 
@@ -874,29 +992,91 @@ export class TryOnStudio {
   }
 
   /**
-   * Works out the size, height and tilt this face needs and applies them.
+   * The scale of the photograph, and where it came from.
    *
-   * Called whenever the subject or the frame changes, because the answer
-   * depends on both: the same face needs a different size in a 145 mm frame
-   * than in a 125 mm one.
+   * A PD the customer typed is the truth; the camera's own estimate is the
+   * fallback. They are never blended, and the panel always says which was used
+   * — a figure that decides how big every frame is drawn should not quietly
+   * change provenance.
    */
-  private applyAutoFit(): void {
+  private get workingPd(): { mm: number; source: "entered" | "estimated" } | null {
+    if (this.enteredPdMm !== null && checkPd(this.enteredPdMm).ok) {
+      return { mm: this.enteredPdMm, source: "entered" };
+    }
+
+    // Only a measurement the detector was reasonably sure of. A bad estimate
+    // is worse than none, because it sizes every frame in the shop wrongly.
+    const estimate = this.measurement;
+    if (estimate?.pdMm && estimate.confidence >= 0.45 && checkPd(estimate.pdMm).ok) {
+      return { mm: estimate.pdMm, source: "estimated" };
+    }
+
+    return null;
+  }
+
+  /**
+   * Solve the placement of the selected frame on the current face.
+   *
+   * Called from the render, so a camera frame re-solves every tick with the
+   * pose it was actually detected at rather than the one before it.
+   */
+  private solveCurrentFit(): FrameFit | null {
     const frame = this.selected;
 
-    this.fit = autoFit(
-      this.measurement,
-      frame
-        ? {
-            lensWidthMm: frame.lensWidthMm,
-            bridgeWidthMm: frame.bridgeWidthMm,
-            templeLengthMm: frame.templeLengthMm,
-            totalWidthMm: frame.totalWidthMm,
-          }
-        : null,
-      frame?.anchors ?? DEFAULT_ANCHORS,
-    );
+    if (!this.overlay || !this.pupils || !frame) {
+      this.fit = null;
+      return null;
+    }
 
-    this.adjust = { ...this.fit.adjustment };
+    const pd = this.workingPd;
+    if (!pd) {
+      this.fit = null;
+      return null;
+    }
+
+    this.fit = solveFit({
+      face: {
+        leftPupil: this.pupils.a,
+        rightPupil: this.pupils.b,
+        leftFaceEdge: this.silhouette ? { x: this.silhouette.leftX, y: this.pupils.a.y } : null,
+        rightFaceEdge: this.silhouette ? { x: this.silhouette.rightX, y: this.pupils.b.y } : null,
+        rollDeg: this.measurement?.rollDeg ?? 0,
+        yawDeg: this.pose.yawDeg,
+        pitchDeg: this.pose.pitchDeg,
+      },
+      pdMm: pd.mm,
+      pdSource: pd.source,
+      physical: {
+        lensWidthMm: frame.lensWidthMm,
+        bridgeWidthMm: frame.bridgeWidthMm,
+        lensHeightMm: frame.lensHeightMm,
+        templeLengthMm: frame.templeLengthMm,
+        totalWidthMm: frame.totalWidthMm,
+      },
+      calibration: this.calibrationFor(frame),
+      artworkWidth: this.overlay.naturalWidth,
+      artworkHeight: this.overlay.naturalHeight,
+      manual: this.manualNudged ? this.adjust : null,
+    });
+
+    return this.fit;
+  }
+
+  private calibrationFor(frame: TryOnFrameData): FrameCalibration {
+    return calibrationFrom(frame.anchors, {
+      frontLeftX: frame.frontLeftX ?? undefined,
+      frontRightX: frame.frontRightX ?? undefined,
+      lensTopY: frame.lensTopY ?? undefined,
+      lensBottomY: frame.lensBottomY ?? undefined,
+    });
+  }
+
+  /** True once the customer has moved the frame off its automatic placement. */
+  private get manualNudged(): boolean {
+    return this.adjust.scale !== 1
+      || this.adjust.rotate !== 0
+      || this.adjust.offsetX !== 0
+      || this.adjust.offsetY !== 0;
   }
 
   /**
@@ -928,8 +1108,6 @@ export class TryOnStudio {
     const panel = this.find<HTMLElement>("[data-tryon-measurements]");
     if (!panel) return;
 
-    const pd = this.measurement?.pdMm ?? null;
-
     // Shown whenever there is a subject, not only when a face was found. A
     // customer whose photo could not be measured needs to be told that, and
     // why — an empty panel that simply vanishes reads as the feature being
@@ -946,28 +1124,40 @@ export class TryOnStudio {
       el.textContent = value;
     };
 
-    set("pd", pd === null ? null : `${pd.toFixed(1)} mm`);
-    set("faceWidth", this.measurement?.faceWidthMm ? `${this.measurement.faceWidthMm.toFixed(0)} mm` : null);
-    set("faceShape", this.faceShape);
-    set("sizeBand", suggestSizeBand(this.measurement?.faceWidthMm ?? null));
-
     const fit = this.fit;
-    set("frameWidth", fit?.frameWidthMm ? `${fit.frameWidthMm.toFixed(0)} mm` : null);
+    const measured = this.measurement;
+
+    // --- what we know about the face ---------------------------------------
+    set("pd", fit
+      ? `${fit.pdMm.toFixed(1)} mm${fit.pdSource === "estimated" ? " (estimated)" : ""}`
+      : null);
+    set("faceWidth", fit?.faceWidthMm ? `${fit.faceWidthMm.toFixed(0)} mm` : null);
+    set("faceShape", this.faceShape);
+    set("sizeBand", suggestSizeBand(fit?.faceWidthMm ?? null));
+
+    // --- what we know about the frame --------------------------------------
+    set("frameWidth", fit?.frameWidthMm ? `${fit.frameWidthMm.toFixed(0)} mm across` : null);
+    set("lensSize", fit?.lensWidthMm && fit?.lensHeightMm
+      ? `${fit.lensWidthMm.toFixed(0)} × ${fit.lensHeightMm.toFixed(0)} mm`
+      : null);
     set("fitVerdict", fit && fit.widthRatio
-      ? `${VERDICT_TEXT[fit.verdict]} · ${Math.round(fit.widthRatio * 100)}% of face width`
+      ? `${VERDICT_TEXT[fit.verdict]} · ${Math.round(fit.widthRatio * 100)}% of your face width`
       : null);
-    set("fitHeight", fit && fit.heightMm
-      ? `${fit.heightMm > 0 ? "+" : ""}${fit.heightMm.toFixed(1)} mm on the nose`
-      : null);
+    set("decentration", fit?.decentrationMm === null || fit === null
+      ? null
+      : fit.decentrationMm === 0
+        ? "None — the lens centres line up with your eyes"
+        : `${Math.abs(fit.decentrationMm)} mm per eye`);
     // Only when a face was actually measured — "0.0 degrees, corrected" against
     // a photo nothing was found in claims a reading that was never taken.
-    set("fitTilt", fit && this.measurement
-      ? `${fit.tiltDeg.toFixed(1)}° head tilt, corrected`
-      : null);
+    set("fitTilt", fit && measured ? `${fit.rollDeg.toFixed(1)}° head tilt, corrected` : null);
 
     const verdictEl = this.find<HTMLElement>("[data-tryon-fit-verdict]");
     if (verdictEl) {
       verdictEl.className = `tryon-verdict is-${fit?.verdict ?? "unknown"}`;
+      verdictEl.textContent = fit && fit.verdict !== "unknown"
+        ? `${VERDICT_TEXT[fit.verdict]} for your face`
+        : "";
       verdictEl.hidden = !fit || fit.verdict === "unknown";
     }
 
@@ -983,7 +1173,35 @@ export class TryOnStudio {
       notesEl.hidden = notes.length === 0;
     }
 
-    this.setNotice("advice", this.hasSubject ? measurementAdvice(this.measurement) : null);
+    // --- does the PD they gave us match the photo? -------------------------
+    const agreement = comparePd(
+      this.enteredPdMm, measured?.pdMm ?? null, measured?.confidence ?? 0);
+
+    const agreeEl = this.find<HTMLElement>("[data-tryon-pd-agreement]");
+    if (agreeEl) {
+      agreeEl.textContent = agreement.message ?? "";
+      agreeEl.className = `tryon-pd-agreement is-${agreement.agreement}`;
+      agreeEl.hidden = agreement.message === null;
+    }
+
+    // Nothing to draw against: say why rather than showing an empty stage.
+    const needsPd = this.hasSubject && this.workingPd === null;
+    const needsPdEl = this.find<HTMLElement>("[data-tryon-needs-pd]");
+    if (needsPdEl) needsPdEl.hidden = !needsPd;
+
+    this.setNotice("advice", this.hasSubject ? measurementAdvice(measured) : null);
+  }
+
+  /** Reflects the manual-vs-automatic state into the adjust panel. */
+  private syncFitMode(): void {
+    const label = this.find<HTMLElement>("[data-tryon-fit-mode]");
+    if (label) {
+      label.textContent = this.manualNudged ? "Manual adjustment" : "Automatic fit";
+      label.className = `tryon-fit-mode is-${this.manualNudged ? "manual" : "auto"}`;
+    }
+
+    const reset = this.find<HTMLButtonElement>("[data-tryon-reset]");
+    if (reset) reset.disabled = !this.manualNudged;
   }
 
   private get hasSubject(): boolean {
@@ -1042,8 +1260,20 @@ export class TryOnStudio {
     if (saveButton) saveButton.hidden = !this.config.canSave;
 
     this.canvas.classList.toggle("is-manual", this.manual);
+    this.syncFitMode();
     this.syncMeasurements();
   }
+}
+
+/**
+ * Keeps a nudge to a nudge.
+ *
+ * Beyond about a fifth either way the customer is no longer adjusting a fit,
+ * they are overriding the measurement — and the panel would still be reporting
+ * the frame's real millimetres beside a picture that contradicts them.
+ */
+function clampNudge(value: number): number {
+  return Math.min(1.2, Math.max(0.8, value));
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
