@@ -51,11 +51,10 @@
 }
 
 <header style="max-width:70ch;margin-bottom:24px;">
+    <div class="tryon-head">
     <h1>Virtual try-on</h1>
-    <p class="muted">
-        Upload a straight-on photo or open your camera. We find your pupils, scale each frame to
-        your face and measure your pupillary distance while you browse @Model.Frames.Count styles.
-    </p>
+    <p>See how a frame sits on your own face. Nothing is uploaded.</p>
+</div>
 </header>
 
 @if (Model.Frames.Count == 0)
@@ -101,39 +100,18 @@ else
         </div>
 
         <aside class="tryon-panel">
-            <div class="card" style="padding:16px;">
+            @* The frame and the verdict on it sit together at the top: the
+               question a customer is actually asking is "does this one suit
+               me?", and it used to be answered below thirty thumbnails. *@
+            <div class="card tryon-chosen">
                 <p class="brand-name" data-tryon-selected="brand"></p>
-                <h3 style="margin:2px 0 2px;font-size:18px;" data-tryon-selected="name"></h3>
-                <p class="small muted" style="margin:0;" data-tryon-selected="colour"></p>
-                <p style="font-weight:700;font-size:17px;margin:6px 0 12px;" data-tryon-selected="price"></p>
-                <a class="btn btn-primary" data-tryon-choose href="#">Choose lenses</a>
-            </div>
+                <h2 class="tryon-chosen-name" data-tryon-selected="name"></h2>
+                <p class="small muted tryon-chosen-colour" data-tryon-selected="colour"></p>
+                <p class="tryon-chosen-price" data-tryon-selected="price"></p>
 
-            <div>
-                <h4 class="tryon-heading">Try another frame (@Model.Frames.Count)</h4>
-                <div class="tryon-thumbs" data-tryon-frames></div>
-            </div>
+                <p class="tryon-verdict is-unknown" data-tryon-fit-verdict hidden></p>
 
-            <div class="card" style="padding:16px;" data-tryon-adjust hidden>
-                <h4 class="tryon-heading" style="margin-top:0;">Fine-tune the fit</h4>
-
-                <label class="tryon-slider">
-                    <span>Size</span>
-                    <input type="range" min="0.75" max="1.35" step="0.01" value="1"
-                           data-tryon-slider="scale" />
-                </label>
-                <label class="tryon-slider">
-                    <span>Height</span>
-                    <input type="range" min="-60" max="60" step="1" value="0"
-                           data-tryon-slider="offsetY" />
-                </label>
-                <label class="tryon-slider">
-                    <span>Tilt</span>
-                    <input type="range" min="-0.25" max="0.25" step="0.005" value="0"
-                           data-tryon-slider="rotate" />
-                </label>
-
-                <button type="button" class="tryon-reset" data-tryon-reset>Reset to automatic fit</button>
+                <a class="btn btn-primary btn-block" data-tryon-choose href="#">Choose lenses</a>
             </div>
 
             <div class="card" style="padding:16px;" data-tryon-measurements hidden>
@@ -172,16 +150,21 @@ else
                 <ul class="tryon-fit-notes" data-tryon-fit-notes hidden></ul>
 
                 <p class="small muted" style="margin:10px 0 0;">
-                    Size, height and tilt are set for you automatically. Nudge them with the
-                    sliders if you prefer &mdash; an estimate from your photo is accurate to
-                    about &plusmn;2&nbsp;mm, and our optician confirms it before your lenses
-                    are cut.
+                    Size, height and tilt are measured from your photo and set for
+                    you — there is nothing to adjust. The reading is accurate to
+                    about &plusmn;2&nbsp;mm, and our optician confirms it before your
+                    lenses are cut.
                 </p>
             </div>
 
             <div class="tryon-controls" data-tryon-actions hidden>
                 <button type="button" class="btn btn-outline" data-tryon-download>Download photo</button>
                 <button type="button" class="btn btn-primary" data-tryon-save hidden>Save to my file</button>
+            </div>
+
+            <div class="tryon-picker">
+                <h4 class="tryon-heading">Try another frame (@Model.Frames.Count)</h4>
+                <div class="tryon-thumbs" data-tryon-frames></div>
             </div>
         </aside>
     </div>

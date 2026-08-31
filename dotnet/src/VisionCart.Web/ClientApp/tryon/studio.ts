@@ -152,6 +152,11 @@ export class TryOnStudio {
 
   private mode: Mode = "upload";
   private selectedId: string;
+  /**
+   * The fit, as computed. Not a user preference: size, height and tilt are
+   * measured from the face, and a slider over them only lets a customer drag
+   * away from a correct fit and then judge the frame on a wrong rendering.
+   */
   private adjust: Adjustment = { ...NO_ADJUSTMENT };
   private manual = false;
   private showGuides = false;
@@ -248,12 +253,6 @@ export class TryOnStudio {
       this.render();
     });
 
-    this.find<HTMLButtonElement>("[data-tryon-reset]")?.addEventListener("click", () => {
-      this.adjust = { ...NO_ADJUSTMENT };
-      this.syncSliders();
-      this.render();
-    });
-
     this.find<HTMLButtonElement>("[data-tryon-download]")?.addEventListener("click", () => {
       void this.download();
     });
@@ -261,13 +260,6 @@ export class TryOnStudio {
     this.find<HTMLButtonElement>("[data-tryon-save]")?.addEventListener("click", () => {
       void this.saveToFile();
     });
-
-    for (const key of ["scale", "offsetY", "rotate"] as const) {
-      this.find<HTMLInputElement>(`[data-tryon-slider="${key}"]`)?.addEventListener("input", e => {
-        this.adjust = { ...this.adjust, [key]: Number((e.currentTarget as HTMLInputElement).value) };
-        this.render();
-      });
-    }
 
     // Manual pupil dragging.
     this.canvas.addEventListener("pointerdown", e => this.onPointerDown(e));
@@ -305,7 +297,6 @@ export class TryOnStudio {
         // needs a new answer — the same face wants a different size in a
         // 145 mm frame than in a 125 mm one.
         this.applyAutoFit();
-        this.syncSliders();
         this.syncMeasurements();
         this.syncChrome();
         void this.loadOverlay();
@@ -529,7 +520,6 @@ export class TryOnStudio {
       }
 
       this.applyAutoFit();
-      this.syncSliders();
       this.syncChrome();
       this.render();
     } catch {
@@ -576,7 +566,6 @@ export class TryOnStudio {
       this.adoptAspect(this.video.videoWidth, this.video.videoHeight);
 
       this.adjust = { ...NO_ADJUSTMENT };
-      this.syncSliders();
       this.syncChrome();
       this.setBusy(null);
 
@@ -849,13 +838,6 @@ export class TryOnStudio {
     if (!el) return;
     el.textContent = message ?? "";
     el.hidden = !message;
-  }
-
-  private syncSliders(): void {
-    for (const key of ["scale", "offsetY", "rotate"] as const) {
-      const slider = this.find<HTMLInputElement>(`[data-tryon-slider="${key}"]`);
-      if (slider) slider.value = String(this.adjust[key]);
-    }
   }
 
   /**

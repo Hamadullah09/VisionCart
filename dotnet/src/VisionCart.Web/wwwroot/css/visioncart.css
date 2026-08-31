@@ -817,3 +817,43 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
     margin-inline: calc(50% - 50vw);
     padding-inline: var(--gutter);
 }
+
+/* --- Try-on: layout -------------------------------------------------------
+   The page previously spent 295px on a heading and a three-line blurb before
+   the mirror began, then put thirty thumbnails and a slider panel above the
+   one thing a customer wants — whether the frame suits them. */
+.tryon-head { margin-bottom: var(--space-4); }
+.tryon-head h1 { font-size: var(--text-h2); margin: 0 0 var(--space-1); }
+.tryon-head p { margin: 0; color: var(--ink-3); font-size: var(--text-small); max-width: 52ch; }
+
+/* The chosen frame and the verdict on it, at the top of the column. */
+.tryon-chosen { padding: var(--space-4); }
+.tryon-chosen-name { font-size: var(--text-h3); margin: var(--space-1) 0 0; }
+.tryon-chosen-colour { margin: 0; }
+.tryon-chosen-price { font-weight: 700; font-size: var(--text-lead); margin: var(--space-2) 0 var(--space-3); }
+.btn-block { display: block; width: 100%; text-align: center; }
+
+/* The verdict is the professional signal — it should read at a glance, not
+   sit in a list of figures. */
+.tryon-verdict {
+    display: flex; align-items: center; gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    font-size: var(--text-small); font-weight: 600;
+    border-left: 3px solid currentColor;
+}
+.tryon-verdict.is-good    { background: var(--good-wash); color: var(--good); }
+.tryon-verdict.is-narrow,
+.tryon-verdict.is-wide    { background: var(--warn-wash); color: var(--warn); }
+.tryon-verdict.is-unknown { background: var(--paper-sunk); color: var(--ink-3); }
+
+/* Capped and scrollable: thirty tiles must not push the fit report off the
+   screen, which is exactly what they were doing. */
+.tryon-picker { display: flex; flex-direction: column; min-height: 0; }
+.tryon-picker .tryon-thumbs {
+    max-height: 232px;
+    overflow-y: auto;
+    padding-right: var(--space-1);
+    scrollbar-width: thin;
+}
