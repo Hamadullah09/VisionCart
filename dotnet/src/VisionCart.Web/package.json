@@ -5,7 +5,9 @@
   "description": "Build-time only. The published application contains compiled JavaScript; Node is never required at runtime or on the host.",
   "scripts": {
     "build:client": "esbuild ClientApp/tryon/entry.ts --bundle --format=esm --target=es2022 --minify --sourcemap --outfile=wwwroot/js/tryon.js --external:./vendor/mediapipe-vision.mjs",
-    "test:client": "node --test ClientApp/tryon/*.test.ts"
+    "test:client": "node --test ClientApp/tryon/*.test.ts",
+    "build:calibrate": "esbuild ClientApp/calibrate/entry.ts --bundle --format=esm --target=es2022 --minify --sourcemap --outfile=wwwroot/js/calibrate.js",
+    "build": "npm run build:client && npm run build:calibrate"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

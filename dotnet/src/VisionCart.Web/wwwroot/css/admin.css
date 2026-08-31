@@ -164,3 +164,119 @@ body.admin { background: var(--paper-sunk); }
 
 /* --- pagination ----------------------------------------------------------- */
 .pager { margin-top: 22px; }
+
+/* --- Try-on calibration ----------------------------------------------------
+   Six fractions decide whether the mirror draws a frame at the size it is
+   actually made in. They used to be six text boxes, which is an accurate way
+   to store them and a hopeless way to enter them. */
+.admin-crumbs {
+    display: flex; gap: 8px; align-items: center;
+    font-size: 13px; color: #6B635C; margin-bottom: 14px;
+}
+.admin-crumbs a { color: #6B635C; }
+.admin-crumbs [aria-current] { color: #1C1917; font-weight: 600; }
+
+.admin-page-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap; margin-bottom: 22px;
+}
+.admin-page-head p { margin: 6px 0 0; max-width: 62ch; }
+
+.calibrate { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+@media (max-width: 1100px) { .calibrate { grid-template-columns: 1fr; } }
+
+.calibrate-stage-wrap { min-width: 0; }
+
+/* A chequerboard, because the artwork is transparent and a plain background
+   would hide exactly the edges the markers are being placed against. */
+.calibrate-stage {
+    position: relative;
+    border: 1px solid #D6CEC2; border-radius: 10px;
+    padding: 20px;
+    background-color: #fff;
+    background-image:
+        linear-gradient(45deg, #EFEAE2 25%, transparent 25%, transparent 75%, #EFEAE2 75%),
+        linear-gradient(45deg, #EFEAE2 25%, transparent 25%, transparent 75%, #EFEAE2 75%);
+    background-size: 18px 18px;
+    background-position: 0 0, 9px 9px;
+    touch-action: none;
+}
+.calibrate-stage img { display: block; width: 100%; height: auto; }
+.calibrate-hint { margin-top: 10px; }
+
+.cal-rail {
+    position: absolute; padding: 0; border: 0; background: none; cursor: grab;
+    display: flex; align-items: center; justify-content: center;
+}
+.cal-rail.is-vertical { width: 22px; transform: translateX(-11px); }
+.cal-rail.is-horizontal { height: 22px; transform: translateY(-11px); }
+.cal-rail > span { display: block; background: #1D4ED8; }
+.cal-rail.is-vertical > span { width: 2px; height: 100%; }
+.cal-rail.is-horizontal > span { height: 2px; width: 100%; }
+.cal-rail:hover > span, .cal-rail.is-dragging > span { background: #1E40AF; box-shadow: 0 0 0 1px rgba(29,78,216,.35); }
+.cal-rail:focus-visible { outline: 2px solid #1D4ED8; outline-offset: 2px; border-radius: 4px; }
+
+.cal-dot {
+    position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+    padding: 0; border-radius: 50%; cursor: grab;
+    border: 2px solid #B91C1C; background: rgba(255,255,255,.55);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.9);
+}
+.cal-dot::after {
+    content: ""; position: absolute; inset: 7px;
+    border-radius: 50%; background: #B91C1C;
+}
+.cal-dot:hover, .cal-dot.is-dragging { border-color: #7F1D1D; }
+.cal-dot:focus-visible { outline: 2px solid #B91C1C; outline-offset: 3px; }
+
+.calibrate-panel { display: flex; flex-direction: column; gap: 16px; }
+.calibrate-heading { font-size: 14px; margin: 0 0 10px; letter-spacing: .01em; }
+
+.calibrate-measures { margin: 0 0 10px; font-size: 13.5px; }
+.calibrate-measures > div {
+    display: flex; justify-content: space-between; gap: 16px;
+    padding: 7px 0; border-bottom: 1px solid #E7E2DA;
+}
+.calibrate-measures > div:last-child { border-bottom: 0; }
+.calibrate-measures dt { color: #6B635C; margin: 0; }
+.calibrate-measures dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+.cal-agreement {
+    margin: 10px 0 0; padding: 9px 12px; border-radius: 8px;
+    font-size: 13px; line-height: 1.5;
+}
+.cal-agreement.is-good { background: #E8F1EC; color: #2F6A4F; }
+.cal-agreement.is-bad { background: #FAF1E1; color: #8A5A1B; }
+.cal-agreement.is-unknown { background: #F2EEE8; color: #6B635C; }
+
+.calibrate-field { display: block; }
+.calibrate-field > span { display: block; font-size: 13px; color: #6B635C; margin-bottom: 8px; }
+.calibrate-field input[type="range"] { width: 100%; accent-color: #1C1917; }
+
+.calibrate-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.calibrate-issues li {
+    font-size: 13px; line-height: 1.5; padding-left: 14px;
+    border-left: 3px solid currentColor;
+}
+.calibrate-issues li.is-blocking { color: #98342C; }
+.calibrate-issues li.is-warning { color: #8A5A1B; }
+
+.calibrate-actions { display: flex; flex-direction: column; gap: 9px; }
+
+/* Readiness, on the frame list. Silence here would mean an administrator only
+   discovers a broken frame by opening the mirror and looking at it. */
+.tryon-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.tryon-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.tryon-state.is-ready { color: #2F6A4F; }
+.tryon-state.is-warning { color: #8A5A1B; }
+.tryon-state.is-blocked { color: #98342C; }
+
+/* A product row: the picture identifies a frame far faster than its SKU does. */
+.admin-product { display: flex; align-items: center; gap: 12px; }
+.admin-product img { width: 56px; height: auto; flex: none; mix-blend-mode: multiply; }
+.admin-product strong { display: block; font-weight: 600; }
+.admin-product .small { display: block; margin-top: 1px; }
+
+/* Labelled buttons, not icon-only ones: an administrator should not have to
+   hover three grey squares to find out which is delete. */
+.admin-row-actions { display: flex; gap: 6px; white-space: nowrap; }

@@ -54,6 +54,38 @@ public sealed class VariantDetails
     public bool IsActive { get; set; } = true;
 }
 
+/// <summary>
+/// Where the frame sits inside its own artwork, all as fractions of the image.
+///
+/// Six numbers, and none of them is a taste judgement: the two lens optical
+/// centres, the two edges of the frame front, and the top and bottom of the
+/// lens opening. Together with the millimetres on the frame record they let the
+/// renderer draw the frame at its true size, so getting them right matters more
+/// than any styling on this screen.
+/// </summary>
+public sealed class TryOnCalibrationInput
+{
+    public double LeftLensCenterX { get; set; }
+    public double LeftLensCenterY { get; set; }
+    public double RightLensCenterX { get; set; }
+    public double RightLensCenterY { get; set; }
+
+    public double FrontLeftX { get; set; }
+    public double FrontRightX { get; set; }
+
+    public double LensTopY { get; set; }
+    public double LensBottomY { get; set; }
+
+    /// <summary>Lower for tinted lenses, which should not hide the eyes entirely.</summary>
+    public double Opacity { get; set; } = 1.0;
+
+    public string? ImageUrl { get; set; }
+
+    /// <summary>Natural size of the artwork, so the fit can be checked server-side.</summary>
+    public int? ImageWidth { get; set; }
+    public int? ImageHeight { get; set; }
+}
+
 public sealed class LensOptionDetails
 {
     public string Group { get; set; } = string.Empty;
@@ -83,9 +115,8 @@ public interface ICatalogueAdminService
     Task<ActionResult<string>> SaveVariantAsync(string frameId, string? variantId,
         VariantDetails details, CancellationToken ct = default);
 
-    Task<ActionResult> SaveTryOnCalibrationAsync(string variantId, double leftX, double leftY,
-        double rightX, double rightY, double scaleAdj, double opacity, string? imageUrl,
-        CancellationToken ct = default);
+    Task<ActionResult> SaveTryOnCalibrationAsync(
+        string variantId, TryOnCalibrationInput input, CancellationToken ct = default);
 
     Task<IReadOnlyList<LensOption>> ListLensOptionsAsync(CancellationToken ct = default);
     Task<ActionResult> SaveLensOptionAsync(string? id, LensOptionDetails details, CancellationToken ct = default);
@@ -294,27 +325,51 @@ public sealed class CatalogueAdminService(
     /// never appear in the try-on.
     /// </summary>
     public async Task<ActionResult> SaveTryOnCalibrationAsync(
-        string variantId, double leftX, double leftY, double rightX, double rightY,
-        double scaleAdj, double opacity, string? imageUrl, CancellationToken ct = default)
+        string variantId, TryOnCalibrationInput input, CancellationToken ct = default)
     {
         var variant = await db.FrameVariants.FirstOrDefaultAsync(v => v.Id == variantId, ct);
         if (variant is null) return ActionResult.Fail("That colourway no longer exists.");
 
-        // Anchors are fractions of the image. Anything outside 0..1 would place
-        // the frame off the artwork entirely.
-        if (leftX is < 0 or > 1 || rightX is < 0 or > 1 || leftY is < 0 or > 1 || rightY is < 0 or > 1)
-            return ActionResult.Fail("Anchor positions must sit inside the image.");
+        // Every figure is a fraction of the image. Anything outside 0..1 would
+        // place part of the frame off the artwork entirely.
+        double[] fractions =
+        [
+            input.LeftLensCenterX, input.LeftLensCenterY,
+            input.RightLensCenterX, input.RightLensCenterY,
+            input.FrontLeftX, input.FrontRightX,
+            input.LensTopY, input.LensBottomY,
+        ];
 
-        if (Math.Abs(rightX - leftX) < 0.02)
-            return ActionResult.Fail("The two anchors are too close together to solve a fit.");
+        if (fractions.Any(v => v is < 0 or > 1 || !double.IsFinite(v)))
+            return ActionResult.Fail("Every marker must sit inside the image.");
 
-        variant.AnchorLeftX = leftX;
-        variant.AnchorLeftY = leftY;
-        variant.AnchorRightX = rightX;
-        variant.AnchorRightY = rightY;
-        variant.TryOnScaleAdj = Math.Clamp(scaleAdj, 0.5, 2.0);
-        variant.TryOnOpacity = Math.Clamp(opacity, 0.1, 1.0);
-        if (!string.IsNullOrWhiteSpace(imageUrl)) variant.TryOnImageUrl = imageUrl.Trim();
+        if (Math.Abs(input.RightLensCenterX - input.LeftLensCenterX) < 0.02)
+            return ActionResult.Fail("The two lens centres are too close together to solve a fit.");
+
+        if (input.FrontRightX - input.FrontLeftX < 0.05)
+            return ActionResult.Fail("The frame front is too narrow to measure against.");
+
+        if (input.LensBottomY - input.LensTopY < 0.02)
+            return ActionResult.Fail("The lens opening is too shallow to measure against.");
+
+        // The lens centres must be inside the frame front, or the picture is
+        // saying the lenses are outside the frame.
+        if (input.LeftLensCenterX < input.FrontLeftX || input.RightLensCenterX > input.FrontRightX)
+            return ActionResult.Fail("The lens centres must sit inside the frame front.");
+
+        variant.AnchorLeftX = input.LeftLensCenterX;
+        variant.AnchorLeftY = input.LeftLensCenterY;
+        variant.AnchorRightX = input.RightLensCenterX;
+        variant.AnchorRightY = input.RightLensCenterY;
+        variant.TryOnFrontLeftX = input.FrontLeftX;
+        variant.TryOnFrontRightX = input.FrontRightX;
+        variant.TryOnLensTopY = input.LensTopY;
+        variant.TryOnLensBottomY = input.LensBottomY;
+        variant.TryOnOpacity = Math.Clamp(input.Opacity, 0.1, 1.0);
+
+        if (input.ImageWidth is > 0) variant.TryOnImageWidth = input.ImageWidth;
+        if (input.ImageHeight is > 0) variant.TryOnImageHeight = input.ImageHeight;
+        if (!string.IsNullOrWhiteSpace(input.ImageUrl)) variant.TryOnImageUrl = input.ImageUrl.Trim();
 
         await db.SaveChangesAsync(ct);
 

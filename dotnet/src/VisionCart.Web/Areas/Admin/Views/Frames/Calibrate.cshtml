@@ -1,0 +1,192 @@
+@using System.Text.Json
+@using VisionCart.Application.Catalogue
+@model FrameCalibrationViewModel
+@{
+    ViewData["Title"] = $"Calibrate {Model.Frame.Name} — {Model.Variant.ColorName}";
+    var v = Model.Variant;
+    var f = Model.Frame;
+
+    var config = new
+    {
+        imageUrl = v.TryOnImageUrl,
+        physical = new
+        {
+            lensWidthMm = f.LensWidthMm,
+            bridgeWidthMm = f.BridgeWidthMm,
+            lensHeightMm = f.LensHeightMm,
+            totalWidthMm = f.TotalWidthMm,
+        },
+        markers = new
+        {
+            leftLensCenterX = v.AnchorLeftX,
+            leftLensCenterY = v.AnchorLeftY,
+            rightLensCenterX = v.AnchorRightX,
+            rightLensCenterY = v.AnchorRightY,
+            frontLeftX = v.TryOnFrontLeftX,
+            frontRightX = v.TryOnFrontRightX,
+            lensTopY = v.TryOnLensTopY,
+            lensBottomY = v.TryOnLensBottomY,
+        },
+        tolerance = TryOnReadiness.CalibrationTolerance,
+    };
+}
+
+<nav class="admin-crumbs" aria-label="Breadcrumb">
+    <a asp-action="Index">Frames</a>
+    <span aria-hidden="true">/</span>
+    <a asp-action="Edit" asp-route-id="@f.Id">@f.Name</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">@v.ColorName</span>
+</nav>
+
+<div class="admin-page-head">
+    <div>
+        <h1>Try-on calibration</h1>
+        <p class="muted">
+            Mark where the lenses and the frame front are in this picture. The mirror uses them
+            with the measurements below to draw this frame at the size it is actually made in.
+        </p>
+    </div>
+    @if (v.TryOnImageUrl is not null)
+    {
+        <a class="btn btn-outline" href="/try-on?variant=@v.Id" target="_blank" rel="noopener">
+            Open in the mirror ↗
+        </a>
+    }
+</div>
+
+@if (v.TryOnImageUrl is null)
+{
+    <p class="alert alert-warn">
+        This colourway has no try-on artwork yet. Upload a front-on PNG with a transparent
+        background on the <a asp-action="Edit" asp-route-id="@f.Id">frame page</a> first.
+    </p>
+}
+else
+{
+    <form method="post" class="calibrate" data-calibrate
+          asp-action="Calibrate" asp-route-id="@f.Id" asp-route-variantId="@v.Id">
+
+        <div class="calibrate-stage-wrap">
+            <div class="calibrate-stage" data-calibrate-stage>
+                <img src="@v.TryOnImageUrl" alt="@f.Name in @v.ColorName" data-calibrate-image />
+
+                @* Every marker is a real button, so the whole screen works from
+                   the keyboard: focus one and nudge it with the arrow keys. *@
+                <button type="button" class="cal-rail is-vertical" data-cal-marker="frontLeftX"
+                        aria-label="Left edge of the frame front"><span></span></button>
+                <button type="button" class="cal-rail is-vertical" data-cal-marker="frontRightX"
+                        aria-label="Right edge of the frame front"><span></span></button>
+                <button type="button" class="cal-rail is-horizontal" data-cal-marker="lensTopY"
+                        aria-label="Top of the lens opening"><span></span></button>
+                <button type="button" class="cal-rail is-horizontal" data-cal-marker="lensBottomY"
+                        aria-label="Bottom of the lens opening"><span></span></button>
+
+                <button type="button" class="cal-dot" data-cal-marker="leftLensCenter"
+                        aria-label="Centre of the left lens"></button>
+                <button type="button" class="cal-dot" data-cal-marker="rightLensCenter"
+                        aria-label="Centre of the right lens"></button>
+            </div>
+
+            <p class="small muted calibrate-hint">
+                Drag a marker, or focus it and use the arrow keys. Hold Shift for finer steps.
+            </p>
+        </div>
+
+        <aside class="calibrate-panel">
+            <section class="card">
+                <h2 class="calibrate-heading">This frame, in millimetres</h2>
+                <dl class="calibrate-measures">
+                    <div><dt>Lens width</dt><dd>@(f.LensWidthMm?.ToString("0.#") ?? "—")</dd></div>
+                    <div><dt>Lens height</dt><dd>@(f.LensHeightMm?.ToString("0.#") ?? "—")</dd></div>
+                    <div><dt>Bridge</dt><dd>@(f.BridgeWidthMm?.ToString("0.#") ?? "—")</dd></div>
+                    <div><dt>Overall width</dt><dd>@(f.TotalWidthMm?.ToString("0.#") ?? "—")</dd></div>
+                    <div><dt>Arm length</dt><dd>@(f.TempleLengthMm?.ToString("0.#") ?? "—")</dd></div>
+                </dl>
+                <p class="small muted">
+                    Wrong? <a asp-action="Edit" asp-route-id="@f.Id">Change them on the frame</a> —
+                    the calibration is only as good as these.
+                </p>
+            </section>
+
+            <section class="card">
+                <h2 class="calibrate-heading">Does the picture agree?</h2>
+                <p class="small muted">
+                    Each row reads the scale of the picture a different way. On a correctly marked
+                    frame they agree.
+                </p>
+
+                <dl class="calibrate-measures" data-cal-scales>
+                    <div><dt>From the lens centres</dt><dd data-cal-scale="centres">—</dd></div>
+                    <div><dt>From the frame front</dt><dd data-cal-scale="front">—</dd></div>
+                    <div><dt>From the lens opening</dt><dd data-cal-scale="aperture">—</dd></div>
+                </dl>
+
+                <p class="cal-agreement" data-cal-agreement></p>
+            </section>
+
+            <section class="card">
+                <h2 class="calibrate-heading">Artwork</h2>
+                <label class="calibrate-field">
+                    <span>A front-on PNG with a transparent background, arms pointing out</span>
+                    <input class="field" name="ImageUrl" value="@v.TryOnImageUrl" />
+                </label>
+                <p class="small muted">
+                    Upload the file in <a asp-area="Admin" asp-controller="Media" asp-action="Index">Media</a>,
+                    then paste its address here. Saving reloads this screen with the new picture.
+                </p>
+            </section>
+
+            <section class="card">
+                <h2 class="calibrate-heading">Lens tint</h2>
+                <label class="calibrate-field">
+                    <span>How much of the eye the lens hides</span>
+                    <input type="range" name="Opacity" min="0.1" max="1" step="0.05"
+                           value="@v.TryOnOpacity.ToString("0.00")" data-cal-opacity />
+                </label>
+                <p class="small muted">
+                    1.00 for clear lenses. Lower it for sunglasses so the eyes still show through.
+                </p>
+            </section>
+
+            @if (Model.Readiness.Issues.Count > 0)
+            {
+                <section class="card">
+                    <h2 class="calibrate-heading">Before this goes live</h2>
+                    <ul class="calibrate-issues">
+                        @foreach (var issue in Model.Readiness.Issues)
+                        {
+                            <li class="is-@issue.Severity.ToString().ToLowerInvariant()">@issue.Message</li>
+                        }
+                    </ul>
+                </section>
+            }
+
+            <div class="calibrate-actions">
+                <button type="submit" class="btn btn-primary btn-block">Save calibration</button>
+                <button type="button" class="btn btn-outline btn-block" data-cal-fit>
+                    Position from the measurements
+                </button>
+                <a class="btn btn-quiet btn-block" asp-action="Edit" asp-route-id="@f.Id">Back to the frame</a>
+            </div>
+        </aside>
+
+        @* The markers write into these; the form posts numbers, the admin never types them. *@
+        <input type="hidden" name="LeftLensCenterX" data-cal-value="leftLensCenterX" />
+        <input type="hidden" name="LeftLensCenterY" data-cal-value="leftLensCenterY" />
+        <input type="hidden" name="RightLensCenterX" data-cal-value="rightLensCenterX" />
+        <input type="hidden" name="RightLensCenterY" data-cal-value="rightLensCenterY" />
+        <input type="hidden" name="FrontLeftX" data-cal-value="frontLeftX" />
+        <input type="hidden" name="FrontRightX" data-cal-value="frontRightX" />
+        <input type="hidden" name="LensTopY" data-cal-value="lensTopY" />
+        <input type="hidden" name="LensBottomY" data-cal-value="lensBottomY" />
+        <input type="hidden" name="ImageWidth" data-cal-value="imageWidth" />
+        <input type="hidden" name="ImageHeight" data-cal-value="imageHeight" />
+    </form>
+
+    <script type="application/json" id="calibrate-config">@Html.Raw(JsonSerializer.Serialize(config))</script>
+
+    @section Scripts {
+        <script type="module" src="~/js/calibrate.js" asp-append-version="true"></script>
+    }
+}

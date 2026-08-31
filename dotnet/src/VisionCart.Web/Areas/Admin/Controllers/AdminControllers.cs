@@ -231,23 +231,44 @@ public class FramesController(
     }
 
     /// <summary>
-    /// Sets where the wearer's pupils must land inside this colourway's artwork.
-    /// Without this a newly photographed frame can never appear in the mirror —
-    /// the legacy application had this screen and the migration would be
-    /// incomplete without it.
+    /// The visual calibration screen for one colourway.
+    ///
+    /// Marking up where the lenses and the frame front are in a photograph is
+    /// the only way the mirror can draw that frame at its recorded width. It
+    /// used to be eight numeric boxes on the edit page, which is a fair way to
+    /// describe the data and a hopeless way to enter it.
     /// </summary>
+    [HttpGet("{id}/variants/{variantId}/calibrate")]
+    public async Task<IActionResult> Calibrate(string id, string variantId, CancellationToken ct)
+    {
+        var variant = await db.FrameVariants.AsNoTracking()
+            .Include(v => v.Frame)
+            .FirstOrDefaultAsync(v => v.Id == variantId && v.FrameId == id, ct);
+
+        if (variant?.Frame is null) return NotFound();
+
+        return View(new FrameCalibrationViewModel
+        {
+            Frame = variant.Frame,
+            Variant = variant,
+            Readiness = TryOnReadiness.Inspect(variant.Frame, variant),
+        });
+    }
+
     [HttpPost("{id}/variants/{variantId}/calibrate")]
     public async Task<IActionResult> Calibrate(string id, string variantId,
-        double anchorLeftX, double anchorLeftY, double anchorRightX, double anchorRightY,
-        double tryOnScaleAdj, double tryOnOpacity, string? tryOnImageUrl, CancellationToken ct)
+        [FromForm] TryOnCalibrationInput input, CancellationToken ct)
     {
-        var result = await catalogue.SaveTryOnCalibrationAsync(
-            variantId, anchorLeftX, anchorLeftY, anchorRightX, anchorRightY,
-            tryOnScaleAdj, tryOnOpacity, tryOnImageUrl, ct);
+        var result = await catalogue.SaveTryOnCalibrationAsync(variantId, input, ct);
 
-        if (result.Ok) TempData["AdminOk"] = "Try-on calibration saved.";
-        else TempData["AdminError"] = result.Error;
-        return RedirectToAction(nameof(Edit), new { id });
+        if (result.Ok)
+        {
+            TempData["AdminOk"] = "Calibration saved. The mirror will use it straight away.";
+            return RedirectToAction(nameof(Calibrate), new { id, variantId });
+        }
+
+        TempData["AdminError"] = result.Error;
+        return RedirectToAction(nameof(Calibrate), new { id, variantId });
     }
 
     private async Task<FrameEditViewModel> BuildEditModelAsync(string? id, CancellationToken ct)

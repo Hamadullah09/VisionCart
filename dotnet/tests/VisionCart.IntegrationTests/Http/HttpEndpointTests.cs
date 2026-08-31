@@ -345,3 +345,158 @@ public class HttpRateLimitTests(VisionCartApp app)
     }
 
 }
+
+/// <summary>
+/// The try-on calibration screen, over HTTP.
+///
+/// The mirror draws a frame at its recorded width in millimetres, and it can
+/// only do that if somebody has marked up where the frame is inside its own
+/// picture. That marking-up happens here, so a route that has quietly stopped
+/// rendering — or a form whose field names no longer bind — takes the accuracy
+/// of every frame in the shop with it.
+/// </summary>
+[Collection("http")]
+public class HttpCalibrationTests(VisionCartApp app)
+{
+    private async Task<(string FrameId, string VariantId)> AnyCalibratableAsync()
+    {
+        var list = await app.Admin.GetStringAsync("/admin/frames");
+
+        // At least 20 characters, so "/admin/frames/new" from the toolbar does
+        // not get mistaken for a frame.
+        var frameId = Regex.Match(list, @"/admin/frames/([a-z0-9]{20,})").Groups[1].Value;
+        Assert.False(string.IsNullOrEmpty(frameId), "the frame list showed no frames");
+
+        var edit = await app.Admin.GetStringAsync($"/admin/frames/{frameId}");
+        var variantId = Regex
+            .Match(edit, $@"/admin/frames/{frameId}/variants/([a-z0-9]+)/calibrate")
+            .Groups[1].Value;
+
+        Assert.False(string.IsNullOrEmpty(variantId),
+            "the frame page offered no route to the calibration screen");
+
+        return (frameId, variantId);
+    }
+
+    [Fact]
+    public async Task The_frame_page_sends_staff_to_the_calibration_screen_rather_than_a_grid_of_numbers()
+    {
+        var (frameId, _) = await AnyCalibratableAsync();
+        var edit = await app.Admin.GetStringAsync($"/admin/frames/{frameId}");
+
+        Assert.Contains("Calibrate the artwork", edit);
+
+        // The old screen asked an administrator to type fractions of an image
+        // into text boxes. Nobody can do that accurately, and the frame is
+        // drawn wrong for every customer when they get it wrong.
+        Assert.DoesNotContain("name=\"anchorLeftX\"", edit);
+        Assert.DoesNotContain("name=\"anchorRightY\"", edit);
+    }
+
+    [Fact]
+    public async Task The_calibration_screen_renders_its_markers_and_its_configuration()
+    {
+        var (frameId, variantId) = await AnyCalibratableAsync();
+        var html = await app.Admin.GetStringAsync(
+            $"/admin/frames/{frameId}/variants/{variantId}/calibrate");
+
+        foreach (var marker in new[]
+                 {
+                     "leftLensCenter", "rightLensCenter",
+                     "frontLeftX", "frontRightX", "lensTopY", "lensBottomY",
+                 })
+        {
+            Assert.Contains($"data-cal-marker=\"{marker}\"", html);
+        }
+
+        // The client needs the millimetres to check the marks against; without
+        // them the screen still drags but can no longer tell anyone it is wrong.
+        Assert.Contains("id=\"calibrate-config\"", html);
+        Assert.Contains("lensWidthMm", html);
+        Assert.Contains("totalWidthMm", html);
+
+        // Every marker is a real control, so the screen works from a keyboard.
+        Assert.Contains("aria-label=\"Centre of the left lens\"", html);
+    }
+
+    [Fact]
+    public async Task Saving_a_calibration_round_trips_through_the_form()
+    {
+        var (frameId, variantId) = await AnyCalibratableAsync();
+        var path = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
+        var token = await app.AntiforgeryTokenAsync(app.Admin, path);
+
+        Assert.False(string.IsNullOrWhiteSpace(token), "the calibration form rendered no token");
+
+        var before = await app.Admin.GetStringAsync(path);
+        var originals = Regex.Matches(before, @"data-cal-value=""(\w+)""")
+            .Select(m => m.Groups[1].Value).ToList();
+
+        Assert.Contains("frontLeftX", originals);
+
+        var response = await VisionCartApp.PostFormAsync(app.Admin, path, new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            ["LeftLensCenterX"] = "0.3100", ["LeftLensCenterY"] = "0.5100",
+            ["RightLensCenterX"] = "0.6900", ["RightLensCenterY"] = "0.5100",
+            ["FrontLeftX"] = "0.1200", ["FrontRightX"] = "0.8800",
+            ["LensTopY"] = "0.1500", ["LensBottomY"] = "0.8500",
+            ["Opacity"] = "0.90",
+            ["ImageWidth"] = "1330", ["ImageHeight"] = "413",
+        });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var after = await app.Admin.GetStringAsync(path);
+        Assert.Contains("\"frontLeftX\":0.12", after);
+        Assert.Contains("\"lensBottomY\":0.85", after);
+    }
+
+    [Fact]
+    public async Task A_calibration_the_mirror_could_not_draw_from_is_refused()
+    {
+        var (frameId, variantId) = await AnyCalibratableAsync();
+        var path = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
+        var token = await app.AntiforgeryTokenAsync(app.Admin, path);
+
+        var response = await VisionCartApp.PostFormAsync(app.Admin, path, new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token,
+            // Lens centres outside the frame front: the picture contradicts itself.
+            ["LeftLensCenterX"] = "0.0500", ["LeftLensCenterY"] = "0.5000",
+            ["RightLensCenterX"] = "0.9500", ["RightLensCenterY"] = "0.5000",
+            ["FrontLeftX"] = "0.2000", ["FrontRightX"] = "0.8000",
+            ["LensTopY"] = "0.1500", ["LensBottomY"] = "0.8500",
+            ["Opacity"] = "1",
+        });
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var after = await app.Admin.GetStringAsync(path);
+        Assert.Contains("must sit inside the frame front", after);
+        // And the bad values must not have been written.
+        Assert.DoesNotContain("\"leftLensCenterX\":0.05", after);
+    }
+
+    [Fact]
+    public async Task The_frame_list_says_which_frames_cannot_be_tried_on()
+    {
+        var html = await app.Admin.GetStringAsync("/admin/frames");
+
+        // Silence here means an administrator only discovers a broken frame by
+        // opening the mirror and looking at it.
+        Assert.Contains("tryon-state", html);
+        Assert.Matches(@"tryon-state is-(ready|warning|blocked)", html);
+    }
+
+    [Fact]
+    public async Task Anonymous_visitors_cannot_reach_the_calibration_screen()
+    {
+        var (frameId, variantId) = await AnyCalibratableAsync();
+        var response = await app.Anonymous.GetAsync(
+            $"/admin/frames/{frameId}/variants/{variantId}/calibrate");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Contains("/login", response.Headers.Location?.OriginalString ?? "");
+    }
+}

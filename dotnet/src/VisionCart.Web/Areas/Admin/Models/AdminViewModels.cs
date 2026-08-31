@@ -1,4 +1,5 @@
 using VisionCart.Application.Admin;
+using VisionCart.Application.Catalogue;
 using VisionCart.Application.DataTransfer;
 using VisionCart.Application.Media;
 using VisionCart.Application.Common;
@@ -34,6 +35,16 @@ public sealed class FrameListViewModel
     public PagedResult<Frame> Results { get; init; } = new();
     public string? Q { get; init; }
     public string? Status { get; init; }
+}
+
+/// <summary>
+/// The visual try-on calibration screen for one colourway.
+/// </summary>
+public sealed class FrameCalibrationViewModel
+{
+    public Frame Frame { get; init; } = null!;
+    public FrameVariant Variant { get; init; } = null!;
+    public TryOnReadiness.Report Readiness { get; init; } = null!;
 }
 
 public sealed class FrameEditViewModel

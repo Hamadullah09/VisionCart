@@ -1,4 +1,5 @@
 @using Microsoft.Extensions.Options
+@using VisionCart.Application.Catalogue
 @model FrameListViewModel
 @inject IOptions<StoreOptions> Store
 @{
@@ -39,42 +40,76 @@
 }
 else
 {
+    @* A table, because tabular data is genuinely what an administrator wants
+       here — but only the columns a decision is made from. Everything else
+       lives on the frame's own page. *@
     <div class="admin-table">
         <table>
             <thead>
                 <tr>
-                    <th>Frame</th><th>Brand</th><th>SKU</th><th class="num">Price</th>
-                    <th class="num">Colourways</th><th class="num">Stock</th><th>Try-on</th><th>Status</th><th></th>
+                    <th>Frame</th>
+                    <th>SKU</th>
+                    <th class="num">Price</th>
+                    <th class="num">Stock</th>
+                    <th>Try-on</th>
+                    <th>Status</th>
+                    <th><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var frame in Model.Results.Items)
             {
                 var stock = frame.Variants.Sum(v => v.StockQty);
-                var calibrated = frame.Variants.Count(v => v.TryOnImageUrl != null);
+                var reports = frame.Variants.Select(v => TryOnReadiness.Inspect(frame, v)).ToList();
+                var blocked = reports.Count(r => !r.CanFitPhysically);
+                var warned = reports.Count(r => r.CanFitPhysically && r.HasWarnings);
+                var lead = frame.Variants
+                    .OrderBy(v => v.Position)
+                    .FirstOrDefault(v => v.TryOnImageUrl != null);
+
                 <tr>
-                    <td>@frame.Name</td>
-                    <td class="small muted">@frame.Brand?.Name</td>
+                    <td>
+                        <div class="admin-product">
+                            @if (lead?.TryOnImageUrl is { } art)
+                            {
+                                <img src="@art" alt="" loading="lazy" width="56" height="24" />
+                            }
+                            <div>
+                                <strong>@frame.Name</strong>
+                                <span class="small muted">
+                                    @(frame.Brand?.Name ?? "No brand")
+                                    · @frame.Variants.Count colourway@(frame.Variants.Count == 1 ? "" : "s")
+                                </span>
+                            </div>
+                        </div>
+                    </td>
                     <td><code>@frame.Sku</code></td>
                     <td class="num">@Money.Format(frame.BasePriceMinor, store.Currency, store.CurrencySymbol)</td>
-                    <td class="num">@frame.Variants.Count</td>
                     <td class="num">@stock</td>
-                    <td class="small">
-                        @if (calibrated == frame.Variants.Count && calibrated > 0)
+                    <td>
+                        @if (frame.Variants.Count == 0)
                         {
-                            <span class="chip chip-paid">All ready</span>
+                            <span class="tryon-state is-blocked">No colourways</span>
                         }
-                        else if (calibrated > 0)
+                        else if (blocked > 0)
                         {
-                            <span class="chip chip-pending">@calibrated of @frame.Variants.Count</span>
+                            <span class="tryon-state is-blocked">@blocked of @frame.Variants.Count incomplete</span>
+                        }
+                        else if (warned > 0)
+                        {
+                            <span class="tryon-state is-warning">@warned need attention</span>
                         }
                         else
                         {
-                            <span class="chip">None</span>
+                            <span class="tryon-state is-ready">Ready</span>
                         }
                     </td>
                     <td><span class="chip">@Humanise.Value(frame.Status)</span></td>
-                    <td><a asp-action="Edit" asp-route-id="@frame.Id">Edit</a></td>
+                    <td class="admin-row-actions">
+                        <a class="btn btn-outline btn-small" asp-action="Edit" asp-route-id="@frame.Id">Edit</a>
+                        <a class="btn btn-quiet btn-small" asp-controller="Frames" asp-action="Detail"
+                           asp-area="" asp-route-slug="@frame.Slug" target="_blank" rel="noopener">View</a>
+                    </td>
                 </tr>
             }
             </tbody>

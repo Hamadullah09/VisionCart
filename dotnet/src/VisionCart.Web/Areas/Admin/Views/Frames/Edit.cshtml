@@ -246,34 +246,33 @@
                     </form>
 
                     <div style="border-top:1px solid var(--ink-100);margin-top:14px;padding-top:12px;">
-                        <h3 style="font-size:14px;margin:0 0 4px;">Virtual try-on calibration</h3>
+                        <h3 style="font-size:14px;margin:0 0 4px;">Virtual try-on</h3>
                         <p class="hint" style="margin-top:0;">
-                            The two anchors are where the wearer's pupils must land inside the artwork,
-                            as a fraction of the image. Everything else — scale, rotation, position —
-                            is solved from the detected pupils, so a correctly anchored asset needs no
-                            per-face tuning. A colourway without artwork never appears in the mirror.
+                            The mirror draws this frame at its recorded width in millimetres, which
+                            needs the artwork marked up: where the lenses are, and where the frame
+                            front starts and ends. That is done on the picture itself, not here.
                         </p>
-                        <form method="post" asp-action="Calibrate" asp-route-id="@Model.Frame.Id"
-                              asp-route-variantId="@variant.Id">
-                            <div class="form-grid three">
-                                <div class="full">
-                                    <label>Artwork URL (transparent PNG, temples pointing out)</label>
-                                    <input class="field" name="tryOnImageUrl" value="@variant.TryOnImageUrl" />
-                                </div>
-                                <div><label>Left anchor X</label><input class="field" name="anchorLeftX" inputmode="decimal" value="@variant.AnchorLeftX" /></div>
-                                <div><label>Left anchor Y</label><input class="field" name="anchorLeftY" inputmode="decimal" value="@variant.AnchorLeftY" /></div>
-                                <div><label>Right anchor X</label><input class="field" name="anchorRightX" inputmode="decimal" value="@variant.AnchorRightX" /></div>
-                                <div><label>Right anchor Y</label><input class="field" name="anchorRightY" inputmode="decimal" value="@variant.AnchorRightY" /></div>
-                                <div><label>Scale adjust</label><input class="field" name="tryOnScaleAdj" inputmode="decimal" value="@variant.TryOnScaleAdj" /></div>
-                                <div><label>Opacity</label><input class="field" name="tryOnOpacity" inputmode="decimal" value="@variant.TryOnOpacity" /></div>
-                            </div>
-                            <button class="btn btn-outline btn-small" style="margin-top:10px;" type="submit">Save calibration</button>
+                        <p class="hint" style="margin:0;">
+                            @if (variant.TryOnImageUrl is null)
+                            {
+                                <text>No artwork yet.</text>
+                            }
+                            else
+                            {
+                                <text>Artwork: <code>@variant.TryOnImageUrl</code></text>
+                            }
+                        </p>
+                        <p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
+                            <a class="btn btn-primary btn-small"
+                               asp-action="Calibrate" asp-route-id="@Model.Frame.Id" asp-route-variantId="@variant.Id">
+                                Calibrate the artwork
+                            </a>
                             @if (variant.TryOnImageUrl is not null)
                             {
-                                <a class="btn btn-outline btn-small" style="margin-top:10px;"
-                                   href="/try-on?variant=@variant.Id" target="_blank" rel="noopener">Preview in the mirror ↗</a>
+                                <a class="btn btn-outline btn-small"
+                                   href="/try-on?variant=@variant.Id" target="_blank" rel="noopener">Preview in the mirror &#8599;</a>
                             }
-                        </form>
+                        </p>
                     </div>
                 </div>
             </div>

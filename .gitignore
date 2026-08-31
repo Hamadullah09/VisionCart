@@ -61,3 +61,6 @@ USER-MANUAL.log
 #   cd dotnet/tools/videoguide && VISIONCART_PASSWORD=... node record.mjs
 /dotnet/docs/videoguide/*.webm
 /dotnet/tools/videoguide/.recordings/
+
+# Rendered back-office pages, dumped by hand for visual QA. Never shipped.
+dotnet/src/VisionCart.Web/wwwroot/_qa/

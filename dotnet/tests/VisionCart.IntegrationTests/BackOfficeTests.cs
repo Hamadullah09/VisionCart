@@ -391,8 +391,23 @@ public class BackOfficeTests(CheckoutFlowFixture fixture)
         Assert.Contains("maximum", result.Error!, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>A calibration the mirror could not draw from must not be saved.</summary>
+    private static TryOnCalibrationInput Calibration(Action<TryOnCalibrationInput>? tweak = null)
+    {
+        var input = new TryOnCalibrationInput
+        {
+            LeftLensCenterX = 0.32, LeftLensCenterY = 0.5,
+            RightLensCenterX = 0.68, RightLensCenterY = 0.5,
+            FrontLeftX = 0.13, FrontRightX = 0.87,
+            LensTopY = 0.16, LensBottomY = 0.84,
+            Opacity = 1,
+        };
+        tweak?.Invoke(input);
+        return input;
+    }
+
     [Fact]
-    public async Task Try_on_calibration_refuses_anchors_that_would_misplace_the_frame()
+    public async Task Try_on_calibration_refuses_marks_that_would_misplace_the_frame()
     {
         using var scope = fixture.NewScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -401,16 +416,63 @@ public class BackOfficeTests(CheckoutFlowFixture fixture)
         var catalogue = scope.ServiceProvider.GetRequiredService<ICatalogueAdminService>();
 
         // Outside the artwork entirely.
-        var offImage = await catalogue.SaveTryOnCalibrationAsync(variantId, -0.2, 0.5, 0.7, 0.5, 1, 1, null);
+        var offImage = await catalogue.SaveTryOnCalibrationAsync(
+            variantId, Calibration(c => c.LeftLensCenterX = -0.2));
         Assert.False(offImage.Ok);
 
-        // Too close together to solve a scale from.
-        var degenerate = await catalogue.SaveTryOnCalibrationAsync(variantId, 0.50, 0.5, 0.505, 0.5, 1, 1, null);
+        // Lens centres too close together to solve a scale from.
+        var degenerate = await catalogue.SaveTryOnCalibrationAsync(
+            variantId, Calibration(c => { c.LeftLensCenterX = 0.50; c.RightLensCenterX = 0.505; }));
         Assert.False(degenerate.Ok);
 
-        // A sane pair is accepted.
-        var ok = await catalogue.SaveTryOnCalibrationAsync(variantId, 0.29, 0.5, 0.71, 0.5, 1, 1, null);
+        // A frame front too narrow to measure the overall width against.
+        var flat = await catalogue.SaveTryOnCalibrationAsync(
+            variantId, Calibration(c => { c.FrontLeftX = 0.49; c.FrontRightX = 0.51; }));
+        Assert.False(flat.Ok);
+
+        // A lens opening with no depth: nothing to seat the frame by.
+        var shallow = await catalogue.SaveTryOnCalibrationAsync(
+            variantId, Calibration(c => { c.LensTopY = 0.50; c.LensBottomY = 0.505; }));
+        Assert.False(shallow.Ok);
+
+        // Lenses outside the frame front is a picture contradicting itself.
+        var outside = await catalogue.SaveTryOnCalibrationAsync(
+            variantId, Calibration(c => c.FrontLeftX = 0.4));
+        Assert.False(outside.Ok);
+
+        var ok = await catalogue.SaveTryOnCalibrationAsync(variantId, Calibration());
         Assert.True(ok.Ok, ok.Error);
+    }
+
+    [Fact]
+    public async Task Try_on_calibration_stores_every_mark_the_renderer_needs()
+    {
+        using var scope = fixture.NewScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var variantId = await db.FrameVariants.Select(v => v.Id).FirstAsync();
+        var catalogue = scope.ServiceProvider.GetRequiredService<ICatalogueAdminService>();
+
+        var saved = await catalogue.SaveTryOnCalibrationAsync(variantId, Calibration(c =>
+        {
+            c.ImageWidth = 1330;
+            c.ImageHeight = 413;
+            c.Opacity = 0.85;
+        }));
+        Assert.True(saved.Ok, saved.Error);
+
+        using var read = fixture.NewScope();
+        var stored = await read.ServiceProvider.GetRequiredService<ApplicationDbContext>()
+            .FrameVariants.AsNoTracking().FirstAsync(v => v.Id == variantId);
+
+        // Without the bounds the renderer cannot tell frame from padding, so a
+        // save that quietly dropped them would leave the mirror guessing.
+        Assert.Equal(0.13, stored.TryOnFrontLeftX);
+        Assert.Equal(0.87, stored.TryOnFrontRightX);
+        Assert.Equal(0.16, stored.TryOnLensTopY);
+        Assert.Equal(0.84, stored.TryOnLensBottomY);
+        Assert.Equal(1330, stored.TryOnImageWidth);
+        Assert.Equal(413, stored.TryOnImageHeight);
+        Assert.Equal(0.85, stored.TryOnOpacity);
     }
 
     [Fact]
