@@ -5,83 +5,169 @@
     var frame = Model.Frame;
     ViewData["Title"] = $"{frame.Name} — {Humanise.Value(frame.Shape)} glasses";
     var store = Store.Value;
-    var lead = frame.Variants.FirstOrDefault();
-    var leadImage = lead?.Images.FirstOrDefault()?.Url;
+
+    var variants = frame.Variants.OrderBy(v => v.Position).ToList();
+    var lead = variants.FirstOrDefault();
+    var tryOnReady = variants.FirstOrDefault(v => v.TryOnImageUrl is not null);
+
+    // The three numbers printed inside a real arm. Somebody who already owns
+    // glasses that fit can compare these directly, which beats any adjective.
+    var sizeCode = frame is { LensWidthMm: { } lw, BridgeWidthMm: { } bw, TempleLengthMm: { } tl }
+        ? $"{lw:0}□{bw:0}-{tl:0}"
+        : null;
 }
 
-<p class="small muted" style="margin:20px 0 12px;">
-    <a asp-controller="Frames" asp-action="Index">Frames</a> / @frame.Name
-</p>
+<nav class="crumbs" aria-label="Breadcrumb">
+    <a asp-controller="Frames" asp-action="Index">Frames</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">@frame.Name</span>
+</nav>
 
-<form method="post" asp-controller="Cart" asp-action="Add">
+<form method="post" asp-controller="Cart" asp-action="Add" class="product">
     <input type="hidden" name="ReturnUrl" value="@Context.Request.Path" />
 
-    <div class="two-col">
-        <div>
-            <div class="card shot" style="background:var(--ink-50);display:flex;align-items:center;justify-content:center;padding:40px;">
-                @if (leadImage is not null)
-                {
-                    <img id="lead-image" src="@leadImage" alt="@frame.Name" style="width:80%;height:auto;" />
-                }
-            </div>
+    <div class="product-shots">
+        <div class="product-hero">
+            @if (lead?.Images.FirstOrDefault()?.Url is { } leadImage)
+            {
+                <img id="lead-image" src="@leadImage" alt="@frame.Name in @lead!.ColorName" />
+            }
+        </div>
 
-            <div class="grid grid-4" style="margin-top:12px;">
-                @foreach (var v in frame.Variants)
+        @if (tryOnReady is not null)
+        {
+            <p class="product-shot-note">
+                <a asp-controller="TryOn" asp-action="Index" asp-route-variant="@tryOnReady.Id">
+                    See this frame on your own face &rarr;
+                </a>
+            </p>
+        }
+    </div>
+
+    <div class="product-buy">
+        @if (frame.Brand is not null)
+        {
+            <p class="brand-name">@frame.Brand.Name</p>
+        }
+        <h1 class="product-title">@frame.Name</h1>
+
+        <p class="product-price">
+            @Money.Format(frame.BasePriceMinor, store.Currency, store.CurrencySymbol)
+            <span class="product-price-note">for the frame. Lenses are chosen below.</span>
+        </p>
+
+        @if (frame.Description is not null)
+        {
+            <p class="product-blurb">@frame.Description</p>
+        }
+
+        @* Colour, as swatches you can see and reach with a keyboard — not
+           invisible radios inside a picture. *@
+        <fieldset class="product-colours">
+            <legend>Colour</legend>
+            <div class="colour-choices">
+                @foreach (var v in variants)
                 {
                     var img = v.Images.FirstOrDefault()?.Url;
-                    <label class="card" style="padding:8px;cursor:pointer;text-align:center;">
+                    var soldOut = v.StockQty <= 0;
+                    <label class="colour-choice @(soldOut ? "is-out" : "")">
                         <input type="radio" name="VariantId" value="@v.Id"
-                               checked="@(v.Id == lead?.Id)" style="display:none;" />
-                        @if (img is not null)
-                        {
-                            <img src="@img" alt="@v.ColorName" style="width:100%;height:auto;" />
-                        }
-                        <span class="small muted">@v.ColorName</span>
+                               data-image="@img" data-tryon="@v.Id"
+                               checked="@(v.Id == lead?.Id)" disabled="@soldOut" />
+                        <span class="colour-swatch" style="--swatch:@(v.ColorHex ?? "#ccc")" aria-hidden="true"></span>
+                        <span class="colour-name">
+                            @v.ColorName
+                            @if (soldOut)
+                            {
+                                <span class="colour-out">Out of stock</span>
+                            }
+                        </span>
                     </label>
                 }
             </div>
+        </fieldset>
+
+        <div class="product-actions">
+            @if (tryOnReady is not null)
+            {
+                <a class="btn btn-primary btn-lg" data-product-tryon
+                   asp-controller="TryOn" asp-action="Index" asp-route-variant="@tryOnReady.Id">
+                    Try it on
+                </a>
+            }
+            <a class="btn btn-outline btn-lg" href="#lenses">Choose lenses</a>
         </div>
 
-        <div>
-            @if (frame.Brand is not null)
+        @* Size before style: it is the question that decides whether a frame is
+           wearable at all, and every figure here is what the mirror measures
+           against. *@
+        <section class="product-size">
+            <h2 class="section-label">Size and fit</h2>
+
+            @if (sizeCode is not null)
             {
-                <p class="brand-name">@frame.Brand.Name</p>
+                <p class="size-code" title="Lens width, bridge width and arm length, as printed inside the arm">
+                    @sizeCode
+                </p>
             }
-            <h1 style="margin:4px 0 8px;">@frame.Name</h1>
-            <p style="font-size:22px;font-weight:700;margin:0 0 4px;">
-                @Money.Format(frame.BasePriceMinor, store.Currency, store.CurrencySymbol)
-                <span class="small muted" style="font-weight:400;">frame — lenses added below</span>
+
+            <dl class="size-table">
+                @if (frame.LensWidthMm is { } lensW)
+                {
+                    <div><dt>Lens width</dt><dd>@lensW.ToString("0.#") mm</dd></div>
+                }
+                @if (frame.LensHeightMm is { } lensH)
+                {
+                    <div><dt>Lens height</dt><dd>@lensH.ToString("0.#") mm</dd></div>
+                }
+                @if (frame.BridgeWidthMm is { } bridge)
+                {
+                    <div><dt>Bridge</dt><dd>@bridge.ToString("0.#") mm</dd></div>
+                }
+                @if (frame.TempleLengthMm is { } temple)
+                {
+                    <div><dt>Arm length</dt><dd>@temple.ToString("0.#") mm</dd></div>
+                }
+                @if (frame.TotalWidthMm is { } total)
+                {
+                    <div><dt>Overall width</dt><dd>@total.ToString("0.#") mm</dd></div>
+                }
+                @if (frame.WeightGrams is { } weight)
+                {
+                    <div><dt>Weight</dt><dd>@weight.ToString("0.#") g</dd></div>
+                }
+            </dl>
+
+            <dl class="size-table">
+                <div><dt>Shape</dt><dd>@Humanise.Value(frame.Shape)</dd></div>
+                <div><dt>Material</dt><dd>@Humanise.Value(frame.Material)</dd></div>
+                <div><dt>Rim</dt><dd>@Humanise.Value(frame.RimType)</dd></div>
+            </dl>
+
+            <p class="small muted">
+                Compare these with a pair you already wear — the numbers are printed
+                inside the arm. If you would rather see them on, the try-on draws this
+                frame at exactly these measurements against your own face.
             </p>
+        </section>
 
-            @if (frame.Description is not null)
-            {
-                <p class="muted">@frame.Description</p>
-            }
+        <section class="product-lenses" id="lenses">
+            <h2 class="section-label">Lenses</h2>
 
-            <table class="spec-table" style="margin:20px 0;">
-                <tr><td>Shape</td><td>@Humanise.Value(frame.Shape)</td></tr>
-                <tr><td>Material</td><td>@Humanise.Value(frame.Material)</td></tr>
-                <tr><td>Rim</td><td>@Humanise.Value(frame.RimType)</td></tr>
-                <tr><td>Size</td><td>@frame.LensWidthMm□@frame.BridgeWidthMm-@frame.TempleLengthMm</td></tr>
-                <tr><td>Total width</td><td>@frame.TotalWidthMm mm</td></tr>
-                <tr><td>Weight</td><td>@frame.WeightGrams g</td></tr>
-                <tr><td>SKU</td><td>@frame.Sku</td></tr>
-            </table>
-
-            <fieldset style="border:0;padding:0;margin:0 0 8px;">
-                <legend style="font-weight:600;margin-bottom:8px;">What do you need?</legend>
+            <fieldset class="lens-mode">
+                <legend>What do you need?</legend>
                 <div class="lens-options">
                     <label class="lens-option">
                         <input type="radio" name="LensMode" value="prescription" />
-                        <span><span class="name">Prescription lenses</span><br /><span class="desc">Made to your Rx.</span></span>
+                        <span><span class="name">Prescription lenses</span><span class="desc">Made to your prescription.</span></span>
                     </label>
                     <label class="lens-option">
                         <input type="radio" name="LensMode" value="plain" />
-                        <span><span class="name">Plain lenses</span><br /><span class="desc">No correction — style or screen use.</span></span>
+                        <span><span class="name">Plain lenses</span><span class="desc">No correction — for style or screen use.</span></span>
                     </label>
                     <label class="lens-option">
                         <input type="radio" name="LensMode" value="frame_only" checked />
-                        <span><span class="name">Frame only</span><br /><span class="desc">You'll fit your own lenses.</span></span>
+                        <span><span class="name">Frame only</span><span class="desc">You will have your own lenses fitted.</span></span>
                     </label>
                 </div>
             </fieldset>
@@ -90,7 +176,10 @@
             {
                 <div class="lens-group">
                     <h3>@LensGroups.Labels.GetValueOrDefault(group.Key, Humanise.Value(group.Key))</h3>
-                    <p class="small muted" style="margin:0;">@LensGroups.Help.GetValueOrDefault(group.Key)</p>
+                    @if (LensGroups.Help.GetValueOrDefault(group.Key) is { } help)
+                    {
+                        <p class="small muted">@help</p>
+                    }
                     <div class="lens-options">
                         @foreach (var option in group.OrderBy(o => o.Position))
                         {
@@ -98,15 +187,17 @@
                                 <input type="checkbox" name="LensOptionCodes" value="@option.Code"
                                        checked="@option.IsDefault" />
                                 <span>
-                                    <span class="name">@option.Name</span>
-                                    <span class="price">
-                                        @(option.PriceMinor == 0
-                                            ? " Included"
-                                            : $" +{Money.Format(option.PriceMinor, store.Currency, store.CurrencySymbol)}")
+                                    <span class="name">
+                                        @option.Name
+                                        <span class="price">
+                                            @(option.PriceMinor == 0
+                                                ? "Included"
+                                                : $"+{Money.Format(option.PriceMinor, store.Currency, store.CurrencySymbol)}")
+                                        </span>
                                     </span>
                                     @if (option.Description is not null)
                                     {
-                                        <br /><span class="desc">@option.Description</span>
+                                        <span class="desc">@option.Description</span>
                                     }
                                 </span>
                             </label>
@@ -114,25 +205,36 @@
                     </div>
                 </div>
             }
+        </section>
 
-            <div class="lens-group">
-                <h3>Your prescription</h3>
-                <p class="small muted" style="margin:0 0 12px;">
-                    Every value is chosen from a list, in steps of 0.25 D — a free-text box is
-                    how a lab ends up cutting the wrong lens.
-                </p>
-                <table>
+        <section class="product-rx">
+            <h2 class="section-label">Your prescription</h2>
+            <p class="small muted">
+                Copy it from the sheet your optician gave you. Every value is chosen from a
+                list, in steps of 0.25 &mdash; a free-text box is how a lab ends up cutting
+                the wrong lens. <a asp-controller="Guides" asp-action="Prescription">How to read a prescription</a>
+            </p>
+
+            <div class="rx-table-wrap">
+                <table class="rx-table">
                     <thead>
-                        <tr><th>Eye</th><th>Sphere</th><th>Cylinder</th><th>Axis</th><th>Add</th></tr>
+                        <tr>
+                            <th scope="col">Eye</th>
+                            <th scope="col">Sphere</th>
+                            <th scope="col">Cylinder</th>
+                            <th scope="col">Axis</th>
+                            <th scope="col">Add</th>
+                        </tr>
                     </thead>
                     <tbody>
                         @foreach (var (side, label) in new[] { ("Od", "Right (OD)"), ("Os", "Left (OS)") })
                         {
                             <tr>
-                                <td>@label</td>
+                                <th scope="row">@label</th>
                                 <td>
-                                    <select name="@(side)Sphere">
-                                        <option value="">—</option>
+                                    <label class="sr-only" for="@(side)Sphere">@label sphere</label>
+                                    <select id="@(side)Sphere" name="@(side)Sphere">
+                                        <option value="">&mdash;</option>
                                         @foreach (var v in Diopters.SphereValues)
                                         {
                                             <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
@@ -140,8 +242,9 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="@(side)Cylinder">
-                                        <option value="">—</option>
+                                    <label class="sr-only" for="@(side)Cylinder">@label cylinder</label>
+                                    <select id="@(side)Cylinder" name="@(side)Cylinder">
+                                        <option value="">&mdash;</option>
                                         @foreach (var v in Diopters.CylinderValues)
                                         {
                                             <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
@@ -149,17 +252,19 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="@(side)Axis">
-                                        <option value="">—</option>
+                                    <label class="sr-only" for="@(side)Axis">@label axis</label>
+                                    <select id="@(side)Axis" name="@(side)Axis">
+                                        <option value="">&mdash;</option>
                                         @foreach (var a in Diopters.AxisValues)
                                         {
-                                            <option value="@a">@a°</option>
+                                            <option value="@a">@a&deg;</option>
                                         }
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="@(side)Add">
-                                        <option value="">—</option>
+                                    <label class="sr-only" for="@(side)Add">@label add</label>
+                                    <select id="@(side)Add" name="@(side)Add">
+                                        <option value="">&mdash;</option>
                                         @foreach (var v in Diopters.AddValues)
                                         {
                                             <option value="@v.ToString("0.00")">@Diopters.Format((double)v)</option>
@@ -170,16 +275,23 @@
                         }
                     </tbody>
                 </table>
-                <label for="PdMm" style="display:block;margin-top:12px;font-size:13px;color:var(--ink-600);">
-                    Pupillary distance (mm)
-                </label>
-                <input class="field" type="text" inputmode="decimal" id="PdMm" name="PdMm"
-                       placeholder="e.g. 63" style="max-width:180px;" />
             </div>
 
-            <div style="margin-top:24px;">
-                <button class="btn btn-primary btn-block" type="submit">Add to bag</button>
-            </div>
+            <label class="rx-pd" for="PdMm">
+                <span>Pupillary distance</span>
+                <input class="field" type="text" inputmode="decimal" id="PdMm" name="PdMm"
+                       placeholder="e.g. 63" aria-describedby="pd-note" />
+                <span aria-hidden="true">mm</span>
+            </label>
+            <p class="small muted" id="pd-note">
+                The distance between the centres of your pupils. It is on your prescription.
+                <a asp-controller="Guides" asp-action="Pd">How to find it</a>
+            </p>
+        </section>
+
+        <div class="product-submit">
+            <button class="btn btn-primary btn-block btn-lg" type="submit">Add to bag</button>
+            <p class="small muted">Free returns within 30 days. Our optician checks every order before it goes to the lab.</p>
         </div>
     </div>
 </form>

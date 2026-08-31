@@ -1,100 +1,212 @@
+@using Microsoft.Extensions.Options
 @model CatalogueViewModel
+@inject IOptions<StoreOptions> Store
 @{
     ViewData["Title"] = "All frames";
     var f = Model.Filters;
+    var store = Store.Value;
+
+    // What is actually switched on, so it can be shown and taken off again
+    // one at a time. Eight dropdowns cannot tell you that at a glance.
+    var applied = new List<(string Label, string Key)>();
+    if (!string.IsNullOrWhiteSpace(f.Q)) applied.Add(($"“{f.Q}”", "q"));
+    if (!string.IsNullOrWhiteSpace(f.Gender)) applied.Add((Humanise.Value(f.Gender), "gender"));
+    if (!string.IsNullOrWhiteSpace(f.Shape)) applied.Add((Humanise.Value(f.Shape), "shape"));
+    if (!string.IsNullOrWhiteSpace(f.Material)) applied.Add((Humanise.Value(f.Material), "material"));
+    if (!string.IsNullOrWhiteSpace(f.RimType)) applied.Add((Humanise.Value(f.RimType), "rimType"));
+    if (!string.IsNullOrWhiteSpace(f.SizeBand)) applied.Add(($"{Humanise.Value(f.SizeBand)} fit", "sizeBand"));
+    if (!string.IsNullOrWhiteSpace(f.Brand))
+    {
+        var brand = Model.Facets.Brands.FirstOrDefault(b => b.Slug == f.Brand);
+        applied.Add((brand.Name ?? f.Brand, "brand"));
+    }
+    if (!string.IsNullOrWhiteSpace(f.Category))
+    {
+        var cat = Model.Facets.Categories.FirstOrDefault(c => c.Slug == f.Category);
+        applied.Add((cat.Name ?? f.Category, "category"));
+    }
+    if (f.MinPrice is { } lo) applied.Add(($"from {Money.Format(lo, store.Currency, store.CurrencySymbol)}", "minPrice"));
+    if (f.MaxPrice is { } hi) applied.Add(($"up to {Money.Format(hi, store.Currency, store.CurrencySymbol)}", "maxPrice"));
+
+    // Everything currently set, so a link can drop exactly one of them.
+    var current = new Dictionary<string, string?>
+    {
+        ["q"] = f.Q, ["gender"] = f.Gender, ["shape"] = f.Shape, ["material"] = f.Material,
+        ["rimType"] = f.RimType, ["brand"] = f.Brand, ["category"] = f.Category,
+        ["sizeBand"] = f.SizeBand, ["sort"] = f.Sort,
+        ["minPrice"] = f.MinPrice is { } a ? Money.FromMinor(a, store.Currency).ToString("0.##") : null,
+        ["maxPrice"] = f.MaxPrice is { } b ? Money.FromMinor(b, store.Currency).ToString("0.##") : null,
+    };
+
+    string Without(string key)
+    {
+        var next = current.Where(kv => kv.Key != key && !string.IsNullOrWhiteSpace(kv.Value))
+            .ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+        return Url.Action("Index", next)!;
+    }
 }
 
-<h1>All frames</h1>
-<p class="muted">@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s")</p>
-
-<div class="catalogue" style="margin-top:24px;">
-    <form class="filters" method="get">
-        <label for="q">Search</label>
-        <input class="field" type="text" id="q" name="q" value="@f.Q" placeholder="Name, brand or SKU" />
-
-        <label for="gender">Wearer</label>
-        <select id="gender" name="gender">
-            <option value="">Any</option>
-            @foreach (var g in Genders.All)
-            {
-                <option value="@g" selected="@(f.Gender == g)">@Humanise.Value(g)</option>
-            }
-        </select>
-
-        <label for="shape">Shape</label>
-        <select id="shape" name="shape">
-            <option value="">Any</option>
-            @foreach (var (value, count) in Model.Facets.Shapes)
-            {
-                <option value="@value" selected="@(f.Shape == value)">@Humanise.Value(value) (@count)</option>
-            }
-        </select>
-
-        <label for="material">Material</label>
-        <select id="material" name="material">
-            <option value="">Any</option>
-            @foreach (var (value, count) in Model.Facets.Materials)
-            {
-                <option value="@value" selected="@(f.Material == value)">@Humanise.Value(value) (@count)</option>
-            }
-        </select>
-
-        <label for="rimType">Rim</label>
-        <select id="rimType" name="rimType">
-            <option value="">Any</option>
-            @foreach (var r in RimTypes.All)
-            {
-                <option value="@r" selected="@(f.RimType == r)">@Humanise.Value(r)</option>
-            }
-        </select>
-
-        <label for="brand">Brand</label>
-        <select id="brand" name="brand">
-            <option value="">Any</option>
-            @foreach (var (name, slug) in Model.Facets.Brands)
-            {
-                <option value="@slug" selected="@(f.Brand == slug)">@name</option>
-            }
-        </select>
-
-        <label for="category">Collection</label>
-        <select id="category" name="category">
-            <option value="">Any</option>
-            @foreach (var (name, slug) in Model.Facets.Categories)
-            {
-                <option value="@slug" selected="@(f.Category == slug)">@name</option>
-            }
-        </select>
-
-        <label for="sizeBand">Frame size</label>
-        <select id="sizeBand" name="sizeBand">
-            <option value="">Any</option>
-            @foreach (var s in SizeBands.All)
-            {
-                <option value="@s" selected="@(f.SizeBand == s)">@Humanise.Value(s)</option>
-            }
-        </select>
-
-        <label for="sort">Sort by</label>
-        <select id="sort" name="sort">
-            <option value="">Featured</option>
-            <option value="price_asc" selected="@(f.Sort == "price_asc")">Price, low to high</option>
-            <option value="price_desc" selected="@(f.Sort == "price_desc")">Price, high to low</option>
-            <option value="newest" selected="@(f.Sort == "newest")">Newest</option>
-        </select>
-
-        <div style="display:flex;gap:8px;margin-top:18px;">
-            <button class="btn btn-primary" type="submit">Apply</button>
-            <a class="btn btn-outline" asp-action="Index">Clear</a>
-        </div>
-    </form>
-
+<div class="catalogue-head">
     <div>
+        <h1>All frames</h1>
+        <p class="muted">
+            @Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s").
+            Every one can be tried on before you order.
+        </p>
+    </div>
+</div>
+
+@if (applied.Count > 0)
+{
+    <div class="filter-chips">
+        <span class="filter-chips-label">Showing</span>
+        @foreach (var (label, key) in applied)
+        {
+            <a class="filter-chip" href="@Without(key)">
+                @label
+                <span class="filter-chip-x" aria-hidden="true">&times;</span>
+                <span class="sr-only">— remove this filter</span>
+            </a>
+        }
+        <a class="filter-chip-clear" asp-action="Index">Clear all</a>
+    </div>
+}
+
+<div class="catalogue">
+    @* Open on a wide screen, folded away on a narrow one — a phone should show
+       frames first and the filters on request. *@
+    <details class="filters" data-catalogue-filters open>
+        <summary>
+            <span>Filter</span>
+            @if (applied.Count > 0)
+            {
+                <span class="filters-count">@applied.Count</span>
+            }
+        </summary>
+
+        <form method="get" data-catalogue-form>
+            <div class="filter-field">
+                <label for="q">Search</label>
+                <input class="field" type="search" id="q" name="q" value="@f.Q" placeholder="Name, brand or SKU" />
+            </div>
+
+            <div class="filter-field">
+                <label for="gender">Wearer</label>
+                <select id="gender" name="gender">
+                    <option value="">Anyone</option>
+                    @foreach (var g in Genders.All)
+                    {
+                        <option value="@g" selected="@(f.Gender == g)">@Humanise.Value(g)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="shape">Shape</label>
+                <select id="shape" name="shape">
+                    <option value="">Any shape</option>
+                    @foreach (var (value, count) in Model.Facets.Shapes)
+                    {
+                        <option value="@value" selected="@(f.Shape == value)">@Humanise.Value(value) (@count)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="sizeBand">Frame size</label>
+                <select id="sizeBand" name="sizeBand">
+                    <option value="">Any size</option>
+                    @foreach (var s in SizeBands.All)
+                    {
+                        <option value="@s" selected="@(f.SizeBand == s)">@Humanise.Value(s)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="material">Material</label>
+                <select id="material" name="material">
+                    <option value="">Any material</option>
+                    @foreach (var (value, count) in Model.Facets.Materials)
+                    {
+                        <option value="@value" selected="@(f.Material == value)">@Humanise.Value(value) (@count)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="rimType">Rim</label>
+                <select id="rimType" name="rimType">
+                    <option value="">Any rim</option>
+                    @foreach (var r in RimTypes.All)
+                    {
+                        <option value="@r" selected="@(f.RimType == r)">@Humanise.Value(r)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="brand">Brand</label>
+                <select id="brand" name="brand">
+                    <option value="">Any brand</option>
+                    @foreach (var (name, slug) in Model.Facets.Brands)
+                    {
+                        <option value="@slug" selected="@(f.Brand == slug)">@name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="category">Collection</label>
+                <select id="category" name="category">
+                    <option value="">Any collection</option>
+                    @foreach (var (name, slug) in Model.Facets.Categories)
+                    {
+                        <option value="@slug" selected="@(f.Category == slug)">@name</option>
+                    }
+                </select>
+            </div>
+
+            <fieldset class="filter-field filter-price">
+                <legend>Price (@store.CurrencySymbol)</legend>
+                <label class="sr-only" for="minPrice">Lowest price</label>
+                <input class="field" type="number" inputmode="numeric" min="0" step="100"
+                       id="minPrice" name="minPrice" placeholder="Any"
+                       value="@(f.MinPrice is { } mn ? Money.FromMinor(mn, store.Currency).ToString("0.##") : null)" />
+                <span aria-hidden="true">to</span>
+                <label class="sr-only" for="maxPrice">Highest price</label>
+                <input class="field" type="number" inputmode="numeric" min="0" step="100"
+                       id="maxPrice" name="maxPrice" placeholder="Any"
+                       value="@(f.MaxPrice is { } mx ? Money.FromMinor(mx, store.Currency).ToString("0.##") : null)" />
+            </fieldset>
+
+            <div class="filter-field">
+                <label for="sort">Sort by</label>
+                <select id="sort" name="sort">
+                    <option value="">Featured</option>
+                    <option value="price_asc" selected="@(f.Sort == "price_asc")">Price, low to high</option>
+                    <option value="price_desc" selected="@(f.Sort == "price_desc")">Price, high to low</option>
+                    <option value="newest" selected="@(f.Sort == "newest")">Newest</option>
+                </select>
+            </div>
+
+            @* Kept even with scripting on: it is the control people look for,
+               and without scripting it is the only way to apply anything. *@
+            <div class="filter-actions">
+                <button class="btn btn-primary" type="submit">Show frames</button>
+                <a class="btn btn-quiet" asp-action="Index">Clear</a>
+            </div>
+        </form>
+    </details>
+
+    <div class="catalogue-results">
         @if (Model.Results.Items.Count == 0)
         {
-            <p class="alert alert-info">
-                No frames match those filters. Try widening your search.
-            </p>
+            <div class="empty-state">
+                <h2>Nothing matches that.</h2>
+                <p class="muted">Try dropping a filter or two — there are @Model.Facets.Shapes.Count shapes to choose from.</p>
+                <a class="btn btn-outline" asp-action="Index">Start again</a>
+            </div>
         }
         else
         {
@@ -107,12 +219,12 @@
 
             @if (Model.Results.Pages > 1)
             {
-                <nav style="display:flex;gap:8px;justify-content:center;margin-top:32px;align-items:center;">
+                <nav class="pager" aria-label="Pagination">
                     @if (Model.Results.HasPrevious)
                     {
                         <a class="btn btn-outline btn-small"
                            href="@Url.Action("Index", new { q = f.Q, gender = f.Gender, shape = f.Shape, material = f.Material, rimType = f.RimType, brand = f.Brand, category = f.Category, sizeBand = f.SizeBand, sort = f.Sort, page = Model.Results.Page - 1 })">
-                            ← Previous
+                            &larr; Previous
                         </a>
                     }
                     <span class="small muted">Page @Model.Results.Page of @Model.Results.Pages</span>
@@ -120,7 +232,7 @@
                     {
                         <a class="btn btn-outline btn-small"
                            href="@Url.Action("Index", new { q = f.Q, gender = f.Gender, shape = f.Shape, material = f.Material, rimType = f.RimType, brand = f.Brand, category = f.Category, sizeBand = f.SizeBand, sort = f.Sort, page = Model.Results.Page + 1 })">
-                            Next →
+                            Next &rarr;
                         </a>
                     }
                 </nav>
@@ -128,3 +240,7 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/catalogue.js" asp-append-version="true" defer></script>
+}

@@ -8,8 +8,10 @@ using VisionCart.Application.Common;
 using VisionCart.Application.Payments;
 using VisionCart.Application.Platform;
 using VisionCart.Application.Prescriptions;
+using VisionCart.Application.Pricing;
 using VisionCart.Application.Promotions;
 using VisionCart.Domain.Entities;
+using VisionCart.Domain.ValueObjects;
 using VisionCart.Web.Models;
 
 namespace VisionCart.Web.Controllers;
@@ -37,19 +39,26 @@ public class HomeController(
 }
 
 [Route("frames")]
-public class FramesController(ICatalogService catalog) : Controller
+public class FramesController(
+    ICatalogService catalog,
+    Microsoft.Extensions.Options.IOptions<StoreOptions> store) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(
         [FromQuery] string? q, [FromQuery] string? gender, [FromQuery] string? shape,
         [FromQuery] string? material, [FromQuery] string? rimType, [FromQuery] string? brand,
         [FromQuery] string? category, [FromQuery] string? sizeBand, [FromQuery] string? sort,
+        [FromQuery] decimal? minPrice, [FromQuery] decimal? maxPrice,
         [FromQuery] int page = 1, CancellationToken ct = default)
     {
+        // The query string carries what a shopper would type — whole rupees.
+        // Converted once, here, as every other price on the way in is.
         var filters = new FrameFilters
         {
             Q = q, Gender = gender, Shape = shape, Material = material, RimType = rimType,
             Brand = brand, Category = category, SizeBand = sizeBand, Sort = sort, Page = page,
+            MinPrice = minPrice is { } lo and > 0 ? Money.ToMinor(lo, store.Value.Currency) : null,
+            MaxPrice = maxPrice is { } hi and > 0 ? Money.ToMinor(hi, store.Value.Currency) : null,
         };
 
         return View(new CatalogueViewModel
