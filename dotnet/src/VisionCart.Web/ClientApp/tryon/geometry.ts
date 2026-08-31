@@ -105,6 +105,62 @@ export function solveTransform(args: {
  * Apply a solved transform and draw the overlay. Leaves the context exactly as
  * it found it, so callers can keep drawing afterwards.
  */
+/**
+ * How dark the shadow a frame casts on the face is, at full strength.
+ *
+ * Real spectacles sit a few millimetres off the face and throw a soft shadow
+ * onto the brow, the nose and the cheeks. Without one the overlay reads as a
+ * sticker lying on the photograph rather than an object in front of it — it is
+ * the single strongest depth cue available to a flat sprite.
+ */
+export const SHADOW_ALPHA = 0.28;
+
+/** Shadow offset and blur, as fractions of the frame's drawn width. */
+const SHADOW_OFFSET_X = 0.012;
+const SHADOW_OFFSET_Y = 0.022;
+const SHADOW_BLUR = 0.018;
+
+/**
+ * How far past the cheek an arm keeps drawing before it has faded out, as a
+ * fraction of the pupil span.
+ *
+ * The temples run back towards the ears, so beyond the widest part of the face
+ * they are behind the head and should not be visible at all. A flat sprite
+ * draws them straight over the cheek, which is the other reason the overlay
+ * reads as pasted on. Fading rather than cutting, because a hard edge is its
+ * own artefact.
+ */
+export const TEMPLE_FADE = 0.22;
+
+export type FaceSilhouette = {
+  /** Canvas x of the widest point of the face on each side. */
+  leftX: number;
+  rightX: number;
+};
+
+/**
+ * Where each temple fades out, in canvas pixels.
+ *
+ * Split from the drawing so the arithmetic can be tested: the compositing
+ * itself needs a canvas, but getting the direction or the extent wrong would
+ * erase the frame rather than the arms, and that is worth pinning.
+ *
+ * Returns, per side, the coordinate where the fade begins (fully opaque) and
+ * where it has finished (fully erased). Everything past `end` is behind the
+ * head entirely.
+ */
+export function templeFadeBounds(
+  silhouette: FaceSilhouette,
+): { left: { start: number; end: number }; right: { start: number; end: number } } {
+  const span = Math.abs(silhouette.rightX - silhouette.leftX);
+  const fade = span * TEMPLE_FADE;
+
+  return {
+    left: { start: silhouette.leftX, end: silhouette.leftX - fade },
+    right: { start: silhouette.rightX, end: silhouette.rightX + fade },
+  };
+}
+
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   image: CanvasImageSource,
@@ -119,17 +175,97 @@ export function drawFrame(
      * changes — which is why this squeezes one axis rather than scaling both.
      */
     squeezeX?: number;
+    /** Draw the shadow the frame casts on the face. */
+    shadow?: boolean;
+    /** Fade the arms out where they pass behind the head. */
+    silhouette?: FaceSilhouette | null;
+    /** Scratch canvas for the occlusion pass; reused between frames. */
+    scratch?: HTMLCanvasElement | null;
   },
 ): void {
+  const opacity = opts.opacity ?? 1;
+  const squeeze = opts.squeezeX ?? 1;
+  const drawnWidth = opts.width * t.scale * squeeze;
+
+  const place = (target: CanvasRenderingContext2D, dx = 0, dy = 0): void => {
+    target.translate(t.translateX + dx, t.translateY + dy);
+    target.rotate(t.rotate);
+    target.scale(t.scale * squeeze, t.scale);
+    target.translate(-t.anchorX, -t.anchorY);
+    target.drawImage(image, 0, 0, opts.width, opts.height);
+  };
+
+  // --- the shadow it casts ------------------------------------------------
+  // brightness(0) keeps the artwork's alpha and blackens everything inside it,
+  // which turns any frame silhouette into its own shadow without a second asset.
+  if (opts.shadow) {
+    ctx.save();
+    ctx.globalAlpha = SHADOW_ALPHA * opacity;
+    ctx.filter = `blur(${(drawnWidth * SHADOW_BLUR).toFixed(2)}px) brightness(0)`;
+    place(ctx, drawnWidth * SHADOW_OFFSET_X, drawnWidth * SHADOW_OFFSET_Y);
+    ctx.restore();
+  }
+
+  // --- the frame itself ---------------------------------------------------
+  // Without a silhouette to respect, draw straight to the canvas: an offscreen
+  // pass every frame is a real cost on a camera feed and buys nothing here.
+  if (!opts.silhouette || !opts.scratch) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    place(ctx);
+    ctx.restore();
+    return;
+  }
+
+  const scratch = opts.scratch;
+  const sctx = scratch.getContext("2d");
+  if (!sctx) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    place(ctx);
+    ctx.restore();
+    return;
+  }
+
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.clearRect(0, 0, scratch.width, scratch.height);
+  sctx.save();
+  sctx.scale(scratch.width / ctx.canvas.width, scratch.height / ctx.canvas.height);
+  place(sctx);
+  sctx.restore();
+
+  // Erase the arms where the head is in front of them. destination-out on the
+  // scratch canvas only, so the photograph underneath is untouched.
+  const bounds = templeFadeBounds(opts.silhouette);
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.globalCompositeOperation = "destination-out";
+
+  const scaleX = scratch.width / ctx.canvas.width;
+  for (const [side, direction] of [
+    [bounds.left, -1] as const,
+    [bounds.right, 1] as const,
+  ]) {
+    const from = side.start * scaleX;
+    const to = side.end * scaleX;
+    const gradient = sctx.createLinearGradient(from, 0, to, 0);
+    gradient.addColorStop(0, "rgba(0,0,0,0)");
+    gradient.addColorStop(1, "rgba(0,0,0,1)");
+    sctx.fillStyle = gradient;
+    sctx.fillRect(Math.min(from, to), 0, Math.abs(to - from), scratch.height);
+
+    // Everything past the fade is fully behind the head.
+    if (direction < 0) sctx.clearRect(0, 0, Math.min(from, to), scratch.height);
+    else sctx.clearRect(Math.max(from, to), 0, scratch.width, scratch.height);
+  }
+  sctx.globalCompositeOperation = "source-over";
+
   ctx.save();
-  ctx.globalAlpha = opts.opacity ?? 1;
-  ctx.translate(t.translateX, t.translateY);
-  ctx.rotate(t.rotate);
-  ctx.scale(t.scale * (opts.squeezeX ?? 1), t.scale);
-  ctx.translate(-t.anchorX, -t.anchorY);
-  ctx.drawImage(image, 0, 0, opts.width, opts.height);
+  ctx.globalAlpha = opacity;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(scratch, 0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.restore();
 }
+
 
 // --- MediaPipe landmark indices -------------------------------------------
 // The 478-point face mesh appends five iris points per eye to the 468-point
@@ -178,6 +314,16 @@ export type FaceMeasurement = {
   confidence: number;
   /** Width of the face at the cheekbones, mm — drives frame size advice. */
   faceWidthMm: number | null;
+
+  /**
+   * The widest points of the face, in the same pixel space as the pupils.
+   *
+   * Beyond these the temples are behind the head, so the renderer fades them
+   * out — the difference between glasses that are worn and a sprite lying on
+   * top of a photograph.
+   */
+  leftFaceEdge: Point;
+  rightFaceEdge: Point;
 };
 
 /**
@@ -234,7 +380,11 @@ export function measureFace(
     }
   }
 
-  return { leftPupil, rightPupil, pdMm, pdLeftMm, pdRightMm, rollDeg, confidence, faceWidthMm };
+  return {
+    leftPupil, rightPupil, pdMm, pdLeftMm, pdRightMm, rollDeg, confidence, faceWidthMm,
+    leftFaceEdge: px(LM.leftFaceEdge),
+    rightFaceEdge: px(LM.rightFaceEdge),
+  };
 }
 
 /** Plain-language guidance shown under the try-on canvas. */

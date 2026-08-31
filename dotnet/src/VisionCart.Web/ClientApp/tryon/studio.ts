@@ -15,6 +15,7 @@ import {
   type Adjustment,
   type FaceMeasurement,
   type FrameAnchors,
+  type FaceSilhouette,
   type Point,
 } from "./geometry.ts";
 import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
@@ -130,6 +131,12 @@ export class TryOnStudio {
 
   /** Where the head is pointing, and how much that reading is trusted. */
   private pose: HeadPose = NEUTRAL_POSE;
+
+  /** Reused for the occlusion pass; allocating one per frame is a real cost. */
+  private scratch: HTMLCanvasElement | null = null;
+
+  /** Where the head is, so the arms can be hidden behind it. */
+  private silhouette: FaceSilhouette | null = null;
 
   /** Damps landmark noise without lagging behind real movement. */
   private readonly smoother = new PoseSmoother();
@@ -402,11 +409,20 @@ export class TryOnStudio {
         },
       });
 
+      if (!this.scratch) this.scratch = document.createElement("canvas");
+      if (this.scratch.width !== this.canvas.width || this.scratch.height !== this.canvas.height) {
+        this.scratch.width = this.canvas.width;
+        this.scratch.height = this.canvas.height;
+      }
+
       drawFrame(ctx, this.overlay, transform, {
         width: this.overlay.naturalWidth,
         height: this.overlay.naturalHeight,
         opacity: (this.selected?.opacity ?? 1) * this.trackingOpacity,
         squeezeX: yawForeshortening(this.pose.yawDeg),
+        shadow: true,
+        silhouette: this.silhouette,
+        scratch: this.scratch,
       });
     }
 
@@ -496,6 +512,10 @@ export class TryOnStudio {
               // canvas space by the letterbox offset.
               const shift = (p: Point): Point => ({ x: p.x + box.x, y: p.y + box.y });
               this.pupils = { a: shift(measured.leftPupil), b: shift(measured.rightPupil) };
+              this.silhouette = {
+                leftX: shift(measured.leftFaceEdge).x,
+                rightX: shift(measured.rightFaceEdge).x,
+              };
               this.measurement = measured;
               this.faceShape = estimateFaceShape(landmarks, box.width, box.height);
               this.manual = false;
@@ -516,6 +536,7 @@ export class TryOnStudio {
         };
         this.measurement = null;
         this.faceShape = null;
+        this.silhouette = null;   // nothing found, so nothing to hide behind
         this.manual = true;
       }
 
@@ -608,6 +629,13 @@ export class TryOnStudio {
                     a: { x: smoothed.leftX, y: smoothed.leftY },
                     b: { x: smoothed.rightX, y: smoothed.rightY },
                   };
+                  // Mirrored preview, so the left edge of the face lands on the
+                  // right of the canvas — order them or the fade erases the
+                  // wrong side.
+                  const e1 = toCanvas(measured.leftFaceEdge).x;
+                  const e2 = toCanvas(measured.rightFaceEdge).x;
+                  this.silhouette = { leftX: Math.min(e1, e2), rightX: Math.max(e1, e2) };
+
                   this.pose = { ...raw, yawDeg: smoothed.yawDeg, pitchDeg: smoothed.pitchDeg };
                   this.measurement = measured;
                   this.lastDetectionMs = timestamp;

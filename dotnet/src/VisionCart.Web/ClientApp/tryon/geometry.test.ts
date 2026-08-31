@@ -13,6 +13,8 @@ import {
   DEFAULT_ANCHORS,
   NO_ADJUSTMENT,
   IRIS_DIAMETER_MM,
+  templeFadeBounds,
+  TEMPLE_FADE,
   autoFit,
   PUPIL_HEIGHT_IN_LENS,
   type FaceMeasurement,
@@ -384,6 +386,8 @@ describe("automatic fit", () => {
     rollDeg: 0,
     confidence: 0.9,
     faceWidthMm: 138,
+    leftFaceEdge: { x: 331, y: 300 },
+    rightFaceEdge: { x: 595, y: 300 },
     ...over,
   });
 
@@ -466,5 +470,46 @@ describe("automatic fit", () => {
     const fit = autoFit(face(), null);
     assert.equal(fit.verdict, "unknown");
     assert.equal(fit.adjustment.scale, 1);
+  });
+});
+
+describe("temple occlusion", () => {
+  const face = { leftX: 300, rightX: 700 };   // 400px wide
+
+  it("starts each fade exactly at the edge of the face", () => {
+    const b = templeFadeBounds(face);
+    assert.equal(b.left.start, 300);
+    assert.equal(b.right.start, 700);
+  });
+
+  it("fades outwards, away from the face, on both sides", () => {
+    // Inwards would erase the lenses instead of the arms.
+    const b = templeFadeBounds(face);
+    assert.ok(b.left.end < b.left.start, "left should fade leftwards");
+    assert.ok(b.right.end > b.right.start, "right should fade rightwards");
+  });
+
+  it("scales the fade with the face, not with the canvas", () => {
+    const wide = templeFadeBounds({ leftX: 200, rightX: 1000 });
+    const narrow = templeFadeBounds(face);
+
+    const wideSpan = Math.abs(wide.right.end - wide.right.start);
+    const narrowSpan = Math.abs(narrow.right.end - narrow.right.start);
+
+    // A face twice as wide gets twice the fade, so a child and an adult get
+    // the same effect rather than the same number of pixels.
+    assert.ok(Math.abs(wideSpan / narrowSpan - 2) < 1e-9);
+  });
+
+  it("uses the published fraction", () => {
+    const b = templeFadeBounds(face);
+    assert.equal(Math.abs(b.right.end - b.right.start), 400 * TEMPLE_FADE);
+  });
+
+  it("survives a mirrored silhouette without inverting", () => {
+    // The camera preview is mirrored; the studio orders the edges, but the
+    // arithmetic should not produce nonsense if it ever does not.
+    const b = templeFadeBounds({ leftX: 700, rightX: 300 });
+    assert.ok(Number.isFinite(b.left.end) && Number.isFinite(b.right.end));
   });
 });
