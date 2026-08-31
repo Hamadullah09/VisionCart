@@ -160,12 +160,25 @@ public class AccountController(
         return RedirectToLocal(input.ReturnUrl);
     }
 
+    /// <summary>
+    /// Signing out changes state, so it is a POST with a token — a GET would let
+    /// any page on the internet sign our customers out with an image tag.
+    /// </summary>
     [HttpPost("/logout")]
     public async Task<IActionResult> Logout()
     {
         await signInManager.SignOutAsync();
         return Redirect("/");
     }
+
+    /// <summary>
+    /// Somebody typed /logout into the address bar. That is a GET, so it must not
+    /// sign anyone out; sending them to the button that does is friendlier than
+    /// the 405 they got before.
+    /// </summary>
+    [HttpGet("/logout")]
+    public IActionResult LogoutPrompt() =>
+        User.Identity?.IsAuthenticated == true ? Redirect("/account") : Redirect("/");
 
     // --- Register -----------------------------------------------------------
 

@@ -527,3 +527,74 @@ public class HttpCalibrationTests(VisionCartApp app)
         Assert.Contains("/login", response.Headers.Location?.OriginalString ?? "");
     }
 }
+
+/// <summary>
+/// Signing out, over HTTP.
+///
+/// The sign-out button returned 400 from every page in the application: the
+/// form wrote <c>action="/logout"</c> by hand, which turns the form tag
+/// helper's antiforgery default off, so no token was rendered and the global
+/// filter rejected the post. Everything looked right — the form was there, the
+/// button was there — and nothing in the suite crossed that route.
+/// </summary>
+[Collection("http")]
+public class HttpSignOutTests(VisionCartApp app)
+{
+    [Fact]
+    public async Task Every_page_offering_sign_out_renders_a_token_for_it()
+    {
+        foreach (var path in new[] { "/account", "/admin" })
+        {
+            var html = await app.Admin.GetStringAsync(path);
+
+            Assert.Contains("/logout", html);
+            Assert.Matches(
+                @"<form[^>]*action=""/logout""[\s\S]{0,400}?__RequestVerificationToken",
+                html);
+        }
+    }
+
+    [Fact]
+    public async Task A_signed_in_customer_can_sign_out()
+    {
+        var client = await app.NewSignedInCustomerAsync();
+
+        var before = await client.GetAsync("/account");
+        Assert.Equal(HttpStatusCode.OK, before.StatusCode);
+
+        var token = await app.AntiforgeryTokenAsync(client, "/account");
+        Assert.False(string.IsNullOrWhiteSpace(token), "/account rendered no antiforgery token");
+
+        var signedOut = await VisionCartApp.PostFormAsync(client, "/logout",
+            new Dictionary<string, string> { ["__RequestVerificationToken"] = token });
+
+        Assert.Equal(HttpStatusCode.Redirect, signedOut.StatusCode);
+        Assert.Equal("/", signedOut.Headers.Location?.OriginalString);
+
+        // And the session is really gone, not merely redirected away from.
+        var after = await client.GetAsync("/account");
+        Assert.Equal(HttpStatusCode.Redirect, after.StatusCode);
+        Assert.Contains("/login", after.Headers.Location?.OriginalString ?? "");
+    }
+
+    [Fact]
+    public async Task Typing_the_logout_url_does_not_sign_anyone_out()
+    {
+        // A GET must never change state — otherwise any page on the internet
+        // could sign our customers out with an image tag.
+        var response = await app.Admin.GetAsync("/logout");
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var still = await app.Admin.GetAsync("/admin");
+        Assert.Equal(HttpStatusCode.OK, still.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_sign_out_without_a_token_is_refused()
+    {
+        var response = await VisionCartApp.PostFormAsync(
+            app.Admin, "/logout", new Dictionary<string, string>());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+}

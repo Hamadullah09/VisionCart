@@ -111,6 +111,16 @@ public sealed class VisionCartApp : WebApplicationFactory<Program>, IAsyncLifeti
         await users.AddToRoleAsync(user, Roles.Customer);
     }
 
+    /// <summary>
+    /// A throwaway signed-in customer, on its own cookie jar.
+    ///
+    /// Anything that ends a session needs one of these: signing out on the
+    /// shared <see cref="Customer"/> client would leave every later test in the
+    /// collection anonymous, and they would fail somewhere far from the cause.
+    /// </summary>
+    public Task<HttpClient> NewSignedInCustomerAsync() =>
+        SignedInClientAsync(CustomerEmail, CustomerPassword);
+
     private async Task<HttpClient> SignedInClientAsync(string email, string password)
     {
         var client = CreateClient(NoRedirect);
