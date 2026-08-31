@@ -640,6 +640,11 @@ export class TryOnStudio {
                   this.measurement = measured;
                   this.lastDetectionMs = timestamp;
                   this.trackingOpacity = 1;
+
+                  // The live path never ran the fit, so the panel stayed empty
+                  // and the frame kept the base solve instead of its true
+                  // manufactured size against the measured face.
+                  this.applyAutoFit();
                   this.syncMeasurements();
                   this.syncPoseHint();
                 }

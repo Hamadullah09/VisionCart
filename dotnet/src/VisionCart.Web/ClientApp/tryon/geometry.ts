@@ -227,37 +227,45 @@ export function drawFrame(
     return;
   }
 
+  // The scratch must share the caller's coordinate system exactly. The visible
+  // context is running under a device-pixel-ratio transform, so a scratch left
+  // at identity draws the frame at logical coordinates onto a backing-pixel
+  // canvas — landing it in the wrong place at the wrong size by precisely that
+  // factor. Copying the matrix is the whole fix.
   sctx.setTransform(1, 0, 0, 1, 0, 0);
   sctx.clearRect(0, 0, scratch.width, scratch.height);
   sctx.save();
-  sctx.scale(scratch.width / ctx.canvas.width, scratch.height / ctx.canvas.height);
+  sctx.setTransform(ctx.getTransform());
   place(sctx);
   sctx.restore();
 
   // Erase the arms where the head is in front of them. destination-out on the
   // scratch canvas only, so the photograph underneath is untouched.
+  // The silhouette is in logical units as well, so the mask is painted under
+  // the same matrix rather than scaled by hand.
   const bounds = templeFadeBounds(opts.silhouette);
-  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.setTransform(ctx.getTransform());
   sctx.globalCompositeOperation = "destination-out";
 
-  const scaleX = scratch.width / ctx.canvas.width;
+  const edge = Math.max(scratch.width, scratch.height);
   for (const [side, direction] of [
     [bounds.left, -1] as const,
     [bounds.right, 1] as const,
   ]) {
-    const from = side.start * scaleX;
-    const to = side.end * scaleX;
+    const from = side.start;
+    const to = side.end;
     const gradient = sctx.createLinearGradient(from, 0, to, 0);
     gradient.addColorStop(0, "rgba(0,0,0,0)");
     gradient.addColorStop(1, "rgba(0,0,0,1)");
     sctx.fillStyle = gradient;
-    sctx.fillRect(Math.min(from, to), 0, Math.abs(to - from), scratch.height);
+    sctx.fillRect(Math.min(from, to), -edge, Math.abs(to - from), edge * 3);
 
     // Everything past the fade is fully behind the head.
-    if (direction < 0) sctx.clearRect(0, 0, Math.min(from, to), scratch.height);
-    else sctx.clearRect(Math.max(from, to), 0, scratch.width, scratch.height);
+    if (direction < 0) sctx.clearRect(-edge, -edge, edge + Math.min(from, to), edge * 3);
+    else sctx.clearRect(Math.max(from, to), -edge, edge * 2, edge * 3);
   }
   sctx.globalCompositeOperation = "source-over";
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
 
   ctx.save();
   ctx.globalAlpha = opacity;
