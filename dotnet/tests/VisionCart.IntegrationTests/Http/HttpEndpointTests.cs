@@ -434,6 +434,12 @@ public class HttpCalibrationTests(VisionCartApp app)
 
         Assert.Contains("frontLeftX", originals);
 
+        // Put back whatever was there. This suite runs against a database a
+        // developer also browses, and a frame left miscalibrated by a test is
+        // one somebody else spends an afternoon investigating.
+        var original = Regex.Matches(before, @"data-cal-value=""(\w+)""[^>]*value=""([\d.]+)""")
+            .ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value);
+
         var response = await VisionCartApp.PostFormAsync(app.Admin, path, new Dictionary<string, string>
         {
             ["__RequestVerificationToken"] = token,
@@ -450,6 +456,27 @@ public class HttpCalibrationTests(VisionCartApp app)
         var after = await app.Admin.GetStringAsync(path);
         Assert.Contains("\"frontLeftX\":0.12", after);
         Assert.Contains("\"lensBottomY\":0.85", after);
+
+        if (original.Count == 8)
+        {
+            var restoreToken = await app.AntiforgeryTokenAsync(app.Admin, path);
+            var restore = new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = restoreToken,
+                ["LeftLensCenterX"] = original["leftLensCenterX"],
+                ["LeftLensCenterY"] = original["leftLensCenterY"],
+                ["RightLensCenterX"] = original["rightLensCenterX"],
+                ["RightLensCenterY"] = original["rightLensCenterY"],
+                ["FrontLeftX"] = original["frontLeftX"],
+                ["FrontRightX"] = original["frontRightX"],
+                ["LensTopY"] = original["lensTopY"],
+                ["LensBottomY"] = original["lensBottomY"],
+                ["Opacity"] = "1",
+                ["ImageWidth"] = original.GetValueOrDefault("imageWidth", ""),
+                ["ImageHeight"] = original.GetValueOrDefault("imageHeight", ""),
+            };
+            await VisionCartApp.PostFormAsync(app.Admin, path, restore);
+        }
     }
 
     [Fact]

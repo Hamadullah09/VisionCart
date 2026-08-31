@@ -45,13 +45,34 @@ repository if you need to consult it.
 
 ## Try-on
 
-`ClientApp/tryon/geometry.ts`, `pose.ts` and `smoothing.ts` are pure — no DOM,
-no network — so they stay testable without a camera. Run them with
+**A frame is drawn at the size it is made in, not stretched onto the pupils.**
+The wearer's PD is what gives a photograph a scale:
+
+    pixels per millimetre = pupil separation in pixels / PD in millimetres
+
+From there `fit.ts` draws the frame at its recorded `TotalWidthMm`, seats it by
+`LensHeightMm`, and reports the gap between the frame's lens centres and the
+wearer's eyes as decentration rather than removing it. Two people photographed
+at the same pupil separation but with different PDs are at different distances,
+so the same frame comes out different sizes on each — that is correct, and
+`fit.test.ts` pins it.
+
+`fit.ts`, `geometry.ts`, `pose.ts` and `smoothing.ts` are pure — no DOM, no
+network — so they stay testable without a camera. Run them with
 `node --test ClientApp/tryon/*.test.ts`.
 
-If you change `DEFAULT_ANCHORS`, change the matching geometry in
-`tools/assets/generate-frame-assets.mjs` too; they are two halves of one
-contract, and the artwork is generated from it.
+**Never branch on a frame's identity.** No `if (variantId === …)`, no per-frame
+multiplier. If a frame needs a correction it belongs in its calibration row,
+and there is a screen for setting that: `/admin/frames/{id}/variants/{v}/calibrate`.
+
+Six numbers say where a frame sits inside its own artwork — two lens centres,
+the two edges of the frame front, the top and bottom of the lens opening. They
+are what lets the renderer tell frame from padding. `tools/assets/frames.json`
+holds the millimetres, the generator draws to them and emits the matching
+calibration, and the seeder writes both; artwork and data therefore agree by
+construction. `TryOnReadiness` (C#) and `checkFrameData` (TS) both read the
+scale of an asset three independent ways and complain when they disagree —
+if you change a threshold, change it in both.
 
 The customer's face never leaves the browser. The MediaPipe model and its
 WebAssembly runtime are served from our own origin rather than a CDN precisely
@@ -68,6 +89,6 @@ Node is a **build-time dependency only** — never required to run or deploy.
 
 | Where | For |
 | --- | --- |
-| `src/VisionCart.Web` | esbuild, bundles the try-on client |
-| `tools/assets` | regenerates frame artwork and fetches the MediaPipe runtime |
+| `src/VisionCart.Web` | esbuild, bundles the try-on client and the calibration screen (`npm run build`) |
+| `tools/assets` | regenerates frame artwork from `frames.json` and fetches the MediaPipe runtime |
 | `tools/screenshots` | captures the figures in the user manual |
