@@ -210,6 +210,10 @@
         }
         else
         {
+            @* The grid is a section, and each card's name is a level 3 heading
+               inside it. Naming the section keeps the outline from jumping
+               straight from the page title to a card. *@
+            <h2 class="sr-only">Frames</h2>
             <div class="grid grid-3">
                 @foreach (var frame in Model.Results.Items)
                 {

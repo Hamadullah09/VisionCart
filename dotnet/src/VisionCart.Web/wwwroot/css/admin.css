@@ -65,12 +65,12 @@ body.admin { background: var(--paper-sunk); }
 .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
 .panel-head h2 { margin: 0; }
 
-.admin-two-col { display: grid; grid-template-columns: 1.65fr 1fr; gap: 22px; align-items: start; }
-@media (max-width: 1040px) { .admin-two-col { grid-template-columns: 1fr; } }
+.admin-two-col { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 1040px) { .admin-two-col { grid-template-columns: minmax(0, 1fr); } }
 
 /* --- stat tiles ----------------------------------------------------------- */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 26px; }
-@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 26px; }
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stat {
     background: var(--surface);
     border: 1px solid var(--rule);
@@ -183,7 +183,7 @@ body.admin { background: var(--paper-sunk); }
 .admin-page-head p { margin: 6px 0 0; max-width: 62ch; }
 
 .calibrate { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
-@media (max-width: 1100px) { .calibrate { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .calibrate { grid-template-columns: minmax(0, 1fr); } }
 
 .calibrate-stage-wrap { min-width: 0; }
 
@@ -280,3 +280,7 @@ body.admin { background: var(--paper-sunk); }
 /* Labelled buttons, not icon-only ones: an administrator should not have to
    hover three grey squares to find out which is delete. */
 .admin-row-actions { display: flex; gap: 6px; white-space: nowrap; }
+
+/* The identity strip under a frame's name: what it is, and whether the mirror
+   can actually show it. */
+.frame-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 0; }

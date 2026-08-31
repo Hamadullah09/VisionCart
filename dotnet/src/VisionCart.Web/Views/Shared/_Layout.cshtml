@@ -25,30 +25,45 @@
         </div>
     }
 
+    @* One markup for both widths. The disclosure holds only the menu, because a
+       <summary> has to be the first child of its <details>; the logo stays
+       outside it and keeps working as a link. Rendered open, so with scripting
+       off the menu is simply a stacked list rather than unreachable. *@
     <header class="site-header">
         <div class="wrap header-inner">
             <a class="brand" asp-controller="Home" asp-action="Index">@storeName</a>
-            <nav class="nav">
-                <a asp-controller="Frames" asp-action="Index">All frames</a>
-                <a href="/frames?gender=men">Men</a>
-                <a href="/frames?gender=women">Women</a>
-                <a href="/frames?gender=kids">Kids</a>
-                <a href="/try-on" class="nav-accent">Virtual try-on</a>
-                <a asp-controller="Home" asp-action="Deals">Deals</a>
-            </nav>
-            <div class="header-actions">
-                @if (User.Identity?.IsAuthenticated == true)
-                {
-                    <a href="/account">Account</a>
-                }
-                else
-                {
-                    <a href="/login">Sign in</a>
-                }
-                <a class="btn btn-outline" asp-controller="Cart" asp-action="Index">
-                    Bag@(cartCount > 0 ? $" ({cartCount})" : "")
-                </a>
-            </div>
+
+            <details class="site-nav" data-site-nav open>
+                <summary class="nav-toggle">
+                    <span class="nav-toggle-bars" aria-hidden="true"></span>
+                    <span class="nav-toggle-word">Menu</span>
+                </summary>
+
+                <div class="nav-panel">
+                    <nav class="nav" aria-label="Main">
+                        <a asp-controller="Frames" asp-action="Index">All frames</a>
+                        <a href="/frames?gender=men">Men</a>
+                        <a href="/frames?gender=women">Women</a>
+                        <a href="/frames?gender=kids">Kids</a>
+                        <a href="/try-on" class="nav-accent">Virtual try-on</a>
+                        <a asp-controller="Home" asp-action="Deals">Deals</a>
+                    </nav>
+
+                    <div class="header-actions">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <a href="/account">Account</a>
+                        }
+                        else
+                        {
+                            <a href="/login">Sign in</a>
+                        }
+                        <a class="btn btn-outline" asp-controller="Cart" asp-action="Index">
+                            Bag@(cartCount > 0 ? $" ({cartCount})" : "")
+                        </a>
+                    </div>
+                </div>
+            </details>
         </div>
     </header>
 
@@ -64,20 +79,20 @@
     <footer class="site-footer">
         <div class="wrap footer-grid">
             <div>
-                <h4>Shop</h4>
+                <h2>Shop</h2>
                 <a asp-controller="Frames" asp-action="Index">All frames</a>
                 <a href="/try-on">Virtual try-on</a>
                 <a asp-controller="Home" asp-action="Deals">Deals</a>
                 <a href="/frames?category=sunglasses">Sunglasses</a>
             </div>
             <div>
-                <h4>Your account</h4>
+                <h2>Your account</h2>
                 <a href="/account">Your account</a>
                 <a href="/account/prescriptions">Your prescriptions</a>
                 <a href="/account/orders">Your orders</a>
             </div>
             <div>
-                <h4>Guides</h4>
+                <h2>Guides</h2>
                 @* These four pages 404'd in the legacy application. They are
                    implemented here, so the links now resolve. *@
                 <a href="/guides/prescription">How to read a prescription</a>
@@ -91,6 +106,7 @@
         </div>
     </footer>
 
+    <script src="~/js/site.js" asp-append-version="true" defer></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -41,6 +41,9 @@
     --ink:          #1C1917;
     --ink-2:        #443E39;
     --ink-3:        #6B635C;
+    /* Hairlines, swatch rings and inert marks only — NOT text. Measured at
+       2.9:1 on the page background, which is below the 4.5:1 that readable
+       body text needs. Quiet text is --ink-3, which clears it at 5.6:1. */
     --ink-4:        #9A918A;
     --rule:         #E7E2DA;
     --rule-strong:  #D6CEC2;
@@ -291,10 +294,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .hint { font-size: var(--text-caption); color: var(--ink-3); margin: 5px 0 0; }
 .field-error { display: block; color: var(--bad); font-size: var(--text-caption); margin-top: var(--space-1); }
 .narrow-form { max-width: 620px; }
-.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 18px; }
-.form-grid.three { grid-template-columns: repeat(3, 1fr); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; }
+.form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .form-grid .full { grid-column: 1 / -1; }
-@media (max-width: 760px) { .form-grid, .form-grid.three { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .form-grid, .form-grid.three { grid-template-columns: minmax(0, 1fr); } }
 
 /* --- alerts --------------------------------------------------------------- */
 .alert {
@@ -357,9 +360,15 @@ tbody tr:last-child td { border-bottom: 0; }
 .crumbs a { color: var(--ink-3); text-decoration: none; }
 .crumbs a:hover { color: var(--ink); }
 
+/* minmax(0, 1fr), never a bare 1fr.
+   A bare `1fr` is `minmax(auto, 1fr)`, and `auto` floors the track at the
+   content's max-content width. A 1330-pixel frame photograph therefore forces
+   a 1330-pixel column on a 375-pixel phone, and the whole page scrolls
+   sideways — which is exactly what it was doing. */
+
 /* --- catalogue filters ---------------------------------------------------- */
-.catalogue { display: grid; grid-template-columns: 236px 1fr; gap: clamp(24px, 4vw, 52px); align-items: start; }
-@media (max-width: 940px) { .catalogue { grid-template-columns: 1fr; } }
+.catalogue { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: clamp(24px, 4vw, 52px); align-items: start; }
+@media (max-width: 940px) { .catalogue { grid-template-columns: minmax(0, 1fr); } }
 .filters { position: sticky; top: 100px; }
 .filter-group { border-bottom: 1px solid var(--rule); padding-block: var(--space-4); }
 .filter-group:first-child { padding-top: 0; }
@@ -423,15 +432,62 @@ tbody tr:last-child td { border-bottom: 0; }
     white-space: nowrap;
 }
 .nav { display: flex; gap: var(--space-5); flex: 1; flex-wrap: wrap; }
-.nav a {
-    font-size: var(--text-small);
-    color: var(--ink-2);
-    text-decoration: none;
-    padding-block: var(--space-1);
-    border-bottom: 1px solid transparent;
+
+/* --- navigation, both widths ----------------------------------------------
+   The menu is a <details> rendered open. On a wide screen the toggle is hidden
+   and the panel lays out as an ordinary row; on a narrow one site.js folds it
+   away and the toggle becomes the control. Same markup, one menu. */
+.site-nav { display: flex; flex: 1; min-width: 0; }
+.nav-panel { display: flex; flex: 1; align-items: center; gap: var(--space-5); min-width: 0; }
+.nav-toggle { display: none; }
+
+@media (max-width: 860px) {
+    .header-inner { min-height: 60px; gap: var(--space-3); flex-wrap: wrap; }
+    .brand { font-size: var(--text-lead); }
+
+    .site-nav { display: block; flex: 1 0 100%; order: 3; }
+
+    .nav-toggle {
+        display: inline-flex; align-items: center; gap: var(--space-2);
+        cursor: pointer; list-style: none;
+        font-size: var(--text-small); font-weight: 500; color: var(--ink);
+        border: 1px solid var(--rule-strong); border-radius: var(--radius);
+        padding: var(--space-2) var(--space-3);
+    }
+    .nav-toggle::-webkit-details-marker { display: none; }
+    .nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .nav-toggle-bars {
+        width: 16px; height: 10px;
+        border-top: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        position: relative;
+    }
+    .nav-toggle-bars::after {
+        content: ""; position: absolute; left: 0; top: 3px;
+        width: 100%; border-top: 2px solid currentColor;
+    }
+
+    /* The toggle sits beside the logo; only the panel drops below it. */
+    .site-nav { display: contents; }
+    .site-nav > .nav-toggle { order: 2; margin-left: auto; }
+    .site-nav > .nav-panel { order: 3; flex: 1 0 100%; }
+
+    .nav-panel { flex-direction: column; align-items: stretch; gap: 0; }
+    .nav {
+        flex-direction: column; gap: 0;
+        border-top: 1px solid var(--rule); margin-top: var(--space-2);
+    }
+    .nav a { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); font-size: var(--text-body); }
+    .nav a:last-child { border-bottom: 0; }
+
+    .header-actions {
+        justify-content: space-between;
+        border-top: 1px solid var(--rule);
+        padding-block: var(--space-3);
+    }
 }
-.nav a:hover { color: var(--ink); border-bottom-color: var(--accent); }
-.nav-accent { color: var(--accent-deep) !important; font-weight: 500; }
+
 .header-actions { display: flex; align-items: center; gap: var(--space-4); font-size: var(--text-small); }
 .header-actions a:not(.btn) { color: var(--ink-2); text-decoration: none; }
 .header-actions a:not(.btn):hover { color: var(--ink); }
@@ -490,7 +546,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 .hero-frame .price { margin: 0; font-size: var(--text-caption); color: var(--ink-3); }
 
 .hero-frames.is-trio {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas: "a b" "c c";
 }
 .hero-frames.is-trio > :nth-child(1) { grid-area: a; }
@@ -499,7 +555,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 
 /* Below a laptop the imagery goes underneath rather than fighting for width. */
 @media (max-width: 860px) {
-    .hero-inner { grid-template-columns: 1fr; gap: var(--space-6); }
+    .hero-inner { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
     .hero h1 { max-width: 20ch; }
 }
 
@@ -520,12 +576,12 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 
 /* --- grids ---------------------------------------------------------------- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: clamp(18px, 2.4vw, 30px); }
-.grid-3 { grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 900px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .grid, .grid-3 { grid-template-columns: 1fr; } }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .grid, .grid-3 { grid-template-columns: minmax(0, 1fr); } }
 
 .two-col { display: grid; grid-template-columns: 1.15fr .85fr; gap: clamp(24px, 4vw, 56px); align-items: start; }
-@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .two-col { grid-template-columns: minmax(0, 1fr); } }
 
 /* --- product card --------------------------------------------------------- */
 .product-card {
@@ -558,10 +614,10 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 }
 
 .product-card .body { padding: 18px 20px 20px; display: flex; flex-direction: column; }
-.brand-name { font-size: var(--text-label); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); margin: 0 0 5px; }
+.brand-name { font-size: var(--text-label); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 5px; }
 .product-card h3 { font-size: var(--text-lead); margin: 0 0 4px; letter-spacing: -.012em; }
 .price { font-size: var(--text-body); font-weight: 500; color: var(--ink); margin: 10px 0 0; font-variant-numeric: tabular-nums; }
-.price .was { color: var(--ink-4); text-decoration: line-through; font-weight: 400; margin-left: var(--space-2); font-size: var(--text-small); }
+.price .was { color: var(--ink-3); text-decoration: line-through; font-weight: 400; margin-left: var(--space-2); font-size: var(--text-small); }
 
 .swatches { display: flex; gap: var(--space-1); margin-top: var(--space-2); }
 .swatch { width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(28,25,23,.18); display: inline-block; }
@@ -610,9 +666,9 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
     padding-block: clamp(44px, 6vw, 68px) 0;
     font-size: var(--text-small);
 }
-.footer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6); }
-@media (max-width: 700px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
-.site-footer h4 {
+.footer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); }
+@media (max-width: 700px) { .footer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.site-footer h2 {
     color: #F7F3EE; font-family: var(--sans); font-size: var(--text-label);
     letter-spacing: .11em; text-transform: uppercase; margin: 0 0 14px; font-weight: 600;
 }
@@ -626,8 +682,8 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 .footer-legal p { margin: 0; }
 
 /* --- try-on --------------------------------------------------------------- */
-.tryon { display: grid; grid-template-columns: 1fr 330px; gap: clamp(22px, 3vw, 40px); align-items: start; }
-@media (max-width: 1000px) { .tryon { grid-template-columns: 1fr; } }
+.tryon { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: clamp(22px, 3vw, 40px); align-items: start; }
+@media (max-width: 1000px) { .tryon { grid-template-columns: minmax(0, 1fr); } }
 
 .tryon-stage {
     position: relative;
@@ -667,7 +723,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 .tryon-controls { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4); }
 .tryon-heading { font-family: var(--sans); font-size: var(--text-caption); font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); margin: 22px 0 10px; }
 
-.tryon-thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); max-height: 260px; overflow-y: auto; padding-right: var(--space-1); }
+.tryon-thumbs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); max-height: 260px; overflow-y: auto; padding-right: var(--space-1); }
 .tryon-thumb { border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); padding: var(--space-2); cursor: pointer; }
 .tryon-thumb:hover { border-color: var(--rule-strong); }
 .tryon-thumb.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-wash); }
@@ -706,15 +762,15 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 .slot-grid { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 14px 0 22px; }
 .slot-grid form { display: inline; }
 .slot { display: inline-block; min-width: 78px; text-align: center; padding: 10px 13px; border-radius: var(--radius); font-variant-numeric: tabular-nums; font-size: var(--text-small); }
-.slot-taken { border: 1px dashed var(--rule-strong); color: var(--ink-4); background: var(--paper-sunk); text-decoration: line-through; }
+.slot-taken { border: 1px dashed var(--rule-strong); color: var(--ink-3); background: var(--paper-sunk); text-decoration: line-through; }
 
 /* --- pagination ----------------------------------------------------------- */
 .pager { display: flex; gap: var(--space-3); align-items: center; justify-content: center; margin-top: var(--space-7); }
 
 /* --- odds and ends -------------------------------------------------------- */
-.grid-4 { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 1000px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px)  { .grid-4 { grid-template-columns: 1fr; } }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .grid-4 { grid-template-columns: minmax(0, 1fr); } }
 
 /* One band of lens choices — thickness, coatings, tints — under a heading. */
 .lens-group { margin-bottom: var(--space-5); }
@@ -788,11 +844,11 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 }
 .product-size {
     font-family: var(--mono); font-size: var(--text-caption);
-    color: var(--ink-4); white-space: nowrap;
+    color: var(--ink-3); white-space: nowrap;
 }
 
 .swatch { background: var(--swatch, #ccc); }
-.swatch-more { font-size: var(--text-caption); color: var(--ink-4); }
+.swatch-more { font-size: var(--text-caption); color: var(--ink-3); }
 
 /* Full-bleed band inside a centred wrapper. Previously done with an inline
    `margin-left: calc(50% - 50vw)` on the element itself — a layout decision
@@ -963,7 +1019,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
     gap: clamp(28px, 4vw, 64px);
     align-items: start;
 }
-@media (max-width: 900px) { .product { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .product { grid-template-columns: minmax(0, 1fr); } }
 
 /* Sticky on a tall screen: the lens builder is long, and losing sight of the
    frame you are buying halfway down it is disorienting. */
@@ -1019,7 +1075,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
     background: var(--swatch);
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .16);
 }
-.colour-out { display: block; font-size: var(--text-label); color: var(--ink-4); }
+.colour-out { display: block; font-size: var(--text-label); color: var(--ink-3); }
 
 /* Try it on is the action this whole page exists to make possible, so it gets
    the weight — not a link buried under a spec table. */
@@ -1088,7 +1144,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 }
 .filter-chips-label {
     font-size: var(--text-label); font-weight: 600;
-    letter-spacing: .09em; text-transform: uppercase; color: var(--ink-4);
+    letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3);
 }
 .filter-chip {
     display: inline-flex; align-items: center; gap: var(--space-2);
@@ -1130,9 +1186,9 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 }
 .filter-field select, .filter-field input { width: 100%; }
 
-.filter-price { border: 0; padding: 0; display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-2); align-items: center; }
+.filter-price { border: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: var(--space-2); align-items: center; }
 .filter-price > legend { grid-column: 1 / -1; }
-.filter-price > span { font-size: var(--text-caption); color: var(--ink-4); }
+.filter-price > span { font-size: var(--text-caption); color: var(--ink-3); }
 
 .filter-actions { display: flex; gap: var(--space-2); margin-top: var(--space-5); }
 .filter-actions .btn { flex: 1; text-align: center; }
