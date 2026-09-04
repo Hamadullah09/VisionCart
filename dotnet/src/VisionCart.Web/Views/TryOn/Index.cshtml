@@ -47,6 +47,7 @@
         }),
         initialVariantId = Model.InitialVariantId,
         knownPdMm = Model.KnownPdMm,
+        storeName = store.Name,
         canSave = Model.CanSave,
         cameraEnabled = Model.CameraEnabled,
         // Served from this application, never a CDN. That is the whole privacy
@@ -238,6 +239,10 @@ else
 
             <div class="tryon-controls" data-tryon-actions hidden>
                 <button type="button" class="btn btn-outline" data-tryon-download>Download photo</button>
+                <button type="button" class="btn btn-outline" data-tryon-details disabled
+                        title="The measurements above, as a text file you can send to an optician">
+                    Download measurements
+                </button>
                 <button type="button" class="btn btn-primary" data-tryon-save hidden>Save to my file</button>
             </div>
 

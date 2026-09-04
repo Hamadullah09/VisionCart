@@ -37,15 +37,19 @@ const FALLBACK_SLUG = "frame";
  * `tryon-ravi-pd-61.5-estimated.jpg` for one the camera worked out. A picture
  * taken before any PD is known keeps the plain `tryon-ravi.jpg` — better no
  * number than a wrong one.
+ *
+ * The measurements that go with a picture are written by the same rule with a
+ * `txt` extension, so the pair sort together in a downloads folder and stay
+ * obviously the same fitting.
  */
-export function snapshotFilename(naming: SnapshotNaming): string {
+export function snapshotFilename(naming: SnapshotNaming, extension = "jpg"): string {
   const slug = cleanSlug(naming.slug);
   const pd = formatPd(naming.pdMm);
 
-  if (pd === null) return `tryon-${slug}.jpg`;
+  if (pd === null) return `tryon-${slug}.${extension}`;
 
   const provenance = naming.pdSource === "estimated" ? "-estimated" : "";
-  return `tryon-${slug}-pd-${pd}${provenance}.jpg`;
+  return `tryon-${slug}-pd-${pd}${provenance}.${extension}`;
 }
 
 /**

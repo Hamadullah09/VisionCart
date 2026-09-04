@@ -23,6 +23,7 @@ import {
 } from "./fit.ts";
 import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
 import { snapshotFilename } from "./naming.ts";
+import { formatFitReport, type FitReport, type ReportSection } from "./report.ts";
 import { estimatePose, NEUTRAL_POSE, type HeadPose } from "./pose.ts";
 import { PoseSmoother, holdThroughLoss } from "./smoothing.ts";
 
@@ -120,6 +121,8 @@ export interface StudioConfig {
   initialVariantId?: string;
   /** A PD already on the customer's file, so they need not type it twice. */
   knownPdMm?: number | null;
+  /** Named in a downloaded fit report, so a forwarded file says where it came from. */
+  storeName?: string | null;
   /** Saving needs both a signed-in customer and the store setting enabled. */
   canSave: boolean;
   cameraEnabled: boolean;
@@ -294,6 +297,10 @@ export class TryOnStudio {
 
     this.find<HTMLButtonElement>("[data-tryon-download]")?.addEventListener("click", () => {
       void this.download();
+    });
+
+    this.find<HTMLButtonElement>("[data-tryon-details]")?.addEventListener("click", () => {
+      this.downloadDetails();
     });
 
     this.find<HTMLButtonElement>("[data-tryon-save]")?.addEventListener("click", () => {
@@ -923,16 +930,109 @@ export class TryOnStudio {
     const blob = await this.snapshotBlob();
     if (!blob) return;
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = snapshotFilename({
+    this.saveLocally(blob, this.downloadName("jpg"));
+  }
+
+  /**
+   * The measurements, as a text file to keep beside the picture.
+   *
+   * The photograph shows the frame on the face; it carries none of the numbers
+   * underneath it, and the decentration is the part an optician actually works
+   * from. Reading them back out of the panel rather than re-deriving them keeps
+   * the file and the screen in step — the panel is already the one place these
+   * values are formatted, and it has hidden whatever does not apply.
+   */
+  private downloadDetails(): void {
+    const report = this.fitReport();
+    if (!report) return;
+
+    const blob = new Blob([formatFitReport(report)], { type: "text/plain;charset=utf-8" });
+    this.saveLocally(blob, this.downloadName("txt"));
+  }
+
+  /**
+   * Harvest the fit panel as it currently stands.
+   *
+   * Walks the panel in document order so the file reads in the same order as
+   * the screen, and takes only rows the panel is showing: a row it hid is a
+   * measurement we do not have, and an empty label in a text file looks like a
+   * number that went missing rather than one that was never taken.
+   */
+  private fitReport(): FitReport | null {
+    const panel = this.find<HTMLElement>("[data-tryon-measurements]");
+    if (!panel || panel.hidden) return null;
+
+    const sections: ReportSection[] = [];
+    let current: ReportSection | null = null;
+
+    for (const node of Array.from(panel.children)) {
+      if (node instanceof HTMLElement && /^H[1-6]$/.test(node.tagName)) {
+        current = { heading: sections.length === 0 ? null : text(node), rows: [] };
+        sections.push(current);
+        continue;
+      }
+
+      if (!(node instanceof HTMLElement) || node.tagName !== "DL") continue;
+
+      if (!current) {
+        current = { heading: null, rows: [] };
+        sections.push(current);
+      }
+
+      for (const row of Array.from(node.querySelectorAll<HTMLElement>("[data-tryon-measure-row]"))) {
+        if (row.hidden) continue;
+
+        const label = row.querySelector("dt");
+        const value = row.querySelector("dd");
+        if (!label || !value) continue;
+
+        const valueText = text(value);
+        if (!valueText) continue;
+
+        current.rows.push({ label: text(label), value: valueText });
+      }
+    }
+
+    if (sections.every(section => section.rows.length === 0)) return null;
+
+    const notesEl = this.find<HTMLElement>("[data-tryon-fit-notes]");
+    const notes = notesEl && !notesEl.hidden
+      ? Array.from(notesEl.querySelectorAll("li")).map(text).filter(Boolean)
+      : [];
+
+    const heading = panel.querySelector("h2");
+    const frame = this.selected;
+
+    return {
+      title: heading ? text(heading) : "How this frame fits you",
+      storeName: this.config.storeName ?? null,
+      frame: frame ? [frame.brand, frame.name, frame.colorName].filter(Boolean).join(" · ") : null,
+      dateText: new Date().toLocaleDateString(undefined, {
+        year: "numeric", month: "long", day: "numeric",
+      }),
+      sections,
+      notes,
+      caveat: text(panel.querySelector<HTMLElement>(".tryon-caveat")) || null,
+    };
+  }
+
+  /** The stem both downloads share, so the picture and its numbers pair up. */
+  private downloadName(extension: string): string {
+    return snapshotFilename({
       slug: this.selected?.slug,
       // The fit that drew the picture, not the PD box as it reads now — the two
       // differ for as long as it takes an edited PD to reach the next render.
       pdMm: this.fit?.pdMm,
       pdSource: this.fit?.pdSource,
-    });
+    }, extension);
+  }
+
+  /** Hand a blob to the browser as a download. Nothing leaves the device. */
+  private saveLocally(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
     document.body.append(link);
     link.click();
     link.remove();
@@ -1115,6 +1215,12 @@ export class TryOnStudio {
     const panel = this.find<HTMLElement>("[data-tryon-measurements]");
     if (!panel) return;
 
+    // Nothing has been measured until there is a fit, and a text file of blank
+    // rows is worse than a button that plainly cannot be pressed yet. Set here
+    // rather than in `syncChrome`, which does not run on every re-solve.
+    const detailsButton = this.find<HTMLButtonElement>("[data-tryon-details]");
+    if (detailsButton) detailsButton.disabled = this.fit === null;
+
     // Shown whenever there is a subject, not only when a face was found. A
     // customer whose photo could not be measured needs to be told that, and
     // why — an empty panel that simply vanishes reads as the feature being
@@ -1281,6 +1387,14 @@ export class TryOnStudio {
  */
 function clampNudge(value: number): number {
   return Math.min(1.2, Math.max(0.8, value));
+}
+
+/**
+ * An element's text, with the whitespace the Razor markup indents with
+ * collapsed — otherwise a label carries the view's newlines into the file.
+ */
+function text(el: Element | null): string {
+  return (el?.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
