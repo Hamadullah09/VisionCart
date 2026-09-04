@@ -22,6 +22,7 @@ import {
   type FrameFit,
 } from "./fit.ts";
 import { createFaceDetector, type FaceDetector } from "./faceLandmarker.ts";
+import { snapshotFilename } from "./naming.ts";
 import { estimatePose, NEUTRAL_POSE, type HeadPose } from "./pose.ts";
 import { PoseSmoother, holdThroughLoss } from "./smoothing.ts";
 
@@ -925,7 +926,13 @@ export class TryOnStudio {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `tryon-${this.selected?.slug ?? "frame"}.jpg`;
+    link.download = snapshotFilename({
+      slug: this.selected?.slug,
+      // The fit that drew the picture, not the PD box as it reads now — the two
+      // differ for as long as it takes an edited PD to reach the next render.
+      pdMm: this.fit?.pdMm,
+      pdSource: this.fit?.pdSource,
+    });
     document.body.append(link);
     link.click();
     link.remove();
