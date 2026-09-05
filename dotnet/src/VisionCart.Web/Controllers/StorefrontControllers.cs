@@ -229,8 +229,16 @@ public class ErrorController : Controller
     /// <summary>
     /// Custom error pages, replacing the framework defaults the legacy
     /// application fell back to. Never renders exception detail.
+    ///
+    /// Every verb, not just GET. UseStatusCodePagesWithReExecute re-runs the
+    /// pipeline against this route using the ORIGINAL request method, so a
+    /// failed POST arrives here as a POST. Constrained to GET, this action then
+    /// answers 405 Method Not Allowed — and the browser shows that instead of
+    /// the real status. An antiforgery rejection on the sign-in form presented
+    /// as "HTTP ERROR 405", which says nothing true about what went wrong and
+    /// sends you looking at IIS verb configuration for hours.
     /// </summary>
-    [HttpGet("{code:int}")]
+    [Route("{code:int}")]
     public IActionResult Status(int code) => View("Status", new ErrorViewModel
     {
         StatusCode = code,

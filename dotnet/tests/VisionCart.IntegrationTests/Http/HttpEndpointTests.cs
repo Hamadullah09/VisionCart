@@ -773,3 +773,36 @@ public class HttpProductWorkspaceTests(VisionCartApp app)
         }
     }
 }
+
+/// <summary>
+/// The error page is re-executed by UseStatusCodePagesWithReExecute using the
+/// original request method, so it has to answer every verb. Constrained to GET
+/// it answers 405 instead, and that 405 replaces the real status on its way to
+/// the browser: an antiforgery rejection on the sign-in form reached production
+/// as "HTTP ERROR 405", which is true of nothing and sends you reading IIS verb
+/// configuration instead of the actual fault.
+/// </summary>
+[Collection("http")]
+public class ErrorPageVerbTests(VisionCartApp app)
+{
+    [Theory]
+    [InlineData("/error/404")]
+    [InlineData("/error/400")]
+    [InlineData("/error/500")]
+    public async Task The_error_page_answers_a_post_rather_than_refusing_the_verb(string path)
+    {
+        var response = await app.Anonymous.PostAsync(path, new FormUrlEncodedContent([]));
+
+        Assert.NotEqual(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_post_to_a_route_that_does_not_exist_still_reports_not_found()
+    {
+        // Not 405. The status the visitor sees must be the one that happened.
+        var response = await app.Anonymous.PostAsync(
+            "/no-such-page-anywhere", new FormUrlEncodedContent([]));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+}
