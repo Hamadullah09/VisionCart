@@ -64,3 +64,6 @@ USER-MANUAL.log
 
 # Rendered back-office pages, dumped by hand for visual QA. Never shipped.
 dotnet/src/VisionCart.Web/wwwroot/_qa/
+
+# FTP deployment log (may quote failing URLs; never commit)
+/dotnet/deploy-ftp.log

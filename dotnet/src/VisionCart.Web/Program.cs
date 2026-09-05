@@ -224,11 +224,36 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapControllerRoute("areas", "{area:exists}/{controller=Dashboard}/{action=Index}/{id?}");
 app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
 
-// Apply migrations and seed on start, so a shared-hosting deployment needs no
-// separate CLI step.
-await app.Services.InitialiseDatabaseAsync(app.Environment.WebRootPath);
+// Open the socket first, then touch the database.
+//
+// Migrating on start is still right for shared hosting — there is no command
+// line to run `dotnet ef` from. But it must not happen *before* the server is
+// listening. IIS gives a worker a fixed window to bind its port and does not
+// always let you extend it; migrating a database that lives on another host
+// across the public internet does not reliably fit inside that window. An
+// application that spends its whole startup budget in MigrateAsync is killed
+// before it ever listens, and the failure surfaces as an unreadable 502.5 with
+// nothing in any log — which is exactly how this application first met
+// production.
+//
+// Starting first also changes what a database problem costs. It used to take
+// the entire site down; now the site answers, and /health/ready says the
+// database is unhealthy. A site that responds and reports itself unwell can be
+// diagnosed. One that never opens a socket cannot.
+await app.StartAsync();
 
-app.Run();
+try
+{
+    await app.Services.InitialiseDatabaseAsync(app.Environment.WebRootPath);
+}
+catch (Exception ex)
+{
+    app.Logger.LogCritical(ex,
+        "Database initialisation failed. The application is serving requests but is not ready; "
+        + "/health/ready will report the database as unhealthy until this is resolved.");
+}
+
+await app.WaitForShutdownAsync();
 
 /// <summary>Exposed so the integration tests can boot the real application.</summary>
 public partial class Program;
