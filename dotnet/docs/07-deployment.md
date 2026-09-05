@@ -223,9 +223,41 @@ recycle to a fixed quiet hour. The email outbox drains inside the worker process
 so while the pool is stopped nothing is sent; queued mail goes out on the next
 start, which is why mail is queued rather than sent inline.
 
-**In-process hosting.** `hostingModel="inprocess"` runs the app inside the IIS
-worker. Out-of-process adds a loopback HTTP hop per request, which on a shared
-host is the largest avoidable latency.
+**In-process hosting is not available to you if the host shares one application
+pool across your sites.** IIS permits exactly one in-process ASP.NET Core
+application per pool, and shared hosts routinely put every site you own in the
+same one. Setting `hostingModel="inprocess"` there does not degrade — the module
+refuses to start the application at all, and it surfaces as **HTTP 500.30 with
+an empty stdout log**, which is close to undiagnosable from outside. myASP.NET
+exposes this as *Manage Website → .NET Core Mode*; if it reads `InProcess` and
+you host more than one Core app, that is your answer. `web.config` ships
+`outofprocess` for this reason. Switch back the moment the application has a
+pool to itself: in-process is roughly twice as fast, because requests skip a
+loopback hop.
+
+**The control panel may own `web.config`.** myASP.NET's file-manager editor
+sanitises the file on save to a permitted subset: `hostingModel`,
+`environmentVariables` and `stdoutLogEnabled` survive, while whole sections —
+`httpProtocol`, `staticContent`, `security` — and attributes like
+`startupTimeLimit` are silently dropped. Its *Error Logs* toggle rewrites the
+file too, re-asserting `stdoutLogEnabled="true"` and reverting anything else you
+changed. Turn that off before editing, verify every change by reopening the
+file, and expect the hardening in this repository's `web.config` not to survive.
+Losing it costs less than it looks: the module handles every path, static files
+are served only from `wwwroot`, and `appsettings*.json`, `web.config` and the
+DLLs are all unreachable over HTTP regardless. What you lose is the
+`X-Powered-By` header removal.
+
+**Uploading over a running application fails.** IIS holds the DLLs open, `STOR`
+returns FTP 550, and the transfer stops part-way leaving a half-updated site.
+`deploy-ftp.ps1` handles this with `app_offline.htm`. If you upload by hand, put
+that file in the site root first and delete it afterwards.
+
+**A site-scoped FTP account may not be able to overwrite.** An account created
+in the panel can create files but is not necessarily permitted to replace ones
+the panel's own process wrote. The symptom is FTP 550 on the first existing
+file while a brand-new file uploads fine. Clear the directory first, or grant
+the account overwrite rights.
 
 **Rate limiting behind a proxy.** The limiters partition per client, keyed on the
 authenticated user or the connecting IP. Behind a reverse proxy every request
