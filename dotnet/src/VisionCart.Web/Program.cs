@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.StaticFiles;
 using System.Threading.RateLimiting;
@@ -108,6 +109,27 @@ builder.Services.AddResponseCompression(options => options.EnableForHttps = fals
 // undiagnosable in production. Configured under "FileLog".
 builder.Services.Configure<FileLogOptions>(builder.Configuration.GetSection("FileLog"));
 builder.Logging.AddVisionCartFileLog(builder.Environment);
+
+// Data protection keys must outlive the worker process.
+//
+// Without a store, ASP.NET Core keeps the key ring in memory: "Using an
+// ephemeral key repository. Protected data will be unavailable when application
+// exits." On shared IIS that is not a warning about some distant edge case —
+// the pool recycles on idle every twenty minutes or so, and every recycle
+// invalidates every antiforgery token and every authentication cookie already
+// issued. Signed-in customers are logged out, and a form rendered before the
+// recycle is rejected when it is submitted after it.
+//
+// The sign-in form is the sharpest version: the token is issued by the GET and
+// validated on the POST, so a recycle in between makes signing in impossible
+// while looking exactly like a wrong password.
+//
+// Keys live beside the log, in the content root rather than under wwwroot,
+// where the application already needs write access and nothing is served over
+// HTTP. SetApplicationName pins the ring so it survives a path change.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "keys")))
+    .SetApplicationName("VisionCart");
 
 builder.Services.AddVisionCartHealthChecks();
 
