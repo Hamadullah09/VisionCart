@@ -67,3 +67,7 @@ dotnet/src/VisionCart.Web/wwwroot/_qa/
 
 # FTP deployment log (may quote failing URLs; never commit)
 /dotnet/deploy-ftp.log
+
+# Data protection key ring - secret, machine-specific, never commit
+/dotnet/src/VisionCart.Web/keys/
+keys/
