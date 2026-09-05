@@ -34,7 +34,8 @@ public class ProductionGuardTests
         ["AllowedHosts"] = "shop.example.com",
     };
 
-    private static void Verify(Dictionary<string, string?> settings, string environment = "Production") =>
+    private static IReadOnlyList<string> Verify(
+        Dictionary<string, string?> settings, string environment = "Production") =>
         ProductionConfigurationGuard.Verify(
             new ConfigurationBuilder().AddInMemoryCollection(settings).Build(), new Env(environment));
 
@@ -95,6 +96,50 @@ public class ProductionGuardTests
         settings["Email:Driver"] = "log";
 
         Assert.Contains("order confirmation", Refusal(settings));
+    }
+
+    [Fact]
+    public void The_log_driver_escape_hatch_is_off_unless_set()
+    {
+        // A false value is not an opt-in, and neither is an absent one.
+        var settings = Good();
+        settings["Email:Driver"] = "log";
+        settings["Email:AllowLogDriverInProduction"] = "false";
+
+        Assert.Contains("order confirmation", Refusal(settings));
+    }
+
+    [Fact]
+    public void The_log_driver_is_allowed_when_somebody_asks_for_it_by_name()
+    {
+        // Bringing a site up before its mailbox exists is a real situation. It
+        // has to be said out loud, though, not reached by leaving a default.
+        var settings = Good();
+        settings["Email:Driver"] = "log";
+        settings["Email:AllowLogDriverInProduction"] = "true";
+
+        var warnings = Verify(settings);
+
+        var warning = Assert.Single(warnings);
+        Assert.Contains("Nobody is receiving mail", warning);
+    }
+
+    [Fact]
+    public void The_log_driver_warns_that_queued_mail_is_never_delivered_later()
+    {
+        // The trap: the log sender marks each message sent, so configuring SMTP
+        // afterwards does not go back and deliver anything.
+        var settings = Good();
+        settings["Email:Driver"] = "log";
+        settings["Email:AllowLogDriverInProduction"] = "true";
+
+        Assert.Contains("will NOT deliver", Assert.Single(Verify(settings)));
+    }
+
+    [Fact]
+    public void A_configuration_with_nothing_wrong_warns_about_nothing()
+    {
+        Assert.Empty(Verify(Good()));
     }
 
     [Fact]

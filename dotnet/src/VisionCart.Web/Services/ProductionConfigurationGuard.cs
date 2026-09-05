@@ -27,11 +27,17 @@ public static class ProductionConfigurationGuard
         "password", "Password1", "admin", "changeme", "visioncart",
     ];
 
-    public static void Verify(IConfiguration configuration, IHostEnvironment environment)
+    /// <summary>
+    /// Throws if the configuration must not start. Returns anything that is
+    /// allowed but should not be quiet — a deliberate compromise still has to be
+    /// visible in the log every time the process starts.
+    /// </summary>
+    public static IReadOnlyList<string> Verify(IConfiguration configuration, IHostEnvironment environment)
     {
-        if (!environment.IsProduction()) return;
+        if (!environment.IsProduction()) return [];
 
         var problems = new List<string>();
+        var warnings = new List<string>();
 
         // --- database ---
         var connection = configuration.GetConnectionString("DefaultConnection");
@@ -58,9 +64,22 @@ public static class ProductionConfigurationGuard
         var driver = configuration["Email:Driver"];
 
         if (string.Equals(driver, "log", StringComparison.OrdinalIgnoreCase))
-            problems.Add(
-                "Email:Driver is 'log', so no customer would receive an order confirmation. " +
-                "Set Email__Driver=smtp and configure a host.");
+        {
+            // Allowed only when someone has said so by name. Bringing a site up
+            // before its mailbox exists is a real situation; discovering months
+            // later that no customer ever got a confirmation is not.
+            if (configuration.GetValue("Email:AllowLogDriverInProduction", false))
+                warnings.Add(
+                    "Email:Driver is 'log'. Nobody is receiving mail: every message is written " +
+                    "to the log and marked sent, so switching to smtp later will NOT deliver " +
+                    "anything queued in the meantime. Email:AllowLogDriverInProduction is set, " +
+                    "so this is deliberate — clear it once SMTP is configured.");
+            else
+                problems.Add(
+                    "Email:Driver is 'log', so no customer would receive an order confirmation. " +
+                    "Set Email__Driver=smtp and configure a host, or set " +
+                    "Email__AllowLogDriverInProduction=true to accept that deliberately.");
+        }
         else if (string.Equals(driver, "smtp", StringComparison.OrdinalIgnoreCase)
                  && string.IsNullOrWhiteSpace(configuration["Email:Host"]))
             problems.Add("Email:Driver is 'smtp' but Email:Host is empty.");
@@ -80,7 +99,7 @@ public static class ProductionConfigurationGuard
         if (configuration["AllowedHosts"] is null or "*")
             problems.Add("AllowedHosts is '*'. Set it to the site's own domain(s).");
 
-        if (problems.Count == 0) return;
+        if (problems.Count == 0) return warnings;
 
         throw new InvalidOperationException(
             "VisionCart refused to start because its production configuration is incomplete:"

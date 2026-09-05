@@ -87,6 +87,23 @@ ASP.NET Core maps a double underscore to a configuration colon, so
 | `Payments__Providers` | `cod,bank_transfer` or add `stripe` |
 | `Payments__StripeSecretKey` | Only if Stripe is listed above |
 
+### Bringing the site up before the mailbox exists
+
+`Email__Driver=log` is refused in Production, because a site that writes every
+order confirmation to a log file looks perfectly healthy from the outside. If
+you genuinely need the site up before SMTP is arranged, say so by name:
+
+| Variable | Value |
+| --- | --- |
+| `Email__Driver` | `log` |
+| `Email__AllowLogDriverInProduction` | `true` |
+
+The application then starts and logs a warning on **every** start, so the
+compromise cannot be forgotten. Understand what it costs first: the log sender
+marks each message **sent**, so mail written during this window is never
+delivered — configuring SMTP afterwards does not go back for it. Clear both
+variables once real mail works.
+
 ### The startup guard
 
 Starting in Production with development configuration is refused, and the

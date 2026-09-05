@@ -113,9 +113,16 @@ builder.Services.AddVisionCartHealthChecks();
 
 // Checked before the host is built, so a misconfigured deployment never opens a
 // socket or touches the database.
-ProductionConfigurationGuard.Verify(builder.Configuration, builder.Environment);
+var configurationWarnings = ProductionConfigurationGuard.Verify(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
+
+// A compromise that was deliberate on the day it was made is not remembered six
+// weeks later. Anything the guard allowed under protest says so on every start.
+foreach (var warning in configurationWarnings)
+{
+    app.Logger.LogWarning("Production configuration: {Warning}", warning);
+}
 
 // Behind IIS the socket address is the proxy; without this every audit entry
 // records the server's own address instead of the client's.
