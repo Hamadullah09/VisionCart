@@ -77,7 +77,7 @@ if (-not (Test-Path -LiteralPath $root)) { throw "No package at $root. Run .\pub
 # On a shared host it carries what the build cannot know: the connection string
 # and other secrets in <environmentVariables>, and a hostingModel the platform
 # may dictate. Publishing writes a generic one, so uploading it silently replaces
-# a working configuration with an empty one — and the failure appears minutes
+# a working configuration with an empty one -- and the failure appears minutes
 # later as an unreadable startup error. Opt in with -Include web.config when
 # replacing it is genuinely what you want.
 $protected = @("web.config")
@@ -136,7 +136,7 @@ function Get-CurlHeader {
 
 # Run curl with a generated config. Native stderr must not become a terminating
 # error before the output is captured, or the one thing that says which file
-# failed is lost — so the preference is relaxed around the call and restored.
+# failed is lost -- so the preference is relaxed around the call and restored.
 function Invoke-Curl {
     param([string[]] $CurlArgs, [string] $What, [string] $LogTo)
 

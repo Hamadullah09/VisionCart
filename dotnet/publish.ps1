@@ -5,7 +5,7 @@
 .DESCRIPTION
     Produces a self-contained folder you can upload over FTP or copy into an IIS
     site. Nothing here needs Docker, Node.js on the server, or a build step at
-    the destination — the target only has to run the .NET hosting bundle.
+    the destination -- the target only has to run the .NET hosting bundle.
 
     Client-side assets are built here, not on the server. Node is a build-time
     dependency only; a shared host has no npm.
@@ -37,7 +37,7 @@ $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $web  = Join-Path $root "src\VisionCart.Web"
 
-Write-Host "VisionCart — production package" -ForegroundColor Cyan
+Write-Host "VisionCart -- production package" -ForegroundColor Cyan
 Write-Host ("-" * 50)
 
 # --- 1. Tests -----------------------------------------------------------------
