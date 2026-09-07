@@ -17,8 +17,8 @@
 {
     var options = Model.Where(o => o.Group == group).OrderBy(o => o.Position).ToList();
     <div class="panel">
-        <h2 style="margin-top:0;">@LensGroups.Labels.GetValueOrDefault(group, Humanise.Value(group))</h2>
-        <div class="admin-table">
+        <h2>@LensGroups.Labels.GetValueOrDefault(group, Humanise.Value(group))</h2>
+        <div class="admin-table stacks">
             <table>
                 <thead>
                     <tr><th>Name</th><th>Code</th><th class="num">Price</th><th>Rx limits</th><th>Default</th><th>Live</th><th></th></tr>
@@ -35,11 +35,11 @@
                         </td>
                         <td>@(option.IsDefault ? "✓" : "")</td>
                         <td>@(option.IsActive ? "✓" : "")</td>
-                        <td style="white-space:nowrap;">
+                        <td class="nowrap">
                             <button class="btn btn-outline btn-small" type="button" data-edit-toggle="l-@option.Id">Edit</button>
                             @if (option.IsActive)
                             {
-                                <form method="post" asp-action="Retire" asp-route-id="@option.Id" style="display:inline;">
+                                <form method="post" asp-action="Retire" asp-route-id="@option.Id" class="inline">
                                     <button class="btn btn-outline btn-small" type="submit">Retire</button>
                                 </form>
                             }
@@ -62,7 +62,7 @@
                                     <label class="checkline"><input type="checkbox" name="IsDefault" value="true" checked="@option.IsDefault" /><span>Ticked by default</span></label>
                                     <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked="@option.IsActive" /><span>Offered in the shop</span></label>
                                 </div>
-                                <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save option</button>
+                                <button class="btn btn-primary btn-small mt-1" type="submit">Save option</button>
                             </form>
                         </td>
                     </tr>
@@ -71,8 +71,8 @@
             </table>
         </div>
 
-        <button class="btn btn-outline btn-small" style="margin-top:10px;" type="button" data-edit-toggle="new-@group">Add an option</button>
-        <div data-edit-panel="new-@group" hidden style="margin-top:10px;">
+        <button class="btn btn-outline btn-small mt-1" type="button" data-edit-toggle="new-@group">Add an option</button>
+        <div class="mt-1" data-edit-panel="new-@group" hidden>
             <form method="post" asp-action="Save">
                 <input type="hidden" name="Group" value="@group" />
                 <div class="form-grid three">
@@ -82,7 +82,7 @@
                     <div class="full"><label>Description</label><input class="field" name="Description" placeholder="One line the customer will read when choosing." /></div>
                     <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked /><span>Offered in the shop</span></label>
                 </div>
-                <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add option</button>
+                <button class="btn btn-primary btn-small mt-1" type="submit">Add option</button>
             </form>
         </div>
     </div>

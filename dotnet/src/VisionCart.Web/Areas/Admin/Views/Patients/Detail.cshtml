@@ -20,12 +20,12 @@
 
 @if (current is not null)
 {
-    <div class="panel" style="background:var(--ink-50);">
-        <h2 style="margin-top:0;">Current prescription</h2>
-        <p style="font-family:ui-monospace,monospace;margin:0 0 4px;">
+    <div class="panel panel-quiet">
+        <h2>Current prescription</h2>
+        <p class="mono mb-1">
             @Rx.Summarise(Rx.FromEntity(current))
         </p>
-        <p class="small muted" style="margin:0;">
+        <p class="small muted m-0">
             Issued @current.IssuedAt.ToString("d MMM yyyy") ·
             Suggested lens index: @Rx.RecommendedIndex(Rx.FromEntity(current))
         </p>
@@ -42,7 +42,7 @@
             }
             else
             {
-                <div class="admin-table">
+                <div class="admin-table stacks">
                     <table>
                         <thead><tr><th>Issued</th><th>Prescription</th><th>Source</th><th>Status</th><th></th></tr></thead>
                         <tbody>
@@ -50,7 +50,7 @@
                         {
                             <tr>
                                 <td class="small">@rx.IssuedAt.ToString("dd/MM/yyyy")</td>
-                                <td class="small" style="font-family:ui-monospace,monospace;">
+                                <td class="small mono">
                                     @Rx.Summarise(Rx.FromEntity(rx))
                                 </td>
                                 <td class="small muted">@Humanise.Value(rx.Source)</td>
@@ -64,7 +64,7 @@
                                     @if (rx.Status == RxStatuses.PendingVerification && canVerify)
                                     {
                                         <form method="post" asp-action="Verify" asp-route-id="@Model.Id"
-                                              asp-route-prescriptionId="@rx.Id" style="display:inline;">
+                                              asp-route-prescriptionId="@rx.Id" class="inline">
                                             <button class="btn btn-primary btn-small" type="submit">Verify</button>
                                         </form>
                                         <button class="btn btn-outline btn-small" type="button"
@@ -82,8 +82,8 @@
                                     <td colspan="5">
                                         <form method="post" asp-action="Reject" asp-route-id="@Model.Id"
                                               asp-route-prescriptionId="@rx.Id"
-                                              style="display:flex;gap:8px;align-items:flex-end;">
-                                            <div style="flex:1;">
+                                              class="inline-form">
+                                            <div class="grow">
                                                 <label class="field-label" for="reason-@rx.Id">
                                                     What needs checking? (the customer is emailed this)
                                                 </label>
@@ -104,12 +104,12 @@
 
         <div class="panel">
             <h2>Add a prescription</h2>
-            <p class="hint" style="margin-top:0;">
+            <p class="hint">
                 A new version — the old one stays on file, and any order dispensed against
                 it still reads correctly. Every value is a drop-down in 0.25 D steps.
             </p>
             <form method="post" asp-action="AddPrescription" asp-route-id="@Model.Id">
-                <div class="admin-table" style="margin-bottom:12px;">
+                <div class="admin-table stacks">
                     <table>
                         <thead>
                             <tr><th>Eye</th><th>SPH</th><th>CYL</th><th>Axis</th><th>Add</th><th>Mono PD</th><th>Seg ht</th></tr>
@@ -155,8 +155,8 @@
                                         }
                                     </select>
                                 </td>
-                                <td><input class="field" name="@(side)PdMm" inputmode="decimal" style="width:80px;" /></td>
-                                <td><input class="field" name="@(side)SegHeightMm" inputmode="decimal" style="width:80px;" /></td>
+                                <td><input class="field" name="@(side)PdMm" inputmode="decimal" class="field field-xs" /></td>
+                                <td><input class="field" name="@(side)SegHeightMm" inputmode="decimal" class="field field-xs" /></td>
                             </tr>
                         }
                         </tbody>
@@ -187,7 +187,7 @@
                     </div>
                 </div>
 
-                <button class="btn btn-primary" style="margin-top:12px;" type="submit">Add prescription</button>
+                <button class="btn btn-primary mt-2" type="submit">Add prescription</button>
             </form>
         </div>
 
@@ -199,7 +199,7 @@
             }
             else
             {
-                <div class="admin-table">
+                <div class="admin-table stacks">
                     <table>
                         <thead><tr><th>Order</th><th>Placed</th><th>Status</th><th class="num">Total</th></tr></thead>
                         <tbody>
@@ -277,7 +277,7 @@
                         <span>Consented to marketing contact</span>
                     </label>
                 </div>
-                <button class="btn btn-primary" style="margin-top:12px;" type="submit">Save file</button>
+                <button class="btn btn-primary mt-2" type="submit">Save file</button>
             </form>
         </div>
 
@@ -292,8 +292,8 @@
                 <div class="grid grid-3">
                     @foreach (var doc in Model.Documents)
                     {
-                        <a class="card" style="padding:6px;" href="@doc.Url" target="_blank" rel="noreferrer noopener">
-                            <img src="@doc.Url" alt="@(doc.Label ?? doc.Kind)" style="width:100%;height:auto;" />
+                        <a class="doc-tile" href="@doc.Url" target="_blank" rel="noreferrer noopener">
+                            <img src="@doc.Url" alt="@(doc.Label ?? doc.Kind)" />
                             <span class="small muted">@Humanise.Value(doc.Kind)</span>
                         </a>
                     }
@@ -312,8 +312,8 @@
                 <div class="grid grid-3">
                     @foreach (var snap in snapshots)
                     {
-                        <a class="card" style="padding:6px;" href="@snap.ImageUrl" target="_blank" rel="noreferrer noopener">
-                            <img src="@snap.ImageUrl" alt="@snap.Variant.Frame.Name" style="width:100%;height:auto;" />
+                        <a class="doc-tile" href="@snap.ImageUrl" target="_blank" rel="noreferrer noopener">
+                            <img src="@snap.ImageUrl" alt="@snap.Variant.Frame.Name" />
                             <span class="small muted">@snap.Variant.Frame.Name</span>
                         </a>
                     }

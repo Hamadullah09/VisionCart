@@ -4,10 +4,10 @@
     var f = Model.Filters;
 }
 
-<div class="panel-head">
+<div class="admin-page-head">
     <div>
         <h1>Patients</h1>
-        <p class="muted">@Model.Results.Total file@(Model.Results.Total == 1 ? "" : "s")</p>
+        <p>@Model.Results.Total file@(Model.Results.Total == 1 ? "" : "s")</p>
     </div>
     <a class="btn btn-primary" asp-action="New">New patient</a>
 </div>
@@ -16,9 +16,9 @@
     <div>
         <label for="q">Search</label>
         <input class="field" type="text" id="q" name="q" value="@f.Q"
-               placeholder="File no, name, phone or email" style="min-width:260px;" />
+               placeholder="File no, name, phone or email" />
     </div>
-    <label class="checkline" style="margin-bottom:8px;">
+    <label class="checkline mb-1">
         <input type="checkbox" name="pending" value="true" checked="@f.PendingRxOnly" />
         <span>Only files with a prescription waiting</span>
     </label>
@@ -28,11 +28,20 @@
 
 @if (Model.Results.Items.Count == 0)
 {
-    <p class="alert alert-info">No patient files match that search.</p>
+    @await Html.PartialAsync("_EmptyState", new EmptyState("patients",
+        string.IsNullOrWhiteSpace(f.Q) && !f.PendingRxOnly ? "No patient files yet" : "No patient files match that search",
+        string.IsNullOrWhiteSpace(f.Q) && !f.PendingRxOnly
+            ? "A file holds somebody's prescriptions, their PD and their order history. Open one the first time they are dispensed to."
+            : "Try a shorter search — a file number, a surname or the last few digits of a phone number is usually enough.")
+        {
+            ActionText = "New patient", ActionUrl = Url.Action("New"),
+            SecondaryText = string.IsNullOrWhiteSpace(f.Q) && !f.PendingRxOnly ? null : "Clear filters",
+            SecondaryUrl = string.IsNullOrWhiteSpace(f.Q) && !f.PendingRxOnly ? null : Url.Action("Index"),
+        })
 }
 else
 {
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
                 <tr>
@@ -45,7 +54,7 @@ else
             {
                 <tr>
                     <td><code>@p.FileNo</code></td>
-                    <td>@p.Name</td>
+                    <td><strong>@p.Name</strong></td>
                     <td class="small muted">@p.Email<br />@p.Phone</td>
                     <td class="num">@(p.PdMm?.ToString("0.#") ?? "—")</td>
                     <td class="num">@p.Orders</td>
@@ -59,7 +68,9 @@ else
                             <span class="small muted">—</span>
                         }
                     </td>
-                    <td><a asp-action="Detail" asp-route-id="@p.Id">Open</a></td>
+                    <td class="admin-row-actions">
+                        <a class="btn btn-outline btn-small" asp-action="Detail" asp-route-id="@p.Id">Open file</a>
+                    </td>
                 </tr>
             }
             </tbody>

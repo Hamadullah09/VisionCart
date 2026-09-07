@@ -17,7 +17,7 @@
         @Model.PendingPurges file@(Model.PendingPurges == 1 ? "" : "s") @(Model.PendingPurges == 1 ? "is" : "are")
         marked deleted but @(Model.PendingPurges == 1 ? "its" : "their") storage object hasn't gone yet.
         The sweep retries hourly.
-        <form method="post" asp-action="Purge" style="display:inline;margin-left:8px;">
+        <form method="post" asp-action="Purge" class="inline">
             <button class="btn btn-outline btn-small" type="submit">Retry now</button>
         </form>
     </div>
@@ -31,21 +31,21 @@
     @Html.AntiForgeryToken()
     <div class="dropzone" data-dropzone tabindex="0" role="button"
          aria-label="Drop product photos here, or click to choose files">
-        <p style="margin:0;font-weight:600;">Drop product photos here</p>
-        <p class="small muted" style="margin:6px 0 0;">
+        <p class="dropzone-title">Drop product photos here</p>
+        <p class="hint">
             Any number at once. JPG, PNG or WebP up to 15&nbsp;MB each.
         </p>
-        <p class="small muted" style="margin:6px 0 0;">or click to choose files</p>
+        <p class="hint">or click to choose files</p>
         <input type="file" accept="image/*" multiple hidden data-file-input />
     </div>
 
-    <div class="form-grid" style="margin-top:14px;">
+    <div class="form-grid mt-2">
         <div>
             <label for="upload-tags">Tag this batch (optional)</label>
             <input class="field" id="upload-tags" data-upload-tags
                    placeholder="e.g. autumn-shoot, acetate" />
         </div>
-        <label class="checkline" style="align-self:end;padding-bottom:8px;">
+        <label class="checkline is-aligned">
             <input type="checkbox" data-keep-alpha />
             <span>Keep transparency (for try-on overlays)</span>
         </label>
@@ -77,7 +77,8 @@
 
 @if (Model.Results.Items.Count == 0)
 {
-    <p class="alert alert-info">Nothing in the library yet.</p>
+    @await Html.PartialAsync("_EmptyState", new EmptyState("media", "Nothing in the library yet",
+        "Upload frame photography and try-on artwork here, then attach it to the colourway it belongs to."))
 }
 else
 {

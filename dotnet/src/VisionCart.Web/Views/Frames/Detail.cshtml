@@ -290,7 +290,18 @@
         </section>
 
         <div class="product-submit">
-            <button class="btn btn-primary btn-block btn-lg" type="submit">Add to bag</button>
+            @* Say what the button will do. A customer who is not signed in is
+               sent to sign in first, and finding that out only after filling in
+               a prescription is a poor way to learn it. *@
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <button class="btn btn-primary btn-block btn-lg" type="submit">Add to cart</button>
+            }
+            else
+            {
+                <button class="btn btn-primary btn-block btn-lg" type="submit">Sign in to add to cart</button>
+                <p class="hint text-center">Your cart is kept with your account, so your prescription is there next time.</p>
+            }
             <p class="small muted">Free returns within 30 days. Our optician checks every order before it goes to the lab.</p>
         </div>
     </div>

@@ -6,15 +6,46 @@
     var store = Store.Value;
     string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
     var f = Model.Filters;
+
+    // Tabs over the same `status` filter the drop-down already uses, so they
+    // cost no new query parameter and stay in step with it. They carry the
+    // rest of the filters through rather than resetting them.
+    string Tab(string? status) =>
+        Url.Action("Index", new { q = f.Q, status, paymentStatus = f.PaymentStatus, labStatus = f.LabStatus })!;
+
+    var tabs = new (string? Key, string Label)[]
+    {
+        (null, "All"),
+        (OrderStatuses.Pending, "Pending"),
+        (OrderStatuses.InLab, "In the lab"),
+        (OrderStatuses.Shipped, "Shipped"),
+        (OrderStatuses.Delivered, "Delivered"),
+    };
 }
 
-<h1>Orders</h1>
-<p class="muted">@Model.Results.Total shown · @M(Model.PaidTotalMinor) paid</p>
+<div class="admin-page-head">
+    <div>
+        <h1>Orders</h1>
+        <p>@Model.Results.Total order@(Model.Results.Total == 1 ? "" : "s") shown, @M(Model.PaidTotalMinor) of it paid.</p>
+    </div>
+    <div class="row">
+        <a class="btn btn-outline" asp-controller="Import" asp-action="Export" asp-route-type="orders">@Icons.Svg("import") Export CSV</a>
+    </div>
+</div>
+
+<nav class="admin-tabs" aria-label="Filter by status">
+    @foreach (var (key, label) in tabs)
+    {
+        var current = string.Equals(f.Status, key, StringComparison.OrdinalIgnoreCase)
+                      || (key is null && string.IsNullOrEmpty(f.Status));
+        <a href="@Tab(key)" class="@(current ? "is-current" : "")" aria-current="@(current ? "page" : null)">@label</a>
+    }
+</nav>
 
 <form method="get" class="filter-bar">
-    <div>
+    <div class="grow">
         <label for="q">Search</label>
-        <input class="field" type="text" id="q" name="q" value="@f.Q" placeholder="Order no, email or phone" />
+        <input class="field" type="search" id="q" name="q" value="@f.Q" placeholder="Order no, email or phone" />
     </div>
     <div>
         <label for="status">Status</label>
@@ -46,32 +77,49 @@
             }
         </select>
     </div>
-    <button class="btn btn-primary" type="submit">Filter</button>
-    <a class="btn btn-outline" asp-action="Index">Clear</a>
+    <button class="btn btn-primary" type="submit">@Icons.Svg("search") Filter</button>
+    <a class="btn btn-quiet" asp-action="Index">Clear</a>
 </form>
 
 @if (Model.Results.Items.Count == 0)
 {
-    <p class="alert alert-info">No orders match those filters.</p>
+    var filtered = !string.IsNullOrWhiteSpace(f.Q) || !string.IsNullOrWhiteSpace(f.Status)
+                   || !string.IsNullOrWhiteSpace(f.PaymentStatus) || !string.IsNullOrWhiteSpace(f.LabStatus);
+    <div class="panel">
+        <div class="empty-state">
+            <span class="empty-art">@Icons.Svg("inbox")</span>
+            <h3>@(filtered ? "No orders match those filters" : "No orders yet")</h3>
+            <p>
+                @(filtered
+                    ? "Nothing in the book matches every filter at once. Clearing one of them usually finds it."
+                    : "Orders placed in the shop will appear here the moment they come in.")
+            </p>
+            @if (filtered)
+            {
+                <a class="btn btn-outline" asp-action="Index">Clear filters</a>
+            }
+        </div>
+    </div>
 }
 else
 {
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
                 <tr>
-                    <th>Order</th><th>Placed</th><th>Customer</th><th>Items</th>
-                    <th class="num">Total</th><th>Payment</th><th>Status</th><th></th>
+                    <th scope="col">Order</th><th scope="col">Placed</th><th scope="col">Customer</th><th scope="col">Items</th>
+                    <th scope="col" class="num">Total</th><th scope="col">Payment</th><th scope="col">Status</th>
+                    <th scope="col"><span class="sr-only">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var o in Model.Results.Items)
             {
                 <tr>
-                    <td><code>@o.OrderNo</code></td>
+                    <td><a asp-action="Detail" asp-route-id="@o.Id"><code>@o.OrderNo</code></a></td>
                     <td class="small">@o.PlacedAt.ToString("dd/MM/yyyy")<br /><span class="muted">@o.PlacedAt.ToString("HH:mm")</span></td>
                     <td class="small">
-                        @(o.PatientName ?? o.Email)
+                        <strong>@(o.PatientName ?? o.Email)</strong>
                         @if (o.FileNo is not null)
                         {
                             <br /><code class="muted">@o.FileNo</code>
@@ -79,9 +127,11 @@ else
                     </td>
                     <td class="small muted">@o.Items</td>
                     <td class="num">@M(o.TotalMinor)</td>
-                    <td><span class="chip @(o.PaymentStatus == PaymentStatuses.Paid ? "chip-paid" : "chip-pending")">@Humanise.Value(o.PaymentStatus)</span></td>
-                    <td><span class="chip">@Humanise.Value(o.Status)</span></td>
-                    <td><a asp-action="Detail" asp-route-id="@o.Id">Open</a></td>
+                    <td><span class="@StatusStyle.Chip(o.PaymentStatus)">@Humanise.Value(o.PaymentStatus)</span></td>
+                    <td><span class="@StatusStyle.Chip(o.Status)">@Humanise.Value(o.Status)</span></td>
+                    <td class="admin-row-actions">
+                        <a class="btn btn-outline btn-small" asp-action="Detail" asp-route-id="@o.Id">Open</a>
+                    </td>
                 </tr>
             }
             </tbody>
@@ -90,7 +140,7 @@ else
 
     @if (Model.Results.Pages > 1)
     {
-        <nav class="pager">
+        <nav class="pager" aria-label="Pagination">
             @if (Model.Results.HasPrevious)
             {
                 <a class="btn btn-outline btn-small"

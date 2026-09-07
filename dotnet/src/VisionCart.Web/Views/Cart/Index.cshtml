@@ -2,73 +2,94 @@
 @model CartView
 @inject IOptions<StoreOptions> Store
 @{
-    ViewData["Title"] = "Your bag";
+    ViewData["Title"] = "Your cart";
     var store = Store.Value;
     string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+    var count = Model.Lines.Sum(l => l.Qty);
 }
 
-<h1>Your bag</h1>
+<div class="page-head">
+    <div>
+        <h1>Your cart</h1>
+        @if (!Model.IsEmpty)
+        {
+            <p>@count item@(count == 1 ? "" : "s"). Prices are worked out on our side every time this page loads, so nothing here can drift.</p>
+        }
+    </div>
+</div>
 
 @if (Model.IsEmpty)
 {
-    <p class="alert alert-info">Your bag is empty.</p>
-    <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse frames</a>
+    <div class="shop-empty">
+        <span class="shop-empty-art">@Icons.Svg("orders")</span>
+        <h2>Your cart is empty</h2>
+        <p>Nothing in here yet. Try a frame on first if you are not sure — it is quicker than guessing from a photograph.</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse frames</a>
+            <a class="btn btn-outline" href="/try-on">Try a pair on</a>
+        </div>
+    </div>
 }
 else
 {
     @foreach (var warning in Model.Warnings.Distinct())
     {
-        <p class="alert alert-warn">@warning</p>
+        <p class="alert alert-warn">@Icons.Svg("warning")<span>@warning</span></p>
     }
 
     @if (Model.PromoError is { } promoError)
     {
-        <p class="alert alert-error">@promoError</p>
+        <p class="alert alert-error">@Icons.Svg("warning")<span>@promoError</span></p>
     }
 
-    <div class="two-col" style="margin-top:20px;">
+    <div class="cart-layout">
         <div>
             @foreach (var line in Model.Lines)
             {
-                <div class="card" style="display:flex;gap:16px;padding:14px;margin-bottom:12px;align-items:flex-start;">
-                    <div style="width:120px;background:var(--ink-50);border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;padding:8px;">
+                <div class="cart-line">
+                    <div class="cart-thumb">
                         @if (line.ImageUrl is not null)
                         {
-                            <img src="@line.ImageUrl" alt="@line.Title" style="width:100%;height:auto;" />
+                            <img src="@line.ImageUrl" alt="@line.Title" loading="lazy" />
                         }
                     </div>
-                    <div style="flex:1;">
-                        <h3 style="margin:0 0 2px;font-size:16px;">@line.Title</h3>
-                        <p class="small muted" style="margin:0 0 2px;">@line.LensSummary</p>
-                        <p class="small muted" style="margin:0 0 10px;">@line.Sku</p>
 
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <form method="post" asp-controller="Cart" asp-action="Update" style="display:flex;gap:6px;align-items:center;">
+                    <div>
+                        <h3>@line.Title</h3>
+                        <p class="cart-meta">@line.LensSummary</p>
+                        <p class="cart-sku">@line.Sku</p>
+
+                        <div class="cart-line-actions">
+                            @* One form, two submit buttons carrying the new
+                               quantity — unchanged from before, so a cart still
+                               works with scripting off. *@
+                            <form method="post" asp-controller="Cart" asp-action="Update">
                                 <input type="hidden" name="itemId" value="@line.ItemId" />
-                                <button class="btn btn-outline btn-small" type="submit" name="qty" value="@(line.Qty - 1)"
-                                        aria-label="Decrease quantity">−</button>
-                                <span style="min-width:2ch;text-align:center;">@line.Qty</span>
-                                <button class="btn btn-outline btn-small" type="submit" name="qty" value="@(line.Qty + 1)"
-                                        aria-label="Increase quantity">+</button>
+                                <span class="qty">
+                                    <button type="submit" name="qty" value="@(line.Qty - 1)"
+                                            aria-label="Decrease quantity of @line.Title">&minus;</button>
+                                    <span class="qty-value" aria-live="polite">@line.Qty</span>
+                                    <button type="submit" name="qty" value="@(line.Qty + 1)"
+                                            aria-label="Increase quantity of @line.Title">+</button>
+                                </span>
                             </form>
                             <form method="post" asp-controller="Cart" asp-action="Remove">
                                 <input type="hidden" name="itemId" value="@line.ItemId" />
-                                <button class="btn btn-outline btn-small" type="submit">Remove</button>
+                                <button class="cart-remove" type="submit">Remove</button>
                             </form>
                         </div>
                     </div>
-                    <div style="font-weight:700;">@M(line.TotalMinor)</div>
+
+                    <div class="cart-price">@M(line.TotalMinor)</div>
                 </div>
             }
         </div>
 
-        <div>
-            <div class="totals">
-                <h3 style="margin:0 0 10px;font-size:16px;">Summary</h3>
+        <aside class="cart-aside">
+            <div class="cart-summary">
+                <h2>Summary</h2>
 
-                <div class="totals-row">
-                    <span>Frames</span><span>@M(Model.Totals.SubtotalMinor)</span>
-                </div>
+                <div class="totals-row"><span>Frames</span><span>@M(Model.Totals.SubtotalMinor)</span></div>
                 @if (Model.Totals.LensTotalMinor > 0)
                 {
                     <div class="totals-row"><span>Lenses</span><span>@M(Model.Totals.LensTotalMinor)</span></div>
@@ -77,7 +98,7 @@ else
                 {
                     <div class="totals-row discount">
                         <span>@promo.Name</span>
-                        <span>− @M(promo.DiscountMinor)</span>
+                        <span>&minus; @M(promo.DiscountMinor)</span>
                     </div>
                 }
                 <div class="totals-row">
@@ -88,32 +109,36 @@ else
                 {
                     <div class="totals-row"><span>Tax</span><span>@M(Model.Totals.TaxMinor)</span></div>
                 }
-                <div class="totals-row grand">
-                    <span>Total</span><span>@M(Model.Totals.TotalMinor)</span>
-                </div>
+                <div class="totals-row grand"><span>Total</span><span>@M(Model.Totals.TotalMinor)</span></div>
 
-                <a class="btn btn-primary btn-block" style="margin-top:16px;"
-                   asp-controller="Checkout" asp-action="Index">Checkout</a>
-                <a class="btn btn-outline btn-block" style="margin-top:8px;"
-                   asp-controller="Frames" asp-action="Index">Keep shopping</a>
+                <a class="btn btn-primary btn-block" asp-controller="Checkout" asp-action="Index">Checkout</a>
+                <a class="btn btn-outline btn-block" asp-controller="Frames" asp-action="Index">Keep shopping</a>
+
+                <p class="cart-note">An optician checks every prescription before it reaches the lab.</p>
             </div>
 
-            <form method="post" asp-controller="Cart" asp-action="Promo" style="margin-top:16px;">
-                <label for="code" class="small muted">Have a code?</label>
-                <div style="display:flex;gap:8px;margin-top:6px;">
-                    <input class="field" type="text" id="code" name="code" value="@Model.PromoCode"
-                           placeholder="Promo code" />
-                    <button class="btn btn-outline" type="submit">Apply</button>
-                </div>
-            </form>
-
-            @if (Model.PromoCode is not null)
-            {
-                <form method="post" asp-controller="Cart" asp-action="Promo" style="margin-top:8px;">
-                    <input type="hidden" name="code" value="" />
-                    <button class="btn btn-outline btn-small" type="submit">Remove code</button>
+            <div class="promo">
+                <h3>Have a code?</h3>
+                <form method="post" asp-controller="Cart" asp-action="Promo">
+                    <div class="promo-row">
+                        <label class="sr-only" for="code">Promotion code</label>
+                        <input class="field" type="text" id="code" name="code" value="@Model.PromoCode"
+                               placeholder="Promo code" autocomplete="off" />
+                        <button class="btn btn-outline" type="submit">Apply</button>
+                    </div>
                 </form>
-            }
-        </div>
+
+                @if (Model.PromoCode is not null)
+                {
+                    <div class="promo-applied">
+                        <code>@Model.PromoCode</code>
+                        <form method="post" asp-controller="Cart" asp-action="Promo">
+                            <input type="hidden" name="code" value="" />
+                            <button class="cart-remove" type="submit">Remove</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </aside>
     </div>
 }

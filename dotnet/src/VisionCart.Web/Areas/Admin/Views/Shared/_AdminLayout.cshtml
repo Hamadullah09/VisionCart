@@ -6,6 +6,21 @@
     var role = User.IsInRole(Roles.Admin) ? "Administrator"
              : User.IsInRole(Roles.Optician) ? "Optician"
              : "Staff";
+
+    var who = User.Identity?.Name ?? "";
+    // Initials for the avatar. An email is the common case, so take the local
+    // part and split it on the usual separators before falling back to letters.
+    var handle = who.Contains('@') ? who[..who.IndexOf('@')] : who;
+    var words = handle.Split(['.', '_', '-', ' '], StringSplitOptions.RemoveEmptyEntries);
+    var initials = words.Length >= 2
+        ? $"{char.ToUpperInvariant(words[0][0])}{char.ToUpperInvariant(words[1][0])}"
+        : (handle.Length >= 2 ? handle[..2].ToUpperInvariant() : "VC");
+
+    // Active navigation state. The old layout had none: thirteen identical
+    // links, and no way to tell which page you were on.
+    var here = (ViewContext.RouteData.Values["controller"] as string) ?? "";
+    string Cur(string controller) =>
+        string.Equals(controller, here, StringComparison.OrdinalIgnoreCase) ? "is-current" : "";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -13,57 +28,188 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@(ViewData["Title"] ?? "Back office") · @storeName</title>
+
+    <link rel="icon" href="~/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" />
+    @* The navy of the back office, not the shop's ink, so a phone chrome
+       matches the screen it is showing. *@
+    <meta name="theme-color" content="#0A1230" />
+
     <link rel="stylesheet" href="~/css/visioncart.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
     @* The back office must never be indexed. *@
     <meta name="robots" content="noindex, nofollow" />
 </head>
 <body class="admin">
+
+@* ---------------------------------------------------------------------------
+   Sidebar. Grouped by the job somebody is doing rather than listed
+   alphabetically, so a dispenser and a bookkeeper each have one place to look.
+   --------------------------------------------------------------------------- *@
+<aside class="admin-side" id="admin-side">
+    <div class="admin-brandbar">
+        <span class="admin-mark">@Icons.Svg("glasses")</span>
+        <a class="admin-brand" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">
+            @storeName
+            <span>Back office</span>
+        </a>
+    </div>
+
+    <nav class="admin-nav" aria-label="Back office">
+        <p class="nav-group">Overview</p>
+        <a asp-area="Admin" asp-controller="Dashboard" asp-action="Index" class="@Cur("Dashboard")" title="Dashboard">
+            @Icons.Svg("dashboard")<span class="nav-label">Dashboard</span>
+        </a>
+
+        <p class="nav-group">Commerce</p>
+        <a asp-area="Admin" asp-controller="Orders" asp-action="Index" class="@Cur("Orders")" title="Orders">
+            @Icons.Svg("orders")<span class="nav-label">Orders</span>
+        </a>
+        <a asp-area="Admin" asp-controller="Promotions" asp-action="Index" class="@Cur("Promotions")" title="Promotions">
+            @Icons.Svg("promos")<span class="nav-label">Promotions</span>
+        </a>
+        <a asp-area="Admin" asp-controller="ShippingRates" asp-action="Index" class="@Cur("ShippingRates")" title="Delivery">
+            @Icons.Svg("delivery")<span class="nav-label">Delivery</span>
+        </a>
+
+        <p class="nav-group">Catalogue</p>
+        <a asp-area="Admin" asp-controller="Frames" asp-action="Index" class="@Cur("Frames")" title="Frames">
+            @Icons.Svg("frames")<span class="nav-label">Frames</span>
+        </a>
+        <a asp-area="Admin" asp-controller="Lenses" asp-action="Index" class="@Cur("Lenses")" title="Lenses">
+            @Icons.Svg("lenses")<span class="nav-label">Lenses</span>
+        </a>
+        @* Vendors had controllers and two views, but no way in from the navigation. *@
+        <a asp-area="Admin" asp-controller="Vendors" asp-action="Index" class="@Cur("Vendors")" title="Vendors">
+            @Icons.Svg("vendors")<span class="nav-label">Vendors</span>
+        </a>
+        <a asp-area="Admin" asp-controller="Media" asp-action="Index" class="@Cur("Media")" title="Media">
+            @Icons.Svg("media")<span class="nav-label">Media</span>
+        </a>
+
+        <p class="nav-group">Clinic</p>
+        <a asp-area="Admin" asp-controller="Patients" asp-action="Index" class="@Cur("Patients")" title="Patients">
+            @Icons.Svg("patients")<span class="nav-label">Patients</span>
+        </a>
+        <a asp-area="Admin" asp-controller="Diary" asp-action="Index" class="@Cur("Diary")" title="Diary">
+            @Icons.Svg("diary")<span class="nav-label">Diary</span>
+        </a>
+
+        <p class="nav-group">Data</p>
+        <a asp-area="Admin" asp-controller="Import" asp-action="Index" class="@Cur("Import")" title="Import and export">
+            @Icons.Svg("import")<span class="nav-label">Import &amp; export</span>
+        </a>
+        <a asp-area="Admin" asp-controller="DataRequests" asp-action="Index" class="@Cur("DataRequests")" title="Data requests">
+            @Icons.Svg("privacy")<span class="nav-label">Data requests</span>
+        </a>
+        @if (isAdmin)
+        {
+            <a asp-area="Admin" asp-controller="Audit" asp-action="Index" class="@Cur("Audit")" title="Audit trail">
+                @Icons.Svg("audit")<span class="nav-label">Audit trail</span>
+            </a>
+        }
+
+        <p class="nav-group">System</p>
+        <a asp-area="Admin" asp-controller="Settings" asp-action="Index" class="@Cur("Settings")" title="Settings">
+            @Icons.Svg("settings")<span class="nav-label">Settings</span>
+        </a>
+    </nav>
+
+    <div class="admin-side-foot">
+        <a href="/" title="View the shop — every page there has a link back">
+            @Icons.Svg("shop")<span>View shop</span>
+        </a>
+    </div>
+</aside>
+
+<div class="nav-scrim" data-nav-close hidden></div>
+
+@* --------------------------------------------------------------------------- *@
+<div class="admin-shell">
     <header class="admin-header">
-        <div class="admin-header-inner">
-            <div>
-                <a class="admin-brand" asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Back office</a>
-                <p class="admin-role">@User.Identity?.Name · @role</p>
-            </div>
-            <nav class="admin-nav">
-                <a asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
-                <a asp-area="Admin" asp-controller="Orders" asp-action="Index">Orders</a>
-                <a asp-area="Admin" asp-controller="Patients" asp-action="Index">Patients</a>
-                <a asp-area="Admin" asp-controller="Diary" asp-action="Index">Diary</a>
-                <a asp-area="Admin" asp-controller="Frames" asp-action="Index">Frames</a>
-                <a asp-area="Admin" asp-controller="Lenses" asp-action="Index">Lenses</a>
-                <a asp-area="Admin" asp-controller="Media" asp-action="Index">Media</a>
-                <a asp-area="Admin" asp-controller="Promotions" asp-action="Index">Promotions</a>
-                <a asp-area="Admin" asp-controller="ShippingRates" asp-action="Index">Delivery</a>
-                <a asp-area="Admin" asp-controller="Import" asp-action="Index">Import</a>
-                <a asp-area="Admin" asp-controller="DataRequests" asp-action="Index">Data requests</a>
-                @if (isAdmin)
-                {
-                    <a asp-area="Admin" asp-controller="Audit" asp-action="Index">Audit</a>
-                }
-                <a asp-area="Admin" asp-controller="Settings" asp-action="Index">Settings</a>
+        <button type="button" class="nav-toggle" data-nav-collapse aria-label="Collapse navigation" title="Collapse navigation">
+            @Icons.Svg("panel")
+        </button>
+        <button type="button" class="nav-burger" data-nav-open aria-label="Open navigation" aria-expanded="false" aria-controls="admin-side">
+            @Icons.Svg("burger")
+        </button>
+
+        <div class="admin-head-title">
+            @* The page's own <h1> is in the body; this is the trail above it,
+               so there is exactly one first-level heading per page. *@
+            <nav class="admin-crumbs" aria-label="Breadcrumb">
+                <a asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Back office</a>
+                <span class="sep" aria-hidden="true">/</span>
+                <span aria-current="page">@(ViewData["Title"] ?? "Dashboard")</span>
             </nav>
-            <div class="admin-actions">
-                <a href="/" target="_blank" rel="noopener">View shop ↗</a>
-                <form method="post" asp-area="" asp-controller="Account" asp-action="Logout" style="display:inline;">
-                    <button class="btn btn-outline btn-small" type="submit">Sign out</button>
-                </form>
+        </div>
+
+        <form class="admin-search" method="get" asp-area="Admin" asp-controller="Frames" asp-action="Index" role="search">
+            @Icons.Svg("search")
+            <label for="admin-q" class="sr-only">Search frames</label>
+            <input id="admin-q" type="search" name="q" placeholder="Search frames…" autocomplete="off" data-search />
+            <kbd aria-hidden="true">Ctrl K</kbd>
+        </form>
+
+        <div class="admin-actions">
+            <div class="menu-wrap">
+                <button type="button" class="icon-btn" data-menu="notifications" aria-haspopup="true" aria-expanded="false" aria-label="Work queue">
+                    @Icons.Svg("bell")
+                </button>
+                @await Component.InvokeAsync("WorkQueue")
+            </div>
+
+            <div class="menu-wrap">
+                <button type="button" class="admin-user" data-menu="profile" aria-haspopup="true" aria-expanded="false">
+                    <span class="avatar" aria-hidden="true">@initials</span>
+                    <span class="admin-user-name">@who<span>@role</span></span>
+                    @Icons.Svg("chevron")
+                </button>
+                <div class="menu" data-menu-panel="profile" hidden>
+                    <div class="menu-head">
+                        <strong>@who</strong>
+                        <span>@role</span>
+                    </div>
+                    <a asp-area="" asp-controller="Account" asp-action="Index">@Icons.Svg("user") My account</a>
+                    <a asp-area="Admin" asp-controller="Settings" asp-action="Index">@Icons.Svg("settings") Settings</a>
+                    <a href="/">@Icons.Svg("shop") View shop</a>
+                    <hr />
+                    <form method="post" asp-area="" asp-controller="Account" asp-action="Logout">
+                        <button type="submit" class="is-danger">@Icons.Svg("logout") Sign out</button>
+                    </form>
+                </div>
             </div>
         </div>
     </header>
 
-    <main class="admin-main">
-        @if (TempData["AdminOk"] is string ok)
-        {
-            <p class="alert alert-ok">@ok</p>
-        }
-        @if (TempData["AdminError"] is string error)
-        {
-            <p class="alert alert-error" role="alert">@error</p>
-        }
+    <main class="admin-main" id="admin-main">
         @RenderBody()
     </main>
+</div>
 
-    @await RenderSectionAsync("Scripts", required: false)
+@* Flash messages become toasts. They are in the markup rather than created by
+   script, so they still appear with scripting off — the script only adds the
+   dismiss button and the timer. *@
+@{
+    var flashOk = TempData["AdminOk"] as string;
+    var flashError = TempData["AdminError"] as string;
+}
+@if (flashOk is not null || flashError is not null)
+{
+    <div class="toast-stack" role="status" aria-live="polite">
+        @if (flashOk is not null)
+        {
+            <p class="alert alert-ok" data-toast>@Icons.Svg("tick")<span>@flashOk</span></p>
+        }
+        @if (flashError is not null)
+        {
+            <p class="alert alert-error" data-toast role="alert">@Icons.Svg("warning")<span>@flashError</span></p>
+        }
+    </div>
+}
+
+<script src="~/js/admin-shell.js" asp-append-version="true" defer></script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

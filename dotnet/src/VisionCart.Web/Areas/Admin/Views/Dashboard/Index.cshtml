@@ -6,22 +6,84 @@
     var store = Store.Value;
     string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
     var s = Model.Stats;
+
+    // Greet by the clock rather than by name: the name is already in the
+    // header, and the time of day is the thing that changes what staff are
+    // about to do.
+    var hour = DateTime.Now.Hour;
+    var greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+    var needsAttention = s.PrescriptionsToCheck + s.AwaitingPayment + s.LowStockLines;
 }
 
-<h1>Dashboard</h1>
-<p class="muted">@DateTime.UtcNow.ToString("dddd, d MMMM yyyy")</p>
-
-<div class="stats" style="margin-top:20px;">
-    <dl class="stat"><dt>Orders today</dt><dd>@s.OrdersToday</dd></dl>
-    <dl class="stat"><dt>Paid, last 30 days</dt><dd>@M(s.PaidLast30DaysMinor)</dd></dl>
-    <dl class="stat @(s.AwaitingPayment > 0 ? "attention" : "")"><dt>Awaiting payment</dt><dd>@s.AwaitingPayment</dd></dl>
-    <dl class="stat"><dt>In the lab</dt><dd>@s.InTheLab</dd></dl>
-    <dl class="stat"><dt>Patient files</dt><dd>@s.PatientFiles</dd></dl>
-    <dl class="stat"><dt>Live frames</dt><dd>@s.LiveFrames</dd></dl>
-    <dl class="stat @(s.PrescriptionsToCheck > 0 ? "attention" : "")"><dt>Prescriptions to check</dt><dd>@s.PrescriptionsToCheck</dd></dl>
-    <dl class="stat @(s.LowStockLines > 0 ? "attention" : "")"><dt>Low stock lines</dt><dd>@s.LowStockLines</dd></dl>
+<div class="admin-page-head">
+    <div>
+        <h1>@greeting</h1>
+        <p>@DateTime.Now.ToString("dddd, d MMMM yyyy") — @(needsAttention == 0
+              ? "nothing is waiting on the shop today."
+              : $"{needsAttention} {(needsAttention == 1 ? "thing needs" : "things need")} somebody to look at.")</p>
+    </div>
+    <div class="row">
+        <a class="btn btn-outline btn-small" asp-controller="Patients" asp-action="New">@Icons.Svg("patients") New patient</a>
+        <a class="btn btn-outline btn-small" asp-controller="Diary" asp-action="Index">@Icons.Svg("diary") Diary</a>
+        <a class="btn btn-primary btn-small" asp-controller="Frames" asp-action="New">@Icons.Svg("plus") Add frame</a>
+    </div>
 </div>
 
+@* --- the numbers ---------------------------------------------------------
+   Eight tiles, ordered by how often somebody acts on them rather than by
+   which query was easiest. The four that can demand work come first. *@
+<div class="stats">
+    <dl class="stat @(s.PrescriptionsToCheck > 0 ? "attention" : "tint-ok")">
+        <dt>Prescriptions to check <span class="stat-icon">@Icons.Svg("clock")</span></dt>
+        <dd>@s.PrescriptionsToCheck</dd>
+        <p class="stat-foot">@(s.PrescriptionsToCheck > 0 ? "Waiting on an optician" : "Queue is clear")</p>
+    </dl>
+
+    <dl class="stat @(s.AwaitingPayment > 0 ? "urgent" : "tint-ok")">
+        <dt>Awaiting payment <span class="stat-icon">@Icons.Svg("card")</span></dt>
+        <dd>@s.AwaitingPayment</dd>
+        <p class="stat-foot">@(s.AwaitingPayment > 0 ? "Held before the lab" : "Everything is paid")</p>
+    </dl>
+
+    <dl class="stat @(s.LowStockLines > 0 ? "attention" : "tint-ok")">
+        <dt>Low stock lines <span class="stat-icon">@Icons.Svg("box")</span></dt>
+        <dd>@s.LowStockLines</dd>
+        <p class="stat-foot">@(s.LowStockLines > 0 ? "Below restock level" : "All above restock level")</p>
+    </dl>
+
+    <dl class="stat tint-purple">
+        <dt>In the lab <span class="stat-icon">@Icons.Svg("flask")</span></dt>
+        <dd>@s.InTheLab</dd>
+        <p class="stat-foot">Being made up now</p>
+    </dl>
+
+    <dl class="stat tint-blue">
+        <dt>Orders today <span class="stat-icon">@Icons.Svg("orders")</span></dt>
+        <dd>@s.OrdersToday</dd>
+        <p class="stat-foot">Placed since midnight</p>
+    </dl>
+
+    <dl class="stat tint-teal">
+        <dt>Paid, last 30 days <span class="stat-icon">@Icons.Svg("money")</span></dt>
+        <dd>@M(s.PaidLast30DaysMinor)</dd>
+        <p class="stat-foot">Cleared payments only</p>
+    </dl>
+
+    <dl class="stat tint-indigo">
+        <dt>Patient files <span class="stat-icon">@Icons.Svg("patients")</span></dt>
+        <dd>@s.PatientFiles</dd>
+        <p class="stat-foot">On the books</p>
+    </dl>
+
+    <dl class="stat tint-cyan">
+        <dt>Live frames <span class="stat-icon">@Icons.Svg("frames")</span></dt>
+        <dd>@s.LiveFrames</dd>
+        <p class="stat-foot">Buyable in the shop</p>
+    </dl>
+</div>
+
+@* --- the queue ------------------------------------------------------------ *@
 <div class="panel">
     <div class="panel-head">
         <h2>Prescriptions waiting for an optician</h2>
@@ -29,21 +91,27 @@
     </div>
     @if (Model.PrescriptionQueue.Count == 0)
     {
-        <p class="muted small">Nothing waiting. The lab queue is clear to proceed.</p>
+        <div class="empty-state">
+            <span class="empty-art">@Icons.Svg("tick")</span>
+            <h3>Nothing waiting</h3>
+            <p>Every prescription on file has been verified. The lab queue is clear to proceed.</p>
+        </div>
     }
     else
     {
-        <div class="admin-table">
+        <div class="admin-table admin-table-flush stacks">
             <table>
                 <thead><tr><th>Patient</th><th>File</th><th>Waiting since</th><th></th></tr></thead>
                 <tbody>
                 @foreach (var rx in Model.PrescriptionQueue)
                 {
                     <tr>
-                        <td>@rx.PatientName</td>
+                        <td><strong>@rx.PatientName</strong></td>
                         <td><code>@rx.FileNo</code></td>
                         <td>@rx.IssuedAt.ToString("d MMM yyyy")</td>
-                        <td><a asp-controller="Patients" asp-action="Detail" asp-route-id="@rx.PatientId">Open file</a></td>
+                        <td class="num">
+                            <a class="btn btn-outline btn-small" asp-controller="Patients" asp-action="Detail" asp-route-id="@rx.PatientId">Open file</a>
+                        </td>
                     </tr>
                 }
                 </tbody>
@@ -63,11 +131,15 @@
         </div>
         @if (Model.RecentOrders.Count == 0)
         {
-            <p class="muted small">No orders yet.</p>
+            <div class="empty-state">
+                <span class="empty-art">@Icons.Svg("inbox")</span>
+                <h3>No orders yet</h3>
+                <p>Orders placed in the shop will appear here as they come in.</p>
+            </div>
         }
         else
         {
-            <div class="admin-table">
+            <div class="admin-table admin-table-flush stacks">
                 <table>
                     <thead><tr><th>Order</th><th>Item</th><th>Status</th><th class="num">Total</th></tr></thead>
                     <tbody>
@@ -76,7 +148,7 @@
                         <tr>
                             <td><a asp-controller="Orders" asp-action="Detail" asp-route-id="@o.Id"><code>@o.OrderNo</code></a></td>
                             <td class="small muted">@o.FirstLine</td>
-                            <td><span class="chip @(o.Status == OrderStatuses.Pending ? "chip-pending" : "")">@Humanise.Value(o.Status)</span></td>
+                            <td><span class="@StatusStyle.Chip(o.Status)">@Humanise.Value(o.Status)</span></td>
                             <td class="num">@M(o.TotalMinor)</td>
                         </tr>
                     }
@@ -89,25 +161,31 @@
     <div class="panel">
         <div class="panel-head">
             <h2>Running low</h2>
-            <a asp-controller="Frames" asp-action="Index">All frames →</a>
+            <a asp-controller="Frames" asp-action="Index" asp-route-stock="low">All low stock →</a>
         </div>
         @if (Model.LowStock.Count == 0)
         {
-            <p class="muted small">Every colourway is above its restock level.</p>
+            <div class="empty-state">
+                <span class="empty-art">@Icons.Svg("box")</span>
+                <h3>Stock is healthy</h3>
+                <p>Every colourway is above its restock level.</p>
+            </div>
         }
         else
         {
-            <div class="admin-table">
+            <div class="admin-table admin-table-flush stacks">
                 <table>
                     <thead><tr><th>Frame</th><th>Colour</th><th class="num">In stock</th><th></th></tr></thead>
                     <tbody>
                     @foreach (var v in Model.LowStock)
                     {
                         <tr>
-                            <td>@v.FrameName</td>
+                            <td><strong>@v.FrameName</strong></td>
                             <td class="small muted">@v.ColorName</td>
-                            <td class="num">@v.StockQty</td>
-                            <td><a asp-controller="Frames" asp-action="Edit" asp-route-id="@v.FrameId">Restock</a></td>
+                            <td class="num"><span class="chip @(v.StockQty == 0 ? "chip-danger" : "chip-warn")">@v.StockQty</span></td>
+                            <td class="num">
+                                <a class="btn btn-outline btn-small" asp-controller="Frames" asp-action="Edit" asp-route-id="@v.FrameId">Restock</a>
+                            </td>
                         </tr>
                     }
                     </tbody>

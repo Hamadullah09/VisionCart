@@ -214,7 +214,11 @@
                inside it. Naming the section keeps the outline from jumping
                straight from the page title to a card. *@
             <h2 class="sr-only">Frames</h2>
-            <div class="grid grid-3">
+            @* Plain .grid, not .grid-3: the catalogue sits beside a filter rail,
+               so how many frames fit across depends on the width left over, not
+               on a number chosen once. Hard-coding three kept a 1680px screen
+               showing three stretched cards with a filter column beside them. *@
+            <div class="grid">
                 @foreach (var frame in Model.Results.Items)
                 {
                     <partial name="_ProductCard" model="frame" />

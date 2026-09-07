@@ -18,15 +18,15 @@
         }
     </select>
 
-    <label asp-for="Email" style="margin-top:12px;">The email address on your account</label>
+    <label class="mt-2" asp-for="Email">The email address on your account</label>
     <input class="field" asp-for="Email" type="email" required />
     <p class="hint">We use this to find your records and to reply to you.</p>
 
-    <label asp-for="Message" style="margin-top:12px;">Anything you'd like to add (optional)</label>
+    <label class="mt-2" asp-for="Message">Anything you'd like to add (optional)</label>
     <textarea class="field" asp-for="Message" rows="4"
               placeholder="For a correction, tell us what should change."></textarea>
 
-    <p class="alert alert-warn" style="margin-top:14px;">
+    <p class="alert alert-warn mt-2">
         We respond within 30 days. We may need to confirm who you are first.
         Prescriptions and completed orders are kept for the period the law
         requires, even after an erasure request — your identifying details are

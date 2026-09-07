@@ -26,11 +26,13 @@
 
 @if (Model.Requests.Items.Count == 0)
 {
-    <p class="alert alert-info">No requests match.</p>
+    @await Html.PartialAsync("_EmptyState", new EmptyState("privacy", "No requests match",
+        "Access and erasure requests raised by customers arrive here. Nothing currently matches the filters you have set.")
+        { SecondaryText = "Clear filters", SecondaryUrl = Url.Action("Index") })
 }
 else
 {
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
             <tr><th>Raised</th><th>Request</th><th>Contact</th><th>Linked file</th><th>Status</th><th></th></tr>

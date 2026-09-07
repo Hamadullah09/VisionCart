@@ -98,6 +98,21 @@ public class CartController(ICartService carts) : Controller
     [HttpPost("add")]
     public async Task<IActionResult> Add([FromForm] AddToCartForm form, CancellationToken ct)
     {
+        // A cart now belongs to an account, so adding is the moment we have to
+        // know whose it is. The customer is sent back to the frame they were
+        // looking at rather than to the shop's front door.
+        //
+        // This gates the shop's own route into a cart, not the checkout itself:
+        // checkout.guestAllowed is left alone, so an order placed through the
+        // service layer — an import, a phone order taken by staff — still works
+        // exactly as before.
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            var next = form.ReturnUrl is { Length: > 0 } r && Url.IsLocalUrl(r) ? r : "/frames";
+            TempData["CartError"] = "Please sign in to add frames to your cart.";
+            return Redirect($"/login?next={Uri.EscapeDataString(next)}");
+        }
+
         var request = new AddToCartRequest
         {
             VariantId = form.VariantId,

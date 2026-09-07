@@ -13,7 +13,7 @@
     is configured but unreachable, so a carrier outage never blocks a sale.
 </p>
 
-<div class="admin-table" style="margin-top:16px;">
+<div class="admin-table stacks mt-3">
     <table>
         <thead>
             <tr>
@@ -68,7 +68,7 @@
                             <div><label>Sort order</label><input class="field" name="Position" type="number" value="@r.Position" /></div>
                             <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked="@r.IsActive" /><span>Offered at checkout</span></label>
                         </div>
-                        <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save rate</button>
+                        <button class="btn btn-primary btn-small mt-1" type="submit">Save rate</button>
                     </form>
                 </td>
             </tr>
@@ -77,8 +77,8 @@
     </table>
 </div>
 
-<button class="btn btn-outline" style="margin-top:14px;" type="button" data-edit-toggle="r-new">Add a delivery rate</button>
-<div class="panel" data-edit-panel="r-new" hidden style="margin-top:12px;">
+<button class="btn btn-outline mt-2" type="button" data-edit-toggle="r-new">Add a delivery rate</button>
+<div class="panel mt-2" data-edit-panel="r-new" hidden>
     <form method="post" asp-action="Save">
         <div class="form-grid three">
             <div><label>Name</label><input class="field" name="Name" required placeholder="Standard delivery" /></div>
@@ -101,7 +101,7 @@
             </div>
             <label class="checkline"><input type="checkbox" name="IsActive" value="true" checked /><span>Offered at checkout</span></label>
         </div>
-        <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add rate</button>
+        <button class="btn btn-primary btn-small mt-1" type="submit">Add rate</button>
     </form>
 </div>
 

@@ -3,7 +3,7 @@
     ViewData["Title"] = "Diary";
 }
 
-<div class="panel-head">
+<div class="admin-page-head">
     <h1>Diary</h1>
     <div>
         <a class="btn btn-outline btn-small"
@@ -39,7 +39,7 @@
 {
     <div class="panel">
         <div class="panel-head">
-            <h2 style="margin:0;">@day.Date.ToString("dddd d MMMM yyyy")</h2>
+            <h2 class="m-0">@day.Date.ToString("dddd d MMMM yyyy")</h2>
             <span class="muted small">
                 @day.Appointments.Count(a => a.Status == AppointmentStatuses.Scheduled) booked
             </span>
@@ -47,17 +47,17 @@
 
         @if (day.Appointments.Count == 0)
         {
-            <p class="muted small" style="margin:0;">
+            <p class="muted small m-0">
                 @(day.Date.DayOfWeek == DayOfWeek.Sunday ? "Closed." : "Nothing booked.")
             </p>
         }
         else
         {
-            <div class="admin-table">
+            <div class="admin-table stacks">
                 <table>
                     <thead>
-                    <tr><th style="width:90px;">Time</th><th>Patient</th><th>Type</th>
-                        <th>Status</th><th style="width:230px;">Actions</th></tr>
+                    <tr><th class="col-time">Time</th><th>Patient</th><th>Type</th>
+                        <th>Status</th><th class="col-actions">Actions</th></tr>
                     </thead>
                     <tbody>
                     @foreach (var appointment in day.Appointments)
@@ -81,7 +81,7 @@
                             <td>
                                 @if (appointment.Status == AppointmentStatuses.Scheduled)
                                 {
-                                    <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                                    <div class="row-tight">
                                         <form method="post" asp-action="SetStatus" asp-route-id="@appointment.Id"
                                               asp-route-from="@Model.From.ToString("yyyy-MM-dd")">
                                             <input type="hidden" name="status" value="@AppointmentStatuses.Completed" />

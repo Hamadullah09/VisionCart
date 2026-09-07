@@ -1,0 +1,120 @@
+@model DashboardView
+@{
+    var s = Model.Stats;
+
+    // How long something has been waiting matters more than the date it
+    // arrived, so the panel says "3 days" rather than a timestamp to subtract.
+    string Ago(DateTime whenUtc)
+    {
+        var span = DateTime.UtcNow - whenUtc;
+        if (span.TotalMinutes < 1) return "just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} hr ago";
+        if (span.TotalDays < 7) return $"{(int)span.TotalDays} d ago";
+        return whenUtc.ToString("d MMM");
+    }
+
+    var waiting = Model.PrescriptionQueue.Count;
+    var lowStock = Model.LowStock.Count;
+    var unpaid = s.AwaitingPayment;
+    var total = waiting + lowStock + (unpaid > 0 ? 1 : 0);
+
+}
+
+@* The count on the bell itself, so the number is visible without opening. *@
+@if (total > 0)
+{
+    <span class="bell-count" data-bell-count aria-hidden="true">@(total > 9 ? "9+" : total.ToString())</span>
+}
+
+<div class="menu notif" data-menu-panel="notifications" hidden>
+    <div class="notif-head">
+        <span>Work queue</span>
+        @if (total > 0)
+        {
+            <span class="chip chip-info chip-plain">@total waiting</span>
+        }
+    </div>
+
+    @if (total == 0)
+    {
+        <div class="empty-state is-compact">
+            <span class="empty-art">
+                @Icons.Svg("tick")
+            </span>
+            <h3>Nothing waiting</h3>
+            <p>No prescriptions to check, every order is paid and all stock is above its restock level.</p>
+        </div>
+    }
+    else
+    {
+        @if (waiting > 0)
+        {
+            <p class="notif-group">Prescriptions to check</p>
+            @* Clinical values are deliberately not shown here, exactly as on the
+               dashboard: the panel says who is waiting, not what they need. *@
+            @foreach (var rx in Model.PrescriptionQueue.Take(4))
+            {
+                <a class="notif-item is-unread"
+                   asp-area="Admin" asp-controller="Patients" asp-action="Detail" asp-route-id="@rx.PatientId">
+                    <span class="notif-icon is-warn" aria-hidden="true">
+                        @Icons.Svg("clock")
+                    </span>
+                    <span class="notif-body">
+                        <strong>@rx.PatientName</strong>
+                        <p>File @rx.FileNo is waiting for an optician to verify it.</p>
+                        <span class="notif-time">Issued @Ago(rx.IssuedAt)</span>
+                    </span>
+                </a>
+            }
+            @if (waiting > 4)
+            {
+                <a class="notif-item" asp-area="Admin" asp-controller="Patients" asp-action="Index" asp-route-pending="true">
+                    <span class="notif-body"><strong>@(waiting - 4) more waiting</strong><p>Open the patient list to see them all.</p></span>
+                </a>
+            }
+        }
+
+        @if (unpaid > 0)
+        {
+            <p class="notif-group">Payment</p>
+            <a class="notif-item is-unread" asp-area="Admin" asp-controller="Orders" asp-action="Index" asp-route-paymentStatus="@PaymentStatuses.Unpaid">
+                <span class="notif-icon is-urgent" aria-hidden="true">
+                    @Icons.Svg("card")
+                </span>
+                <span class="notif-body">
+                    <strong>@unpaid @(unpaid == 1 ? "order is" : "orders are") awaiting payment</strong>
+                    <p>Nothing goes to the lab until payment clears.</p>
+                </span>
+            </a>
+        }
+
+        @if (lowStock > 0)
+        {
+            <p class="notif-group">Stock</p>
+            @foreach (var v in Model.LowStock.Take(3))
+            {
+                <a class="notif-item"
+                   asp-area="Admin" asp-controller="Frames" asp-action="Edit" asp-route-id="@v.FrameId">
+                    <span class="notif-icon is-info" aria-hidden="true">
+                        @Icons.Svg("box")
+                    </span>
+                    <span class="notif-body">
+                        <strong>@v.FrameName · @v.ColorName</strong>
+                        <p>@v.StockQty left, restock level @v.LowStockAt.</p>
+                    </span>
+                </a>
+            }
+            @if (lowStock > 3)
+            {
+                <a class="notif-item" asp-area="Admin" asp-controller="Frames" asp-action="Index" asp-route-stock="low">
+                    <span class="notif-body"><strong>@(lowStock - 3) more running low</strong><p>Open the frame list filtered to low stock.</p></span>
+                </a>
+            }
+        }
+    }
+
+    <div class="notif-foot">
+        <a asp-area="Admin" asp-controller="Dashboard" asp-action="Index">Open the dashboard</a>
+    </div>
+</div>

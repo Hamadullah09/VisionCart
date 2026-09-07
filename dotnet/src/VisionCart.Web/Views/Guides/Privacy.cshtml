@@ -3,10 +3,13 @@
     var storesSnapshots = (bool)(ViewData["StoresSnapshots"] ?? false);
     var email = ViewData["StoreEmail"];
 }
-<article style="max-width:70ch;">
-<h1>Privacy and your data</h1>
-<p class="muted">Your prescription is health data, and we treat it that way.</p>
-
+<article class="prose">
+<div class="page-head">
+    <div>
+        <h1>Privacy and your data</h1>
+        <p>Your prescription is health data, and we treat it that way.</p>
+    </div>
+</div>
 <h2>Your photograph never leaves your device</h2>
 <p>The face detection behind the virtual try-on runs entirely inside your own web
 browser. The model and its runtime are served from this website — no third party

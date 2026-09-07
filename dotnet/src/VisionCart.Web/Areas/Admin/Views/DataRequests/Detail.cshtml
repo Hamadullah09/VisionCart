@@ -17,7 +17,7 @@
 <div class="admin-two-col">
     <div>
         <div class="panel">
-            <h2 style="margin-top:0;">The request</h2>
+            <h2>The request</h2>
             <dl class="column-help">
                 <dt>Contact</dt><dd>@request.Email</dd>
                 <dt>Linked patient file</dt>
@@ -40,13 +40,13 @@
 
             @if (!string.IsNullOrWhiteSpace(request.CustomerMessage))
             {
-                <h3 style="font-size:15px;">What the customer wrote</h3>
-                <p class="audit-detail" style="max-width:none;">@request.CustomerMessage</p>
+                <h3>What the customer wrote</h3>
+                <p class="audit-detail is-wide">@request.CustomerMessage</p>
             }
         </div>
 
         <div class="panel">
-            <h2 style="margin-top:0;">Progress this request</h2>
+            <h2>Progress this request</h2>
             <form method="post" asp-action="SetStatus" asp-route-id="@request.Id">
                 <label for="status">Status</label>
                 <select class="field" id="status" name="status">
@@ -58,12 +58,12 @@
                     }
                 </select>
 
-                <label for="staffNotes" style="margin-top:10px;">Internal notes</label>
+                <label class="mt-1" for="staffNotes">Internal notes</label>
                 <textarea class="field" id="staffNotes" name="staffNotes" rows="3"
                           placeholder="What you did, and how identity was confirmed.">@request.StaffNotes</textarea>
                 <p class="hint">Visible to staff only. Never shown to the customer.</p>
 
-                <button class="btn btn-primary" type="submit" style="margin-top:10px;">Save</button>
+                <button class="btn btn-primary mt-1" type="submit">Save</button>
             </form>
         </div>
     </div>
@@ -71,8 +71,8 @@
     <div>
         @if (isErasure)
         {
-            <div class="panel" style="border-color:#ecdcb0;">
-                <h2 style="margin-top:0;">Erasure</h2>
+            <div class="panel panel-warn">
+                <h2>Erasure</h2>
 
                 @if (Model.Impact is null)
                 {
@@ -116,7 +116,7 @@
                         <form method="post" asp-action="Erase" asp-route-id="@request.Id">
                             <label for="confirm">Type <code>ERASE</code> to confirm</label>
                             <input class="field" id="confirm" name="confirm" autocomplete="off" required />
-                            <button class="btn btn-primary btn-danger" type="submit" style="margin-top:10px;">
+                            <button class="btn btn-primary btn-danger mt-1" type="submit">
                                 Erase this customer's details
                             </button>
                         </form>
@@ -128,7 +128,7 @@
         @if (request.Kind == DataSubjectRequestKinds.Export)
         {
             <div class="panel">
-                <h2 style="margin-top:0;">Export</h2>
+                <h2>Export</h2>
                 <p class="small">
                     A customer who can still sign in can download their own data from
                     <code>/account/privacy</code> without staff involvement. Use the
@@ -139,7 +139,7 @@
         }
 
         <div class="panel">
-            <h2 style="margin-top:0;">Handled</h2>
+            <h2>Handled</h2>
             <p class="small muted">
                 @if (request.HandledAt is null)
                 {

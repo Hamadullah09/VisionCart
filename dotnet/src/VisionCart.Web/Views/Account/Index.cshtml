@@ -4,41 +4,119 @@
 @{
     ViewData["Title"] = "Your account";
     var store = Store.Value;
+    string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
+
+    var who = User.Identity?.Name ?? "";
+    // Initials from the local part of the address, split on the usual
+    // separators — the same rule the back office uses for staff.
+    var handle = who.Contains('@') ? who[..who.IndexOf('@')] : who;
+    var words = handle.Split(['.', '_', '-', ' '], StringSplitOptions.RemoveEmptyEntries);
+    var initials = words.Length >= 2
+        ? $"{char.ToUpperInvariant(words[0][0])}{char.ToUpperInvariant(words[1][0])}"
+        : (handle.Length >= 2 ? handle[..2].ToUpperInvariant() : "VC");
+
+    // Only orders that were actually paid for count towards what somebody has
+    // spent — a pending or cancelled order is not money out.
+    var paid = Model.Where(o => o.PaymentStatus == PaymentStatuses.Paid).ToList();
+    var spent = paid.Sum(o => o.TotalMinor);
+    var since = Model.Count > 0 ? Model.Min(o => o.PlacedAt) : (DateTime?)null;
 }
-<h1>Your account</h1>
-<p class="muted">Signed in as @User.Identity?.Name</p>
 
-<nav class="account-nav">
-    <a class="btn btn-outline btn-small" asp-controller="Addresses" asp-action="Index">Your addresses</a>
-    <a class="btn btn-outline btn-small" asp-controller="Appointments" asp-action="Index">Appointments</a>
-    <a class="btn btn-outline btn-small" asp-controller="Privacy" asp-action="Index">Your data</a>
-</nav>
+<div class="account-hero">
+    <span class="account-avatar" aria-hidden="true">@initials</span>
+    <div class="account-who">
+        <h1>@who</h1>
+        <p>@(since is { } d ? $"Shopping with us since {d:MMMM yyyy}" : "Welcome — your first order will show up here")</p>
+    </div>
+    <dl class="account-figures">
+        <div class="account-figure">
+            <dt>Orders</dt>
+            <dd>@Model.Count</dd>
+        </div>
+        <div class="account-figure">
+            <dt>Spent</dt>
+            <dd>@M(spent)</dd>
+        </div>
+    </dl>
+    <form method="post" asp-controller="Account" asp-action="Logout">
+        <button class="btn btn-outline" type="submit">@Icons.Svg("logout") Sign out</button>
+    </form>
+</div>
 
-<h2>Recent orders</h2>
+<div class="account-cards">
+    <a class="account-card" asp-controller="Addresses" asp-action="Index">
+        <span class="account-card-icon">@Icons.Svg("truck")</span>
+        <h2>Addresses</h2>
+        <p>Where we deliver. The default is filled in for you at checkout.</p>
+        <span class="go">Manage @Icons.Svg("arrow-right")</span>
+    </a>
+    <a class="account-card" asp-controller="Appointments" asp-action="Index">
+        <span class="account-card-icon">@Icons.Svg("diary")</span>
+        <h2>Appointments</h2>
+        <p>Eye tests, fittings and collections at the practice.</p>
+        <span class="go">Book or review @Icons.Svg("arrow-right")</span>
+    </a>
+    <a class="account-card" asp-controller="Privacy" asp-action="Index">
+        <span class="account-card-icon">@Icons.Svg("shield")</span>
+        <h2>Your data</h2>
+        <p>Download everything we hold, or ask us to correct or erase it.</p>
+        <span class="go">See what we hold @Icons.Svg("arrow-right")</span>
+    </a>
+    <a class="account-card" asp-controller="Frames" asp-action="Index">
+        <span class="account-card-icon">@Icons.Svg("frames")</span>
+        <h2>Browse frames</h2>
+        <p>Every frame can be tried on before you order.</p>
+        <span class="go">Shop now @Icons.Svg("arrow-right")</span>
+    </a>
+</div>
+
+<div class="section-head">
+    <h2>Your orders</h2>
+    @if (Model.Count > 0)
+    {
+        <a asp-controller="Frames" asp-action="Index">Order again →</a>
+    }
+</div>
+
 @if (Model.Count == 0)
 {
-    <p class="alert alert-info">You haven't placed an order yet.</p>
-    <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse frames</a>
+    <div class="shop-empty">
+        <span class="shop-empty-art">@Icons.Svg("cart")</span>
+        <h2>No orders yet</h2>
+        <p>When you order, it will show up here with its progress through our lab and out for delivery.</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" asp-controller="Frames" asp-action="Index">Browse frames</a>
+            <a class="btn btn-outline" href="/try-on">Try a pair on</a>
+        </div>
+    </div>
 }
 else
 {
-    <table>
-        <thead><tr><th>Order</th><th>Placed</th><th>Status</th><th>Total</th><th></th></tr></thead>
-        <tbody>
-        @foreach (var order in Model)
-        {
-            <tr>
-                <td><code>@order.OrderNo</code></td>
-                <td>@order.PlacedAt.ToString("d MMM yyyy")</td>
-                <td><span class="chip">@Humanise.Value(order.Status)</span></td>
-                <td>@Money.Format(order.TotalMinor, store.Currency, store.CurrencySymbol)</td>
-                <td><a asp-controller="Order" asp-action="Detail" asp-route-orderNo="@order.OrderNo">View</a></td>
-            </tr>
-        }
-        </tbody>
-    </table>
+    @* data-label on each cell, because the card-stacking script that fills
+       these in automatically only loads in the back office. *@
+    <div class="shop-table">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Order</th><th scope="col">Placed</th><th scope="col">Status</th>
+                    <th scope="col" class="num">Total</th><th scope="col"><span class="sr-only">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var order in Model)
+            {
+                <tr>
+                    <td data-label="Order"><code>@order.OrderNo</code></td>
+                    <td data-label="Placed">@order.PlacedAt.ToString("d MMM yyyy")</td>
+                    <td data-label="Status"><span class="@StatusStyle.Chip(order.Status)">@Humanise.Value(order.Status)</span></td>
+                    <td data-label="Total" class="num">@M(order.TotalMinor)</td>
+                    <td class="num">
+                        <a class="btn btn-outline btn-small"
+                           asp-controller="Order" asp-action="Detail" asp-route-orderNo="@order.OrderNo">View</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
 }
-
-<form method="post" asp-controller="Account" asp-action="Logout" style="margin-top:28px;">
-    <button class="btn btn-outline" type="submit">Sign out</button>
-</form>

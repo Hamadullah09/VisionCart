@@ -5,15 +5,18 @@
     ViewData["Title"] = "Prescription eyewear, fitted properly";
     ViewData["Banner"] = Model.Banners.FirstOrDefault();
     var store = Store.Value;
-}
 
-@{
     // Real product in the hero rather than an illustration: the fastest way to
     // answer "what does this shop sell?" is to show three of them.
     var heroFrames = Model.Featured
         .Where(f => f.Variants.Any(v => v.ImageUrl is not null))
         .Take(3)
         .ToList();
+
+    // Shape is the one filter most people can answer about themselves without
+    // being taught the vocabulary first, so it gets a shortcut off the home
+    // page instead of living behind the catalogue's facet panel.
+    var shapes = new[] { "rectangle", "round", "cat_eye", "aviator", "square", "oval", "wayfarer" };
 }
 
 <div class="hero full-bleed">
@@ -26,10 +29,17 @@
                 right size, and we measure your pupillary distance while you browse.
             </p>
             <div class="hero-actions">
-                <a class="btn btn-primary" href="/try-on">Try frames on</a>
+                <a class="btn btn-primary" href="/try-on">@Icons.Svg("camera") Try frames on</a>
                 <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Browse all frames</a>
             </div>
-            <p class="note">Your photo stays on your device unless you choose to save it.</p>
+
+            @* The three things that separate this from an online frame catalogue,
+               stated where somebody is deciding whether to bother. *@
+            <ul class="hero-proof">
+                <li>@Icons.Svg("shield") Your photo never leaves your device</li>
+                <li>@Icons.Svg("ruler") PD measured as you browse</li>
+                <li>@Icons.Svg("return") 14 days to change your mind</li>
+            </ul>
         </div>
 
         @if (heroFrames.Count > 0)
@@ -41,12 +51,69 @@
                     <a class="hero-frame" asp-controller="Frames" asp-action="Detail" asp-route-slug="@frame.Slug">
                         <img src="@shot.ImageUrl" alt="@frame.Name in @shot.ColorName" />
                         <p class="name">@frame.Name</p>
-                        <p class="price">@Money.Format(frame.LowestPriceMinor, Store.Value.Currency, Store.Value.CurrencySymbol)</p>
+                        <p class="price">@Money.Format(frame.LowestPriceMinor, store.Currency, store.CurrencySymbol)</p>
                     </a>
                 }
             </div>
         }
     </div>
+</div>
+
+<div class="trust-strip">
+    <div class="trust-item">
+        @Icons.Svg("camera")
+        <div><strong>Virtual try-on</strong><span>Scaled to your face from your own PD, not stretched onto your pupils.</span></div>
+    </div>
+    <div class="trust-item">
+        @Icons.Svg("flask")
+        <div><strong>Lenses cut in our lab</strong><span>Single vision, varifocal and coatings, glazed in house.</span></div>
+    </div>
+    <div class="trust-item">
+        @Icons.Svg("eye")
+        <div><strong>Checked by an optician</strong><span>Every prescription is read and verified before it is made up.</span></div>
+    </div>
+    <div class="trust-item">
+        @Icons.Svg("truck")
+        <div><strong>Tracked delivery</strong><span>With 14 days to send them back if they are not right.</span></div>
+    </div>
+</div>
+
+@* --- who they are for ---------------------------------------------------- *@
+<div class="section-head">
+    <h2>Shop by wearer</h2>
+    <a asp-controller="Frames" asp-action="Index">All frames →</a>
+</div>
+<div class="cat-grid">
+    <a class="cat-card is-teal" href="/frames?gender=men">
+        @Icons.Svg("men")
+        <h3>Men</h3>
+        <p>Wider fits, heavier acetates and metal aviators.</p>
+        <span class="go">Browse men’s @Icons.Svg("arrow-right")</span>
+    </a>
+    <a class="cat-card is-plum" href="/frames?gender=women">
+        @Icons.Svg("women")
+        <h3>Women</h3>
+        <p>Cat eye, round and softer rectangles across the range.</p>
+        <span class="go">Browse women’s @Icons.Svg("arrow-right")</span>
+    </a>
+    <a class="cat-card is-amber" href="/frames?gender=kids">
+        @Icons.Svg("kids")
+        <h3>Kids</h3>
+        <p>Small sizes in flexible TR90 that survives a school bag.</p>
+        <span class="go">Browse kids’ @Icons.Svg("arrow-right")</span>
+    </a>
+</div>
+
+@* --- the frames themselves ----------------------------------------------- *@
+<div class="section-head">
+    <h2>Popular this season</h2>
+    <a asp-controller="Frames" asp-action="Index">See all →</a>
+</div>
+<div class="grid grid-4">
+    @foreach (var frame in Model.Featured)
+    {
+        <partial name="_ProductCard" model="frame" />
+    }
 </div>
 
 @if (Model.Deals.Count > 0)
@@ -58,47 +125,66 @@
     <div class="grid grid-3">
         @foreach (var deal in Model.Deals.Take(3))
         {
-            <div class="card" style="padding:18px;">
-                <h3 style="margin:0 0 6px;font-size:17px;">@deal.Name</h3>
-                <p class="muted small" style="margin:0 0 10px;">
-                    @(deal.Description ?? IPromotionService.Describe(deal))
-                </p>
+            <div class="deal-card">
+                <h3>@deal.Name</h3>
+                <p>@(deal.Description ?? IPromotionService.Describe(deal))</p>
                 @if (deal.Code is not null)
                 {
-                    <code class="chip">@deal.Code</code>
+                    <span class="deal-code">@deal.Code</span>
                 }
                 @if (deal.EndsAt is { } ends)
                 {
-                    <p class="small muted" style="margin:10px 0 0;">Ends @ends.ToString("d MMM")</p>
+                    <p class="deal-ends">Ends @ends.ToString("d MMM")</p>
                 }
             </div>
         }
     </div>
 }
 
-<h2>How it works</h2>
-<div class="grid grid-3">
-    <div class="card" style="padding:18px;">
-        <h3 style="margin:0 0 6px;font-size:16px;">1. Try them on</h3>
-        <p class="muted small" style="margin:0;">Upload a photo or use your camera. Frames are scaled to your face automatically.</p>
+@* --- shape shortcut ------------------------------------------------------- *@
+<div class="section-head">
+    <h2>Shop by shape</h2>
+    <a asp-controller="Frames" asp-action="Index">Use the full filters →</a>
+</div>
+<div class="shape-rail">
+    @foreach (var shape in shapes)
+    {
+        <a class="shape-chip" href="/frames?shape=@shape">@Humanise.Value(shape)</a>
+    }
+</div>
+
+@* --- how it works --------------------------------------------------------- *@
+<div class="section-head">
+    <h2>How it works</h2>
+</div>
+<div class="steps">
+    <div class="step">
+        <span class="step-n">1</span>
+        @Icons.Svg("camera", "step-icon")
+        <h3>Try them on</h3>
+        <p>Upload a photo or use your camera. Frames are drawn at the size they are actually made in, so what you see is the size you get.</p>
     </div>
-    <div class="card" style="padding:18px;">
-        <h3 style="margin:0 0 6px;font-size:16px;">2. Add your prescription</h3>
-        <p class="muted small" style="margin:0;">Type it in, or upload a photo of the paper one and our optician will read it.</p>
+    <div class="step">
+        <span class="step-n">2</span>
+        @Icons.Svg("ruler", "step-icon")
+        <h3>Add your prescription</h3>
+        <p>Type it in, or upload a photo of the paper one and our optician will read it for you before anything is cut.</p>
     </div>
-    <div class="card" style="padding:18px;">
-        <h3 style="margin:0 0 6px;font-size:16px;">3. We make and ship</h3>
-        <p class="muted small" style="margin:0;">Lenses cut in our lab and delivered, with 14 days to change your mind.</p>
+    <div class="step">
+        <span class="step-n">3</span>
+        @Icons.Svg("truck", "step-icon")
+        <h3>We make and ship</h3>
+        <p>Lenses are surfaced and glazed in our lab, then delivered tracked — with 14 days to change your mind.</p>
     </div>
 </div>
 
-<div class="section-head">
-    <h2>Popular this season</h2>
-    <a asp-controller="Frames" asp-action="Index">See all →</a>
-</div>
-<div class="grid grid-4">
-    @foreach (var frame in Model.Featured)
-    {
-        <partial name="_ProductCard" model="frame" />
-    }
+<div class="cta-band full-bleed">
+    <div class="wrap">
+        <h2>Not sure what suits you?</h2>
+        <p>Put a frame on your own face in about ten seconds. Nothing is uploaded, and you keep the measurements.</p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" href="/try-on">@Icons.Svg("camera") Start the try-on</a>
+            <a class="btn btn-outline" href="/guides/pd">How we measure your PD</a>
+        </div>
+    </div>
 </div>

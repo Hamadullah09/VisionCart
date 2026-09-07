@@ -7,21 +7,23 @@
     var store = Store.Value;
 }
 
-<div class="panel-head">
+<div class="admin-page-head">
     <div>
         <h1>Promotions</h1>
-        <p class="muted">Deals go live the moment you save — no deploy, no developer.</p>
+        <p>Deals go live the moment you save — no deploy, no developer.</p>
     </div>
     <a class="btn btn-primary" asp-action="New">New deal</a>
 </div>
 
 @if (Model.Count == 0)
 {
-    <p class="alert alert-info">No deals configured yet.</p>
+    @await Html.PartialAsync("_EmptyState", new EmptyState("promos", "No deals yet",
+        "A promotion goes live the moment it is saved. Set one up for a discount code, a percentage off, or a free lens upgrade.")
+        { ActionText = "New deal", ActionUrl = Url.Action("New") })
 }
 else
 {
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
                 <tr><th>Deal</th><th>Code</th><th>Type</th><th>Value</th><th>Window</th>
@@ -59,12 +61,15 @@ else
                     <td>@(p.Stackable ? "✓" : "")</td>
                     <td>
                         <form method="post" asp-action="Toggle" asp-route-id="@p.Id">
-                            <button class="btn btn-outline btn-small" type="submit">
+                            <button class="chip chip-button @(p.IsActive ? "chip-ok" : "chip-plain")" type="submit"
+                                    title="@(p.IsActive ? "Pause this deal" : "Make this deal live")">
                                 @(p.IsActive ? "Live" : "Paused")
                             </button>
                         </form>
                     </td>
-                    <td><a asp-action="Edit" asp-route-id="@p.Id">Edit</a></td>
+                    <td class="admin-row-actions">
+                        <a class="btn btn-outline btn-small" asp-action="Edit" asp-route-id="@p.Id">Edit</a>
+                    </td>
                 </tr>
             }
             </tbody>

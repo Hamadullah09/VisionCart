@@ -8,117 +8,159 @@
     var input = Model.Input;
 }
 
-<h1>Checkout</h1>
+<div class="page-head">
+    <div>
+        <h1>Checkout</h1>
+        <p>Five short sections. Nothing is charged until the last one.</p>
+    </div>
+    <a class="btn btn-outline" asp-controller="Cart" asp-action="Index">Back to cart</a>
+</div>
 
 @if (User.Identity?.IsAuthenticated != true && Model.GuestAllowed)
 {
     <p class="alert alert-info">
-        Checking out as a guest. <a href="/login">Sign in</a> to reuse a saved prescription and track your order.
+        @Icons.Svg("info")
+        <span>Checking out as a guest. <a href="/login">Sign in</a> to reuse a saved prescription and track your order.</span>
     </p>
 }
 
 <div asp-validation-summary="All" class="alert alert-error" role="alert"></div>
 
 <form method="post" asp-action="Place">
-    <div class="two-col" style="margin-top:20px;">
+    <div class="checkout-layout">
         <div>
-            <h2 style="margin-top:0;">Contact</h2>
-            <label for="Email" class="small muted">Email *</label>
-            <input class="field" id="Email" name="Email" type="email" value="@input.Email" required />
-            <p class="small muted">Order updates and your prescription link go here.</p>
+            <section class="checkout-section">
+                <h2><span class="checkout-step" aria-hidden="true">1</span> Contact</h2>
+                <div class="form-grid">
+                    <div>
+                        <label for="Email">Email <span class="req">*</span></label>
+                        <input class="field" id="Email" name="Email" type="email" value="@input.Email"
+                               autocomplete="email" required />
+                        <p class="hint">Order updates and your prescription link go here.</p>
+                    </div>
+                    <div>
+                        <label for="Phone">Phone <span class="req">*</span></label>
+                        <input class="field" id="Phone" name="Phone" type="tel" value="@input.Phone"
+                               autocomplete="tel" required />
+                        <p class="hint">The courier calls before delivery.</p>
+                    </div>
+                </div>
+            </section>
 
-            <label for="Phone" class="small muted">Phone *</label>
-            <input class="field" id="Phone" name="Phone" type="tel" value="@input.Phone" required />
-            <p class="small muted">The courier calls before delivery.</p>
+            <section class="checkout-section">
+                <h2><span class="checkout-step" aria-hidden="true">2</span> Delivery address</h2>
+                <div class="form-grid">
+                    <div class="full">
+                        <label for="FullName">Full name <span class="req">*</span></label>
+                        <input class="field" id="FullName" name="FullName" value="@input.FullName"
+                               autocomplete="name" required />
+                    </div>
+                    <div class="full">
+                        <label for="Line1">Address <span class="req">*</span></label>
+                        <input class="field" id="Line1" name="Line1" value="@input.Line1"
+                               autocomplete="address-line1" required />
+                    </div>
+                    <div class="full">
+                        <label for="Line2">Apartment, suite <span class="muted">(optional)</span></label>
+                        <input class="field" id="Line2" name="Line2" value="@input.Line2"
+                               autocomplete="address-line2" />
+                    </div>
+                    <div>
+                        <label for="City">City <span class="req">*</span></label>
+                        <input class="field" id="City" name="City" value="@input.City"
+                               autocomplete="address-level2" required />
+                    </div>
+                    <div>
+                        <label for="State">Province / state</label>
+                        <input class="field" id="State" name="State" value="@input.State"
+                               autocomplete="address-level1" />
+                    </div>
+                    <div>
+                        <label for="PostalCode">Postal code</label>
+                        <input class="field" id="PostalCode" name="PostalCode" value="@input.PostalCode"
+                               autocomplete="postal-code" />
+                    </div>
+                    <div>
+                        <label for="Country">Country</label>
+                        <select id="Country" name="Country" autocomplete="country">
+                            <option value="PK" selected="@(input.Country == "PK")">Pakistan</option>
+                            <option value="AE" selected="@(input.Country == "AE")">United Arab Emirates</option>
+                            <option value="GB" selected="@(input.Country == "GB")">United Kingdom</option>
+                            <option value="US" selected="@(input.Country == "US")">United States</option>
+                        </select>
+                    </div>
+                    <label class="checkline full">
+                        <input type="checkbox" name="SaveAddress" value="true" checked="@input.SaveAddress" />
+                        <span>Save this address for next time</span>
+                    </label>
+                </div>
+            </section>
 
-            <h2>Delivery address</h2>
-            <label for="FullName" class="small muted">Full name *</label>
-            <input class="field" id="FullName" name="FullName" value="@input.FullName" required />
+            <section class="checkout-section">
+                <h2><span class="checkout-step" aria-hidden="true">3</span> Delivery method</h2>
+                <div class="pay-options">
+                    @foreach (var quote in Model.ShippingQuotes)
+                    {
+                        <label class="pay-option">
+                            <input type="radio" name="ShippingCode" value="@quote.Code"
+                                   checked="@(input.ShippingCode == quote.Code || (input.ShippingCode is null && quote == Model.ShippingQuotes[0]))" />
+                            <span class="line-name">
+                                <span class="name">@quote.Name</span>
+                                <span class="desc">@quote.EtaText</span>
+                            </span>
+                            <span class="line-total">@(quote.PriceMinor == 0 ? "Free" : M(quote.PriceMinor))</span>
+                        </label>
+                    }
+                </div>
+            </section>
 
-            <label for="Line1" class="small muted">Address *</label>
-            <input class="field" id="Line1" name="Line1" value="@input.Line1" required />
+            <section class="checkout-section">
+                <h2><span class="checkout-step" aria-hidden="true">4</span> Payment</h2>
+                <div class="pay-options">
+                    @foreach (var method in Model.PaymentMethods)
+                    {
+                        <label class="pay-option">
+                            <input type="radio" name="PaymentMethod" value="@method.Id"
+                                   checked="@(input.PaymentMethod == method.Id || (string.IsNullOrEmpty(input.PaymentMethod) && method == Model.PaymentMethods[0]))" required />
+                            <span class="line-name">
+                                <span class="name">@method.Label</span>
+                                <span class="desc">@method.Description</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+            </section>
 
-            <label for="Line2" class="small muted">Apartment, suite (optional)</label>
-            <input class="field" id="Line2" name="Line2" value="@input.Line2" />
+            <section class="checkout-section">
+                <h2><span class="checkout-step" aria-hidden="true">5</span> Anything we should know?</h2>
+                <label for="Notes">Notes <span class="muted">(optional)</span></label>
+                <textarea class="field" id="Notes" name="Notes" rows="3"
+                          placeholder="Delivery instructions, or details about your prescription.">@input.Notes</textarea>
 
-            <label for="City" class="small muted">City *</label>
-            <input class="field" id="City" name="City" value="@input.City" required />
-
-            <label for="State" class="small muted">Province / state</label>
-            <input class="field" id="State" name="State" value="@input.State" />
-
-            <label for="PostalCode" class="small muted">Postal code</label>
-            <input class="field" id="PostalCode" name="PostalCode" value="@input.PostalCode" />
-
-            <label for="Country" class="small muted">Country</label>
-            <select id="Country" name="Country">
-                <option value="PK" selected="@(input.Country == "PK")">Pakistan</option>
-                <option value="AE" selected="@(input.Country == "AE")">United Arab Emirates</option>
-                <option value="GB" selected="@(input.Country == "GB")">United Kingdom</option>
-                <option value="US" selected="@(input.Country == "US")">United States</option>
-            </select>
-
-            <label style="display:flex;gap:8px;align-items:center;margin-top:12px;">
-                <input type="checkbox" name="SaveAddress" value="true" checked="@input.SaveAddress" />
-                <span class="small">Save this address for next time</span>
-            </label>
-
-            <h2>Delivery method</h2>
-            @foreach (var quote in Model.ShippingQuotes)
-            {
-                <label class="lens-option" style="margin-bottom:8px;">
-                    <input type="radio" name="ShippingCode" value="@quote.Code"
-                           checked="@(input.ShippingCode == quote.Code || (input.ShippingCode is null && quote == Model.ShippingQuotes[0]))" />
-                    <span style="flex:1;">
-                        <span class="name">@quote.Name</span><br />
-                        <span class="desc">@quote.EtaText</span>
-                    </span>
-                    <span style="font-weight:600;">@(quote.PriceMinor == 0 ? "Free" : M(quote.PriceMinor))</span>
-                </label>
-            }
-
-            <h2>Payment</h2>
-            @foreach (var method in Model.PaymentMethods)
-            {
-                <label class="lens-option" style="margin-bottom:8px;">
-                    <input type="radio" name="PaymentMethod" value="@method.Id"
-                           checked="@(input.PaymentMethod == method.Id || (string.IsNullOrEmpty(input.PaymentMethod) && method == Model.PaymentMethods[0]))" required />
-                    <span>
-                        <span class="name">@method.Label</span><br />
-                        <span class="desc">@method.Description</span>
-                    </span>
-                </label>
-            }
-
-            <label for="Notes" class="small muted" style="margin-top:16px;display:block;">
-                Anything we should know? (optional)
-            </label>
-            <textarea class="field" id="Notes" name="Notes" rows="3"
-                      placeholder="Delivery instructions, or details about your prescription.">@input.Notes</textarea>
-
-            <button class="btn btn-primary btn-block" style="margin-top:20px;" type="submit">Place order</button>
-            <p class="small muted" style="margin-top:10px;">
-                By ordering you confirm the prescription details you gave us are current and correct.
-            </p>
+                <button class="btn btn-primary btn-block btn-lg mt-3" type="submit">Place order</button>
+                <p class="hint text-center">
+                    By ordering you confirm the prescription details you gave us are current and correct.
+                </p>
+            </section>
         </div>
 
-        <div>
-            <div class="totals">
-                <h3 style="margin:0 0 12px;font-size:16px;">Your order</h3>
+        <aside class="cart-aside">
+            <div class="cart-summary">
+                <h2>Your order</h2>
 
                 @foreach (var line in Model.Cart.Lines)
                 {
-                    <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--ink-200);">
-                        <div style="flex:1;">
-                            <div class="small" style="font-weight:600;">@line.Title</div>
-                            <div class="small muted">@line.LensSummary</div>
-                            <div class="small muted">Qty @line.Qty</div>
-                        </div>
-                        <div class="small" style="font-weight:600;">@M(line.TotalMinor)</div>
+                    <div class="checkout-line">
+                        <span class="qty-badge">@line.Qty</span>
+                        <span class="line-name">
+                            @line.Title
+                            <span>@line.LensSummary</span>
+                        </span>
+                        <span class="line-total">@M(line.TotalMinor)</span>
                     </div>
                 }
 
-                <div class="totals-row" style="margin-top:10px;">
+                <div class="totals-row mt-2">
                     <span>Frames</span><span>@M(Model.Cart.Totals.SubtotalMinor)</span>
                 </div>
                 @if (Model.Cart.Totals.LensTotalMinor > 0)
@@ -127,7 +169,7 @@
                 }
                 @foreach (var promo in Model.Cart.Promotions)
                 {
-                    <div class="totals-row discount"><span>@promo.Name</span><span>− @M(promo.DiscountMinor)</span></div>
+                    <div class="totals-row discount"><span>@promo.Name</span><span>&minus; @M(promo.DiscountMinor)</span></div>
                 }
                 <div class="totals-row">
                     <span>Delivery</span>
@@ -138,10 +180,9 @@
                     <div class="totals-row"><span>Tax</span><span>@M(Model.Cart.Totals.TaxMinor)</span></div>
                 }
                 <div class="totals-row grand"><span>Total</span><span>@M(Model.Cart.Totals.TotalMinor)</span></div>
+
+                <p class="cart-note">Delivery is recalculated from your address when you place the order.</p>
             </div>
-            <p class="small muted" style="margin-top:10px;">
-                Delivery is recalculated from your address when you place the order.
-            </p>
-        </div>
+        </aside>
     </div>
 </form>

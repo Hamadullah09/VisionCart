@@ -5,65 +5,103 @@
     ViewData["Title"] = $"Order {Model.OrderNo}";
     var store = Store.Value;
     string M(int minor) => Money.Format(minor, store.Currency, store.CurrencySymbol);
-    var statusChip = Model.PaymentStatus == PaymentStatuses.Paid ? "chip-paid" : "chip-pending";
+
+    // Where the order is, told as a journey rather than as three database
+    // columns. Cancelled and refunded are not points on that journey, so they
+    // get a plain statement instead of a track with a dot stuck in the middle.
+    var journey = new (string Label, string Status)[]
+    {
+        ("Placed", OrderStatuses.Pending),
+        ("Paid", OrderStatuses.Paid),
+        ("In the lab", OrderStatuses.InLab),
+        ("Shipped", OrderStatuses.Shipped),
+        ("Delivered", OrderStatuses.Delivered),
+    };
+    var halted = Model.Status is OrderStatuses.Cancelled or OrderStatuses.Refunded;
+    // "ready" sits between the lab and the courier; it belongs at the lab step.
+    var effective = Model.Status == OrderStatuses.Ready ? OrderStatuses.InLab : Model.Status;
+    var reached = Array.FindIndex(journey, s => s.Status == effective);
 }
 
-<h1 style="margin-bottom:4px;">Thank you — order @Model.OrderNo</h1>
-<p class="muted">Placed @Model.PlacedAt.ToString("d MMMM yyyy 'at' HH:mm")</p>
+<div class="page-head">
+    <div>
+        <h1>Thank you — order @Model.OrderNo</h1>
+        <p>Placed @Model.PlacedAt.ToString("d MMMM yyyy 'at' HH:mm")</p>
+    </div>
+    <span class="@StatusStyle.Chip(Model.PaymentStatus)">@Humanise.Value(Model.PaymentStatus)</span>
+</div>
 
-<p style="margin:16px 0;">
-    <span class="chip">@Humanise.Value(Model.Status)</span>
-    <span class="chip @statusChip">@Humanise.Value(Model.PaymentStatus)</span>
-    <span class="chip">@Humanise.Value(Model.FulfilmentStatus)</span>
-</p>
+@if (halted)
+{
+    <div class="order-halted">
+        @Icons.Svg("info")
+        <p>This order is @Humanise.Value(Model.Status).ToLowerInvariant(). Nothing further will be made or shipped.</p>
+    </div>
+}
+else
+{
+    <ol class="order-track">
+        @for (var i = 0; i < journey.Length; i++)
+        {
+            var state = reached < 0 ? "" : i < reached ? "is-done" : i == reached ? "is-now" : "";
+            <li class="order-step @state" aria-current="@(i == reached ? "step" : null)">@journey[i].Label</li>
+        }
+    </ol>
+}
 
 @if (Model.PaymentStatus == PaymentStatuses.Unpaid
      && Model.Payments.Any(p => p.Provider == PaymentProviders.BankTransfer))
 {
     <p class="alert alert-info">
-        We're waiting for your bank transfer. Quote <strong>@Model.OrderNo</strong> as the reference
-        and email us the receipt — we'll start the lab work as soon as it clears.
+        @Icons.Svg("info")
+        <span>
+            We are waiting for your bank transfer. Quote <strong>@Model.OrderNo</strong> as the reference
+            and email us the receipt — we will start the lab work as soon as it clears.
+        </span>
     </p>
 }
 
-<div class="two-col" style="margin-top:24px;">
+<div class="cart-layout">
     <div>
-        <h2 style="margin-top:0;">What you ordered</h2>
+        <div class="section-head"><h2>What you ordered</h2></div>
+
         @foreach (var item in Model.Items)
         {
-            <div class="card" style="display:flex;gap:14px;padding:14px;margin-bottom:12px;">
-                <div style="width:100px;background:var(--ink-50);border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;padding:6px;">
+            <div class="cart-line order-line">
+                <div class="cart-thumb">
                     @if (item.ImageSnapshot is not null)
                     {
-                        <img src="@item.ImageSnapshot" alt="@item.TitleSnapshot" style="width:100%;height:auto;" />
+                        <img src="@item.ImageSnapshot" alt="@item.TitleSnapshot" loading="lazy" />
                     }
                 </div>
-                <div style="flex:1;">
-                    <h3 style="margin:0 0 2px;font-size:16px;">@item.TitleSnapshot</h3>
-                    <p class="small muted" style="margin:0;">@item.SkuSnapshot</p>
+                <div>
+                    <h3>@item.TitleSnapshot</h3>
+                    <p class="cart-sku">@item.SkuSnapshot</p>
                     @if (item.LensSummary is not null)
                     {
-                        <p class="small muted" style="margin:4px 0 0;">@item.LensSummary</p>
+                        <p class="cart-meta">@item.LensSummary</p>
                     }
-                    <p class="small muted" style="margin:4px 0 0;">Qty @item.Qty</p>
+                    <p class="cart-meta">Qty @item.Qty</p>
                     @if (item.PrescriptionId is not null)
                     {
-                        <p class="small" style="margin:8px 0 0;">
-                            <span class="chip chip-pending">Prescription awaiting verification</span>
+                        <p class="mt-1">
+                            <span class="chip chip-warn">Prescription awaiting verification</span>
                         </p>
-                        <p class="small muted" style="margin:4px 0 0;">
-                            One of our opticians checks every prescription before the lenses are cut.
-                        </p>
+                        <p class="hint">One of our opticians checks every prescription before the lenses are cut.</p>
                     }
                 </div>
-                <div style="font-weight:700;">@M(item.TotalMinor)</div>
+                <div class="cart-price">@M(item.TotalMinor)</div>
             </div>
         }
+
+        <p class="mt-4">
+            <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Keep shopping</a>
+        </p>
     </div>
 
-    <div>
-        <div class="totals">
-            <h3 style="margin:0 0 10px;font-size:16px;">Totals</h3>
+    <aside class="cart-aside">
+        <div class="cart-summary">
+            <h2>Totals</h2>
             <div class="totals-row"><span>Frames</span><span>@M(Model.SubtotalMinor)</span></div>
             @if (Model.LensTotalMinor > 0)
             {
@@ -73,7 +111,7 @@
             {
                 <div class="totals-row discount">
                     <span>Discount@(Model.PromoCode is not null ? $" ({Model.PromoCode})" : "")</span>
-                    <span>− @M(Model.DiscountMinor)</span>
+                    <span>&minus; @M(Model.DiscountMinor)</span>
                 </div>
             }
             <div class="totals-row">
@@ -87,29 +125,29 @@
             <div class="totals-row grand"><span>Total</span><span>@M(Model.TotalMinor)</span></div>
         </div>
 
-        @if (Model.ShippingAddress is { } address)
+        @if (Model.ShippingAddress is { } addr)
         {
-            <div class="card" style="padding:16px;margin-top:16px;">
-                <h3 style="margin:0 0 8px;font-size:15px;">Delivery address</h3>
-                <p class="small muted" style="margin:0;">
-                    @address.FullName<br />
-                    @address.Line1<br />
-                    @if (!string.IsNullOrWhiteSpace(address.Line2))
+            <div class="info-card">
+                <h3>Delivery address</h3>
+                <address>
+                    @addr.FullName<br />
+                    @addr.Line1<br />
+                    @if (!string.IsNullOrWhiteSpace(addr.Line2))
                     {
-                        @address.Line2<br />
+                        @addr.Line2<br />
                     }
-                    @address.City@(string.IsNullOrWhiteSpace(address.State) ? "" : ", " + address.State)
-                    @address.PostalCode<br />
-                    @address.Country
-                </p>
+                    @addr.City@(string.IsNullOrWhiteSpace(addr.State) ? "" : ", " + addr.State)
+                    @addr.PostalCode<br />
+                    @addr.Country
+                </address>
             </div>
         }
 
         @foreach (var shipment in Model.Shipments.Where(s => s.TrackingNumber is not null))
         {
-            <div class="card" style="padding:16px;margin-top:16px;">
-                <h3 style="margin:0 0 8px;font-size:15px;">Tracking</h3>
-                <p class="small" style="margin:0;">
+            <div class="info-card">
+                <h3>Tracking</h3>
+                <p>
                     @shipment.Carrier.ToUpperInvariant() — @shipment.TrackingNumber
                     @if (shipment.TrackingUrl is not null)
                     {
@@ -119,9 +157,5 @@
                 </p>
             </div>
         }
-    </div>
+    </aside>
 </div>
-
-<p style="margin-top:32px;">
-    <a class="btn btn-outline" asp-controller="Frames" asp-action="Index">Keep shopping</a>
-</p>

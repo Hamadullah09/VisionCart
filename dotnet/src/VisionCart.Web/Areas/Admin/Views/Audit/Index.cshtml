@@ -20,7 +20,7 @@
     <div>
         <label for="q">Search</label>
         <input class="field" type="text" id="q" name="q" value="@f.Q"
-               placeholder="Entity id, actor or IP" style="min-width:220px;" />
+               placeholder="Entity id, actor or IP" />
     </div>
     <div>
         <label for="action">Action</label>
@@ -56,11 +56,13 @@
 
 @if (Model.Results.Items.Count == 0)
 {
-    <p class="alert alert-info">No entries match those filters.</p>
+    @await Html.PartialAsync("_EmptyState", new EmptyState("audit", "No entries match those filters",
+        "The trail records every change to a patient record, a price or an order. Widen the dates, or clear the filters to see the whole history.")
+        { SecondaryText = "Clear filters", SecondaryUrl = Url.Action("Index") })
 }
 else
 {
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
                 <tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Detail</th><th>From</th></tr>
@@ -69,7 +71,7 @@ else
             @foreach (var row in Model.Results.Items)
             {
                 <tr>
-                    <td class="small" style="white-space:nowrap;">
+                    <td class="small nowrap">
                         @row.CreatedAt.ToString("dd/MM/yyyy")<br />
                         <span class="muted">@row.CreatedAt.ToString("HH:mm:ss")</span>
                     </td>
@@ -79,7 +81,7 @@ else
                         @row.Entity
                         @if (row.EntityId is not null)
                         {
-                            <br /><code class="muted" style="font-size:11px;">@row.EntityId</code>
+                            <br /><code class="muted tiny">@row.EntityId</code>
                         }
                     </td>
                     <td class="audit-detail">@row.Detail</td>

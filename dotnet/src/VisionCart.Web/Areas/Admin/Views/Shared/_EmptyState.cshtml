@@ -1,0 +1,23 @@
+@model EmptyState
+@* Wrapped in a panel so an empty list still occupies the same block on the
+   page as a full one, rather than collapsing the layout around it. *@
+<div class="panel">
+    <div class="empty-state">
+        <span class="empty-art">@Icons.Svg(Model.Icon)</span>
+        <h3>@Model.Title</h3>
+        <p>@Model.Body</p>
+        @if (Model.ActionUrl is not null || Model.SecondaryUrl is not null)
+        {
+            <div class="row">
+                @if (Model.SecondaryUrl is not null && Model.SecondaryText is not null)
+                {
+                    <a class="btn btn-outline" href="@Model.SecondaryUrl">@Model.SecondaryText</a>
+                }
+                @if (Model.ActionUrl is not null && Model.ActionText is not null)
+                {
+                    <a class="btn btn-primary" href="@Model.ActionUrl">@Icons.Svg("plus") @Model.ActionText</a>
+                }
+            </div>
+        }
+    </div>
+</div>

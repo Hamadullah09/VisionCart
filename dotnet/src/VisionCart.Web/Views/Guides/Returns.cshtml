@@ -3,10 +3,13 @@
     var days = ViewData["ReturnDays"];
     var email = ViewData["StoreEmail"];
 }
-<article style="max-width:70ch;">
-<h1>Returns and remakes</h1>
-<p class="muted">You have @days days to change your mind.</p>
-
+<article class="prose">
+<div class="page-head">
+    <div>
+        <h1>Returns and remakes</h1>
+        <p>You have @days days to change your mind.</p>
+    </div>
+</div>
 <h2>Changing your mind</h2>
 <p>If the frames are not right, tell us within @days days of delivery and we will
 arrange a return. Frames must come back unworn and in their case, with the cloth

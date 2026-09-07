@@ -48,13 +48,13 @@
         </div>
         <div class="full checkline">
             <input type="checkbox" asp-for="IsDefault" id="IsDefault" />
-            <label for="IsDefault" style="text-transform:none;letter-spacing:0;margin:0;">
+            <label for="IsDefault" class="label-plain">
                 Use this as my default delivery address
             </label>
         </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:16px;">
+    <div class="row mt-3">
         <button class="btn btn-primary" type="submit">Save address</button>
         <a class="btn btn-outline" asp-action="Index">Cancel</a>
     </div>

@@ -4,6 +4,26 @@
 @{
     var storeName = Store.Value.Name;
     var cartCount = await Carts.CountAsync();
+
+    // Staff who follow "View shop" out of the back office need a way back. The
+    // shop's header otherwise offers a customer an account and a cart, and no
+    // route to /admin exists anywhere on this side of the site.
+    var isStaff = Roles.StaffRoles.Any(User.IsInRole);
+
+    // Active navigation state. The shop had none: six identical links, and no
+    // page said which section you were looking at.
+    var ctrl = (ViewContext.RouteData.Values["controller"] as string) ?? "";
+    var act = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var gender = Context.Request.Query["gender"].ToString();
+
+    // "All frames" is the catalogue with no wearer chosen; Men/Women/Kids are
+    // the same page filtered, so the query string is what separates them.
+    string OnFrames(string? g) =>
+        ctrl.Equals("Frames", StringComparison.OrdinalIgnoreCase) && act.Equals("Index", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(gender, g ?? "", StringComparison.OrdinalIgnoreCase) ? "is-current" : "";
+    string On(string controller, string? action = null) =>
+        ctrl.Equals(controller, StringComparison.OrdinalIgnoreCase)
+        && (action is null || act.Equals(action, StringComparison.OrdinalIgnoreCase)) ? "is-current" : "";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -11,6 +31,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@(ViewData["Title"] is null ? storeName : $"{ViewData["Title"]} · {storeName}")</title>
+
+    @* An SVG first for anything modern, the .ico for what is not, and a PNG
+       for the iOS home screen — which ignores both of the others. *@
+    <link rel="icon" href="~/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" />
+    <link rel="manifest" href="~/site.webmanifest" />
+    <meta name="theme-color" content="#1C1917" />
+
     <link rel="stylesheet" href="~/css/visioncart.css" asp-append-version="true" />
 </head>
 <body>
@@ -31,7 +60,10 @@
        off the menu is simply a stacked list rather than unreachable. *@
     <header class="site-header">
         <div class="wrap header-inner">
-            <a class="brand" asp-controller="Home" asp-action="Index">@storeName</a>
+            <a class="brand" asp-controller="Home" asp-action="Index" aria-label="@storeName — home">
+                <span class="brand-mark" aria-hidden="true">@Icons.Svg("glasses")</span>
+                <span class="brand-text">VisionCart<em>Optical</em></span>
+            </a>
 
             <details class="site-nav" data-site-nav open>
                 <summary class="nav-toggle">
@@ -41,26 +73,46 @@
 
                 <div class="nav-panel">
                     <nav class="nav" aria-label="Main">
-                        <a asp-controller="Frames" asp-action="Index">All frames</a>
-                        <a href="/frames?gender=men">Men</a>
-                        <a href="/frames?gender=women">Women</a>
-                        <a href="/frames?gender=kids">Kids</a>
-                        <a href="/try-on" class="nav-accent">Virtual try-on</a>
-                        <a asp-controller="Home" asp-action="Deals">Deals</a>
+                        <a class="@OnFrames(null)" asp-controller="Frames" asp-action="Index">All frames</a>
+                        <a class="@OnFrames("men")" href="/frames?gender=men">Men</a>
+                        <a class="@OnFrames("women")" href="/frames?gender=women">Women</a>
+                        <a class="@OnFrames("kids")" href="/frames?gender=kids">Kids</a>
+                        <a class="nav-accent @On("TryOn")" href="/try-on">@Icons.Svg("camera") Virtual try-on</a>
+                        <a class="@On("Home", "Deals")" asp-controller="Home" asp-action="Deals">Deals</a>
                     </nav>
 
                     <div class="header-actions">
+                        @if (isStaff)
+                        {
+                            <a class="nav-staff" href="/admin" title="Return to the back office">
+                                @Icons.Svg("dashboard") Back office
+                            </a>
+                        }
+                        @* Signed out, signing in is the only thing to do here, so
+                           it takes the solid capsule. Signed in, the account is a
+                           quiet link and the cart becomes the heavy control —
+                           only ever one of the two carries the weight. *@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <a href="/account">Account</a>
+                            <a class="header-link @On("Account")" href="/account">@Icons.Svg("user") Account</a>
                         }
                         else
                         {
-                            <a href="/login">Sign in</a>
+                            <a class="header-btn" href="/login">@Icons.Svg("user") Sign in</a>
                         }
-                        <a class="btn btn-outline" asp-controller="Cart" asp-action="Index">
-                            Bag@(cartCount > 0 ? $" ({cartCount})" : "")
-                        </a>
+
+                        @* The cart appears only once there is something in it. An
+                           empty cart is a control that does nothing, sitting on
+                           every page for the whole of a first visit — and the
+                           shop is called VisionCart, so it is a cart, not a bag. *@
+                        @if (cartCount > 0)
+                        {
+                            <a class="header-btn cart-link" asp-controller="Cart" asp-action="Index">
+                                @Icons.Svg("cart")
+                                <span>Cart</span>
+                                <span class="cart-count" aria-label="@cartCount item@(cartCount == 1 ? "" : "s")">@cartCount</span>
+                            </a>
+                        }
                     </div>
                 </div>
             </details>
@@ -69,7 +121,7 @@
 
     @if (TempData["CartError"] is string cartError)
     {
-        <div class="wrap"><p class="alert alert-error">@cartError</p></div>
+        <div class="wrap"><p class="alert alert-error">@Icons.Svg("warning")<span>@cartError</span></p></div>
     }
 
     <main class="wrap">
@@ -87,9 +139,14 @@
             </div>
             <div>
                 <h2>Your account</h2>
-                <a href="/account">Your account</a>
-                <a href="/account/prescriptions">Your prescriptions</a>
-                <a href="/account/orders">Your orders</a>
+                @* /account/orders and /account/prescriptions were linked here but
+                   no controller ever served them, so both 404'd from the footer
+                   of every page in the shop. Orders live on the account page
+                   itself; the other three are the sections that do exist. *@
+                <a href="/account">Your account &amp; orders</a>
+                <a href="/account/addresses">Your addresses</a>
+                <a href="/account/appointments">Appointments</a>
+                <a href="/account/privacy">Your data</a>
             </div>
             <div>
                 <h2>Guides</h2>

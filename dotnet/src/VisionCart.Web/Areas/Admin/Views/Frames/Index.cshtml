@@ -20,14 +20,14 @@
     };
 }
 
-<div class="panel-head">
+<div class="admin-page-head">
     <div>
         <h1>Frames</h1>
-        <p class="muted">@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s")</p>
+        <p>@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s") in the catalogue. Everything a customer can try on and buy starts here.</p>
     </div>
-    <div class="admin-row-actions">
-        <a class="btn btn-outline" asp-controller="Vendors" asp-action="Index">Vendors</a>
-        <a class="btn btn-primary" asp-action="New">New frame</a>
+    <div class="row">
+        <a class="btn btn-outline" asp-controller="Vendors" asp-action="Index">@Icons.Svg("vendors") Vendors</a>
+        <a class="btn btn-primary" asp-action="New">@Icons.Svg("plus") New frame</a>
     </div>
 </div>
 
@@ -63,22 +63,46 @@
 
 @if (Model.Results.Items.Count == 0)
 {
-    <p class="alert alert-info">
-        @(Model.Stock switch
-        {
-            "out" => "Nothing is out of stock.",
-            "low" => "Nothing is running low.",
-            "in" => "Nothing is in stock.",
-            _ => "No frames match that search.",
-        })
-    </p>
+    var searching = !string.IsNullOrWhiteSpace(Model.Q) || !string.IsNullOrWhiteSpace(Model.Status);
+    <div class="panel">
+        <div class="empty-state">
+            <span class="empty-art">@Icons.Svg("frames")</span>
+            <h3>
+                @(Model.Stock switch
+                {
+                    "out" => "Nothing is out of stock",
+                    "low" => "Nothing is running low",
+                    "in" => "Nothing is in stock",
+                    _ => searching ? "No frames match that search" : "No frames yet",
+                })
+            </h3>
+            <p>
+                @(Model.Stock switch
+                {
+                    "out" => "Every colourway has stock against it.",
+                    "low" => "Every colourway is above its restock level.",
+                    "in" => "No colourway currently has stock. Add stock on a frame, or import a supplier's list.",
+                    _ => searching
+                        ? "Try a shorter search, or clear the filters to see the whole catalogue."
+                        : "Add your first frame, or bring a supplier's catalogue in from a CSV.",
+                })
+            </p>
+            <div class="row">
+                @if (searching || Model.Stock != "any")
+                {
+                    <a class="btn btn-outline" asp-action="Index">Clear filters</a>
+                }
+                <a class="btn btn-primary" asp-action="New">@Icons.Svg("plus") New frame</a>
+            </div>
+        </div>
+    </div>
 }
 else
 {
     @* A table, because tabular data is genuinely what an administrator wants
        here — but only the columns a decision is made from. Everything else
        lives on the frame's own page. *@
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
                 <tr>
@@ -158,7 +182,7 @@ else
                             <span class="tryon-state is-ready">Ready</span>
                         }
                     </td>
-                    <td><span class="chip">@Humanise.Value(frame.Status)</span></td>
+                    <td><span class="@StatusStyle.Chip(frame.Status)">@Humanise.Value(frame.Status)</span></td>
                     <td class="admin-row-actions">
                         <a class="btn btn-outline btn-small" asp-action="Detail" asp-route-id="@frame.Id">Details</a>
                         <a class="btn btn-quiet btn-small" asp-action="Edit" asp-route-id="@frame.Id">Edit</a>

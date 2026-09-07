@@ -77,7 +77,7 @@ public sealed class ErrorViewModel
 }
 
 /// <summary>
-/// The product page's add-to-bag form. Diopter fields arrive as strings because
+/// The product page's add-to-cart form. Diopter fields arrive as strings because
 /// they come from drop-downs whose empty option means "not given"; parsing here
 /// keeps the nullable semantics the prescription model expects.
 /// </summary>

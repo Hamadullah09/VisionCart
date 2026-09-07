@@ -3,15 +3,16 @@
     ViewData["Title"] = "Your data";
 }
 
-<h1>Your data</h1>
-<p class="muted">
-    What we hold about you, and how to change it. Because we are an optical
+<div class="page-head">
+    <div>
+        <h1>Your data</h1>
+        <p>What we hold about you, and how to change it. Because we are an optical
     practice, some records — prescriptions and orders — have to be kept even when
-    you ask us to erase your details.
-</p>
-
+    you ask us to erase your details.</p>
+    </div>
+</div>
 <div class="panel">
-    <h2 style="margin-top:0;">Download a copy</h2>
+    <h2>Download a copy</h2>
     <p>
         Everything we hold on your account: your details, addresses, orders,
         prescriptions and appointments, as a single file.
@@ -20,7 +21,7 @@
 </div>
 
 <div class="panel">
-    <h2 style="margin-top:0;">Ask us to change something</h2>
+    <h2>Ask us to change something</h2>
     <p>
         Correct a detail, restrict how we use your data, or ask us to erase you
         from our records.
@@ -31,7 +32,12 @@
 <h2>Your requests</h2>
 @if (Model.Count == 0)
 {
-    <p class="alert alert-info">You haven't made a request.</p>
+    <div class="shop-empty">
+        <span class="shop-empty-art">@Icons.Svg("shield")</span>
+        <h2>No requests yet</h2>
+        <p>Any correction, restriction or erasure request you raise will be listed here with its progress.</p>
+        <a class="btn btn-outline" asp-action="Raise">Make a request</a>
+    </div>
 }
 else
 {

@@ -7,9 +7,12 @@
     var past = Model.Appointments.Except(upcoming).OrderByDescending(a => a.StartsAt).ToList();
 }
 
-<h1>Your appointments</h1>
-<p class="muted">Eye tests, fittings and collections at the practice.</p>
-
+<div class="page-head">
+    <div>
+        <h1>Your appointments</h1>
+        <p>Eye tests, fittings and collections at the practice.</p>
+    </div>
+</div>
 @if (TempData["AccountOk"] is string ok)
 {
     <p class="alert alert-ok">@ok</p>
@@ -24,7 +27,12 @@
 <h2>Coming up</h2>
 @if (upcoming.Count == 0)
 {
-    <p class="alert alert-info">You have no appointments booked.</p>
+    <div class="shop-empty">
+        <span class="shop-empty-art">@Icons.Svg("diary")</span>
+        <h2>Nothing booked</h2>
+        <p>Eye tests, fittings and collections are all booked here. We will remind you the day before.</p>
+        <a class="btn btn-primary" asp-action="Book">Book an appointment</a>
+    </div>
 }
 else
 {

@@ -10,10 +10,10 @@
     <span aria-current="page">Vendors</span>
 </nav>
 
-<div class="panel-head">
+<div class="admin-page-head">
     <div>
         <h1>Vendors</h1>
-        <p class="muted">
+        <p>
             @live active@(Model.Vendors.Count > live ? $", {Model.Vendors.Count - live} retired" : "").
             Who a purchase order goes to &mdash; not the brand on the arm.
         </p>
@@ -23,13 +23,13 @@
 
 @if (Model.Vendors.Count == 0)
 {
-    <p class="alert alert-info">
-        No vendors yet. Add one and you can record where each frame is bought from.
-    </p>
+    @await Html.PartialAsync("_EmptyState", new EmptyState("vendors", "No vendors yet",
+        "A vendor is who a purchase order goes to — not the brand on the arm. Add one and each frame can record where it is bought from.")
+        { ActionText = "New vendor", ActionUrl = Url.Action("New") })
 }
 else
 {
-    <div class="admin-table">
+    <div class="admin-table stacks">
         <table>
             <thead>
                 <tr>
@@ -60,11 +60,11 @@ else
                     <td>
                         @if (v.IsActive)
                         {
-                            <span class="tryon-state is-ready">Active</span>
+                            <span class="chip chip-ok">Active</span>
                         }
                         else
                         {
-                            <span class="tryon-state is-warning">Retired</span>
+                            <span class="chip chip-plain">Retired</span>
                         }
                     </td>
                     <td class="admin-row-actions">

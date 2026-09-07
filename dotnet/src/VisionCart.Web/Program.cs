@@ -29,6 +29,11 @@ builder.Services.AddControllersWithViews(options =>
 });
 
 builder.Services.AddHttpContextAccessor();
+
+// The back-office header reads the outstanding work queue on every page. A
+// short-lived cache keeps that from turning each page view into a second
+// dashboard's worth of aggregates.
+builder.Services.AddMemoryCache();
 builder.Services.AddVisionCartInfrastructure(builder.Configuration);
 
 // HTTP-side implementations of the abstractions the application layer declares.

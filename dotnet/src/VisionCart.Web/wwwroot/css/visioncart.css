@@ -111,7 +111,14 @@
     --space-9: 96px;
 
     --measure: 68ch;
-    --gutter: clamp(20px, 5vw, 56px);
+    --gutter: clamp(20px, 4vw, 48px);
+
+    /* How wide the shop is allowed to get. 1240px left a 1680px screen 74%
+       used with 220px of dead margin down each side, and squeezed the
+       catalogue grid to three columns — a shop looking through a letterbox.
+       Prose still wraps at --measure or .wrap-narrow; this governs the
+       furniture and the product grids, which want the room. */
+    --wrap-max: 1460px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -197,7 +204,7 @@ code, kbd, .mono { font-family: var(--mono); font-size: .9em; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* --- layout --------------------------------------------------------------- */
-.wrap { max-width: 1240px; margin: 0 auto; padding-inline: var(--gutter); }
+.wrap { max-width: var(--wrap-max); margin: 0 auto; padding-inline: var(--gutter); }
 .wrap-narrow { max-width: 780px; margin: 0 auto; padding-inline: var(--gutter); }
 .prose { max-width: var(--measure); }
 
@@ -367,7 +374,7 @@ tbody tr:last-child td { border-bottom: 0; }
    sideways — which is exactly what it was doing. */
 
 /* --- catalogue filters ---------------------------------------------------- */
-.catalogue { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: clamp(24px, 4vw, 52px); align-items: start; }
+.catalogue { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: clamp(24px, 3vw, 44px); align-items: start; }
 @media (max-width: 940px) { .catalogue { grid-template-columns: minmax(0, 1fr); } }
 .filters { position: sticky; top: 100px; }
 .filter-group { border-bottom: 1px solid var(--rule); padding-block: var(--space-4); }
@@ -409,43 +416,284 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 
 .site-header {
-    background: var(--paper);
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    backdrop-filter: saturate(180%) blur(14px);
     border-bottom: 1px solid var(--rule);
     position: sticky;
     top: 0;
     z-index: 40;
 }
+@supports not (backdrop-filter: blur(1px)) {
+    .site-header { background: var(--paper); }
+}
+
+/* The three-colour hairline that used to sit here has gone. A rainbow rule
+   across the top of an optician's shop is the single most template-looking
+   thing a header can do, and it was competing with the frames — which are the
+   only things on this page that should be carrying colour. */
+
+/* The header lifts off the page once it is actually overlapping content —
+   pure CSS, and browsers without scroll-driven animation simply keep the
+   flat header they had. */
+@supports (animation-timeline: scroll()) {
+    .site-header {
+        animation: header-lift linear both;
+        animation-timeline: scroll();
+        animation-range: 0 90px;
+    }
+    @keyframes header-lift {
+        to { box-shadow: 0 1px 0 var(--rule), 0 8px 28px rgba(28, 25, 23, .09); }
+    }
+}
+
 .header-inner {
     display: flex;
     align-items: center;
-    gap: 34px;
-    min-height: 76px;
+    gap: clamp(var(--space-4), 2.4vw, 30px);
+    min-height: 82px;
     padding-block: var(--space-3);
 }
+
+/* --- brand -----------------------------------------------------------------
+   A mark beside the name. The shop was a wordmark alone, which left the tab,
+   the phone home screen and the header with nothing in common. */
 .brand {
-    font-family: var(--serif);
-    font-size: var(--text-h3);
-    font-weight: 600;
-    letter-spacing: -.022em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
     color: var(--ink);
     text-decoration: none;
     white-space: nowrap;
 }
-.nav { display: flex; gap: var(--space-5); flex: 1; flex-wrap: wrap; }
+.brand-mark {
+    width: 40px; height: 40px; flex: none;
+    display: grid; place-items: center;
+    border-radius: 13px;
+    background: linear-gradient(145deg, #2C2724 0%, var(--ink) 55%, #0F0D0C 100%);
+    color: var(--paper);
+    box-shadow: 0 2px 6px rgba(28, 25, 23, .22), inset 0 1px 0 rgba(255, 255, 255, .1);
+    transition: transform .2s cubic-bezier(.2, .8, .3, 1), box-shadow .2s ease;
+}
+.brand-mark svg { width: 23px; height: 23px; }
+.brand:hover .brand-mark {
+    transform: translateY(-1px) rotate(-3deg);
+    box-shadow: 0 5px 14px rgba(28, 25, 23, .26), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+.brand-text {
+    font-family: var(--serif);
+    font-size: var(--text-h3);
+    font-weight: 600;
+    letter-spacing: -.024em;
+    line-height: 1;
+}
+.brand-text em {
+    display: block;
+    font-family: var(--sans);
+    font-style: normal;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-top: 3px;
+}
+
+/* --- links -----------------------------------------------------------------
+   A pill that fills on hover rather than an underline that grows. It gives the
+   whole item a hit area you can see, which matters more here than elegance:
+   these six links are how somebody gets anywhere. The active one stays filled,
+   because the shop previously had no active state at all. */
+/* Brand hard left, account and bag hard right, and the six section links
+   spread across everything in between. The gap is the minimum they may close
+   to on a narrow laptop; on a wide screen space-between opens them out to fill
+   the middle rather than leaving a pool of empty paper beside the logo. */
+/* One cluster, centred between the brand and the controls.
+
+   This was `justify-content: space-between` across the full middle width, and
+   that is what made the bar look scattered: six words of unequal length pushed
+   to even spacing produce gaps of visibly different optical weight, so the
+   navigation stops reading as one thing and starts reading as six things that
+   happen to be on the same line. A fixed gap keeps them a group; centring the
+   group balances the wordmark on the left against the cart on the right. */
+.nav {
+    display: flex;
+    justify-content: center;
+    gap: clamp(18px, 2.2vw, 36px);
+    flex: 1;
+    flex-wrap: nowrap;
+    align-items: center;
+    white-space: nowrap;
+}
+/* Text and a rule, not a capsule. Six filled pills in a row is a lot of
+   furniture for six words, and it turned the header into a toolbar rather
+   than a shopfront. The indicator is now a fine rule under the word — the
+   quietest thing that can still say "you are here", and the convention every
+   other shop this one competes with already uses. */
+.nav a {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 2px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -.008em;
+    color: var(--ink-2);
+    text-decoration: none;
+    transition: color .16s ease;
+}
+.nav a::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 1.5px; border-radius: 2px;
+    background: var(--ink);
+    transform: scaleX(0);
+    transition: transform .22s cubic-bezier(.2, .8, .3, 1), background-color .16s ease;
+}
+.nav a:hover { color: var(--ink); text-decoration: none; }
+.nav a:hover::after { transform: scaleX(1); }
+
+.nav a.is-current { color: var(--ink); font-weight: 600; }
+.nav a.is-current::after { transform: scaleX(1); background: var(--accent); height: 2px; }
+
+/* The try-on is the one thing this shop does that a frame catalogue does not.
+   It carries the accent in its own colour, which is enough to mark it out
+   without drawing a box round it. */
+.nav a.nav-accent { color: var(--accent-deep); font-weight: 600; }
+.nav a.nav-accent svg { width: 16px; height: 16px; }
+.nav a.nav-accent::after { background: var(--accent); }
+
+/* --- account and cart ------------------------------------------------------
+   Sign in is a link, because signing in is not what anybody came here to do.
+   The cart is the one solid control in the header — and it only exists when
+   there is something in it. */
+.header-link {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink-2);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.header-link svg { width: 17px; height: 17px; opacity: .65; }
+.header-link:hover { color: var(--ink); text-decoration: none; }
+.header-link:hover svg { opacity: 1; }
+
+/* The solid capsule in the header. Sign in wears it when nobody is signed in;
+   the cart wears it once there is something to carry. Only ever one of them is
+   the heaviest thing on the bar. */
+.header-btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 11px 20px;
+    border-radius: 100px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: var(--text-small);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(28, 25, 23, .18);
+    transition: background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.header-btn svg { width: 18px; height: 18px; }
+.header-btn:hover {
+    background: var(--accent-deep);
+    color: var(--paper);
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(124, 106, 82, .32);
+}
+.header-btn:active { transform: translateY(1px); }
+
+/* An empty cart is a button that does nothing, on every page, for the whole of
+   a first visit. It appears the moment there is something to carry. */
+.cart-link { padding-left: 16px; }
+
+.cart-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 21px; height: 21px; padding: 0 6px;
+    border-radius: 100px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11.5px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* --- the way back ----------------------------------------------------------
+   Staff who follow "View shop" out of the back office had no route back: the
+   shop header offers a customer an account and a bag and nothing else. This is
+   only rendered for staff, and it is the only nav item that is a button, so it
+   reads as leaving the shop rather than moving around inside it.
+
+   Teal rather than ink: the bag is the solid dark control in this header, and
+   two heavy pills side by side would compete for the same attention. */
+.nav-staff {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px;
+    border-radius: 100px;
+    background: var(--tint-teal-w);
+    color: var(--tint-teal) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint-teal) 26%, transparent);
+    font-size: var(--text-caption);
+    font-weight: 650;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color .16s ease, color .16s ease;
+}
+.nav-staff svg { width: 14px; height: 14px; }
+.nav-staff:hover {
+    background: var(--tint-teal);
+    color: #fff !important;
+    text-decoration: none;
+}
 
 /* --- navigation, both widths ----------------------------------------------
    The menu is a <details> rendered open. On a wide screen the toggle is hidden
    and the panel lays out as an ordinary row; on a narrow one site.js folds it
    away and the toggle becomes the control. Same markup, one menu. */
 .site-nav { display: flex; flex: 1; min-width: 0; }
+
+/* A browser wraps a <details> element's content in a `::details-content` box,
+   so `.nav-panel` is not a flex item of `.site-nav` — that wrapper is, and it
+   sizes to its content. The panel's own `flex: 1` therefore grew it inside a
+   box that had already collapsed, which is why the account link and the bag
+   stopped wherever the links happened to end instead of at the right edge.
+   Where the pseudo-element is unsupported the panel is a direct child and its
+   own flex rule does the same job. */
+.site-nav::details-content { display: flex; flex: 1; min-width: 0; }
+
 .nav-panel { display: flex; flex: 1; align-items: center; gap: var(--space-5); min-width: 0; }
 .nav-toggle { display: none; }
 
-@media (max-width: 860px) {
-    .header-inner { min-height: 60px; gap: var(--space-3); flex-wrap: wrap; }
-    .brand { font-size: var(--text-lead); }
+/* The bar needs roughly 970px to hold the brand, six links and the cart on one
+   line; below that "Deals" wrapped onto a second row and the header grew to
+   132px with one orphaned word floating in it. The drawer therefore takes over
+   at 1024px, not 860.
 
-    .site-nav { display: block; flex: 1 0 100%; order: 3; }
+   site.js matches on the same width — it forces the disclosure open above the
+   breakpoint, so if the two ever disagree the toggle appears while the panel
+   is still pinned open. Change both together. */
+@media (max-width: 1024px) {
+    /* A grid rather than a wrapping flex row. The old rules ordered the toggle
+       before the panel with `order`, which never took effect: a browser wraps a
+       <details> element's content in a `::details-content` box, so `.nav-panel`
+       was never the flex item being ordered — the wrapper was, and it laid out
+       wherever it landed. The result was that opening the menu on a phone sent
+       the Menu button below the whole panel.
+
+       Explicit grid areas say where the three parts go and stop depending on
+       which box the browser makes the item. */
+    .header-inner {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "brand toggle"
+            "panel panel";
+        align-items: center;
+        min-height: 62px;
+        gap: var(--space-3);
+    }
+    .brand { grid-area: brand; }
+    .brand-text { font-size: var(--text-lead); }
+    .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
+    .brand-mark svg { width: 18px; height: 18px; }
 
     .nav-toggle {
         display: inline-flex; align-items: center; gap: var(--space-2);
@@ -468,29 +716,85 @@ tbody tr:last-child td { border-bottom: 0; }
         width: 100%; border-top: 2px solid currentColor;
     }
 
-    /* The toggle sits beside the logo; only the panel drops below it. */
+    /* The <details> itself contributes no box, so its summary and its content
+       become items of the header grid directly. */
     .site-nav { display: contents; }
-    .site-nav > .nav-toggle { order: 2; margin-left: auto; }
-    .site-nav > .nav-panel { order: 3; flex: 1 0 100%; }
+    .site-nav > .nav-toggle { grid-area: toggle; justify-self: end; }
+
+    /* The content wrapper is the item that has to span, not the panel inside
+       it. Where ::details-content is unsupported the wrapper auto-places into
+       the first column of row two — narrower than the full width, but still
+       below the toggle and still readable, which is the failure worth having. */
+    .site-nav::details-content { grid-area: panel; display: block; }
+    .site-nav > .nav-panel { width: 100%; }
 
     .nav-panel { flex-direction: column; align-items: stretch; gap: 0; }
     .nav {
         flex-direction: column; gap: 0;
+        /* The row keeps items vertically centred; the column must not centre
+           them horizontally, or every link shrinks to its own text width and
+           floats in the middle of the panel instead of being a full-width row.
+           The spreading and side padding are for the horizontal bar only. */
+        align-items: stretch;
+        justify-content: flex-start;
+        padding-inline: 0;
         border-top: 1px solid var(--rule); margin-top: var(--space-2);
     }
-    .nav a { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); font-size: var(--text-body); }
+    /* A row in a stacked list, not a pill: a 100px radius on a full-width item
+       sitting on a divider reads as a mistake. The active item keeps the accent
+       but states it with a bar down the left instead of a filled capsule. */
+    .nav a {
+        padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+        border-radius: var(--radius);
+        border-bottom: 1px solid var(--rule);
+        font-size: var(--text-body);
+        margin-inline: calc(-1 * var(--space-3));
+    }
     .nav a:last-child { border-bottom: 0; }
+
+    /* The sliding rule belongs to the horizontal bar. Stacked, each row already
+       has a divider under it, and a second line growing along the same edge
+       reads as a rendering fault. */
+    .nav a::after { display: none; }
+    .nav a:hover { box-shadow: none; background: var(--paper-sunk); }
+    .nav a.is-current,
+    .nav a.is-current:hover {
+        background: var(--surface);
+        color: var(--ink);
+        font-weight: 600;
+        box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .nav a.nav-accent { background: none; box-shadow: none; color: var(--accent-deep); }
+    .nav a.nav-accent:hover { background: var(--paper-sunk); }
+    .nav a.nav-accent.is-current,
+    .nav a.nav-accent.is-current:hover {
+        background: var(--accent-deep); color: var(--paper); box-shadow: none;
+    }
 
     .header-actions {
         justify-content: space-between;
         border-top: 1px solid var(--rule);
         padding-block: var(--space-3);
+        flex-wrap: wrap;
+        gap: var(--space-3);
     }
+    /* The divider separates two clusters on one line; stacked, the border-top
+       above already does that job. */
+    .header-actions::before { display: none; }
+    .nav-staff { width: 100%; justify-content: center; padding-block: 11px; }
 }
 
-.header-actions { display: flex; align-items: center; gap: var(--space-4); font-size: var(--text-small); }
-.header-actions a:not(.btn) { color: var(--ink-2); text-decoration: none; }
-.header-actions a:not(.btn):hover { color: var(--ink); }
+/* Sign in and the cart are two different kinds of thing — a link and the
+   shop's one solid control — so they need more air between them than the 16px
+   this rule used to give. Declared once: a second .header-actions rule further
+   up was being overridden by this one, which is why the gap set there had no
+   effect at all. */
+.header-actions { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-small); }
+/* No blanket colour rule here any more. `.header-actions a:not(.btn)` scored
+   (0,2,1) against `.cart-link`'s (0,1,0), so it won — painting the cart's
+   label and trolley in --ink-2 on the --ink pill: 68,62,57 on 28,25,23, about
+   1.3:1, which is invisible. Every control in this area now carries its own
+   class and states its own colour. */
 
 main.wrap { padding-block: clamp(28px, 4vw, 52px); }
 
@@ -575,7 +879,7 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 .section-head a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* --- grids ---------------------------------------------------------------- */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: clamp(18px, 2.4vw, 30px); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: clamp(18px, 1.8vw, 26px); }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) { .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .grid, .grid-3 { grid-template-columns: minmax(0, 1fr); } }
@@ -842,7 +1146,12 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
     margin: 0 0 var(--space-2);
     font-size: var(--text-small); color: var(--ink-3);
 }
-.product-size {
+/* The three numbers on a card in the grid. Named for what it is: sharing
+   `.product-size` with the detail page's "Size and fit" <section> meant that
+   whole section inherited monospace, caption type and `white-space: nowrap`,
+   which stopped its paragraphs wrapping and pushed the page out to twice the
+   viewport width. */
+.product-sizecode {
     font-family: var(--mono); font-size: var(--text-caption);
     color: var(--ink-3); white-space: nowrap;
 }
@@ -854,8 +1163,23 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
    `margin-left: calc(50% - 50vw)` on the element itself — a layout decision
    living in the markup, and one that produced a horizontal scrollbar whenever
    a vertical one appeared. */
+/* The half of that trick nobody gets for free: `50vw` counts the vertical
+   scrollbar and `50%` does not, so the moment a page is tall enough to scroll,
+   every full-bleed band overhangs by exactly the scrollbar's width and the
+   whole document slides sideways. That was still true here.
+
+   Measuring against the body instead of the viewport removes the mismatch at
+   source rather than clipping the symptom: `cqw` resolves against the body's
+   content box, which already excludes the scrollbar. The band then works out
+   to exactly the body's width and sits flush at both edges.
+
+   The container is put on the shop's body only. `container-type` also makes an
+   element the containing block for `position: fixed` descendants, which would
+   pin the back office's off-canvas drawer to the body instead of the viewport. */
+body:not(.admin) { container-type: inline-size; }
+
 .full-bleed {
-    margin-inline: calc(50% - 50vw);
+    margin-inline: calc(50% - 50cqw);
     padding-inline: var(--gutter);
 }
 
@@ -1099,7 +1423,11 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 }
 .size-table > div:last-child { border-bottom: 0; }
 .size-table dt { color: var(--ink-3); margin: 0; }
-.size-table dd { margin: 0; font-variant-numeric: tabular-nums; text-transform: capitalize; }
+/* No `text-transform: capitalize` here. It was capitalising every word in the
+   cell, so millimetres and grams rendered as "52 Mm" and "24 G"; the values it
+   was meant to help — shape, material, rim — arrive already sentence-cased
+   from Humanise.Value, and it was turning those into "Cat Eye" too. */
+.size-table dd { margin: 0; font-variant-numeric: tabular-nums; }
 
 .lens-mode { border: 0; padding: 0; margin: 0 0 var(--space-5); }
 .lens-mode legend { font-weight: 600; font-size: var(--text-small); margin-bottom: var(--space-2); padding: 0; }
@@ -1205,4 +1533,842 @@ main.wrap > .full-bleed:first-child { margin-top: calc(-1 * clamp(28px, 4vw, 52p
 @media (max-width: 860px) {
     .filters { position: static; }
     .filters > summary { display: flex; }
+}
+
+/* ===========================================================================
+   Shop front — home page composition
+   ---------------------------------------------------------------------------
+   The shop already had a hero, a product grid and a set of cards. What it did
+   not have was a way in for somebody who does not yet know what they want: no
+   route from "I need glasses" to a shortlist. These sections are that route —
+   who they are for, what shape suits them, and what the shop actually promises
+   — laid over the same warm paper as everything else.
+
+   Colour arrives here for the first time. It is confined to category tiles and
+   the step numbers, where it labels a choice; the frames themselves stay on
+   white, because a product photograph competes with any colour put beside it.
+   =========================================================================== */
+
+:root {
+    /* Three tints, warm enough to sit on paper. Used only to tell one card
+       from its neighbour, never to decorate. */
+    --tint-teal:    #0F6B63;
+    --tint-teal-w:  #E6F2F0;
+    --tint-plum:    #6D3F63;
+    --tint-plum-w:  #F3EAF1;
+    --tint-amber:   #92400E;
+    --tint-amber-w: #FBF0E2;
+}
+
+/* An inline SVG with no width carries its own intrinsic size — 300×150 in most
+   browsers — so anything holding one has to say how big the icon is. The shop
+   had no icons in buttons or alerts until now, hence no rule.
+
+   The alert only becomes a flex row when it actually contains an icon, so the
+   plain text alerts used elsewhere keep laying out exactly as they did. */
+.btn svg { width: 17px; height: 17px; flex: none; }
+
+.alert:has(> svg) { display: flex; align-items: flex-start; gap: var(--space-2); }
+.alert > svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+
+/* asp-validation-summary always renders its container. With .alert on it, a
+   valid form still drew an empty red box above the fields. */
+.validation-summary-valid { display: none; }
+
+/* Which fields are compulsory, said before the form is submitted rather than
+   after it comes back. */
+.req { color: var(--bad); font-weight: 700; }
+
+/* --- hero ------------------------------------------------------------------
+   A quiet wash rather than a flat block, so the fold has some depth without
+   putting a photograph behind live text. */
+.hero {
+    background:
+        radial-gradient(80% 120% at 12% 0%, rgba(124, 106, 82, .10), transparent 58%),
+        radial-gradient(70% 110% at 100% 20%, rgba(15, 107, 99, .09), transparent 60%),
+        var(--paper-sunk);
+}
+.hero h1 { letter-spacing: -.035em; }
+
+/* The three claims that answer "why here?", directly under the buttons. */
+.hero-proof {
+    display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5);
+    margin: var(--space-5) 0 0; padding: 0; list-style: none;
+}
+.hero-proof li {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: var(--text-small); color: var(--ink-2); font-weight: 500;
+}
+.hero-proof svg { width: 16px; height: 16px; color: var(--tint-teal); flex: none; }
+
+/* --- trust strip ---------------------------------------------------------- */
+.trust-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-5) 0;
+    border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 900px) { .trust-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .trust-strip { grid-template-columns: minmax(0, 1fr); } }
+
+.trust-item { display: flex; align-items: flex-start; gap: var(--space-3); }
+.trust-item svg { width: 22px; height: 22px; flex: none; color: var(--accent); margin-top: 1px; }
+.trust-item strong { display: block; font-size: var(--text-small); font-weight: 600; }
+.trust-item span { display: block; font-size: var(--text-caption); color: var(--ink-3); line-height: 1.5; margin-top: 2px; }
+
+/* --- shop by wearer --------------------------------------------------------
+   The catalogue already filters on ?gender=, so these are links into a search
+   that exists rather than a new listing to maintain. */
+.cat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(14px, 2vw, 22px);
+}
+@media (max-width: 760px) { .cat-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.cat-card {
+    position: relative;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    min-height: 190px;
+    padding: var(--space-5);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--rule);
+    background: var(--tint-wash, var(--paper-sunk));
+    text-decoration: none;
+    overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.cat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--lift-2);
+    border-color: var(--tint, var(--rule-strong));
+    text-decoration: none;
+}
+.cat-card.is-teal  { --tint: var(--tint-teal);  --tint-wash: var(--tint-teal-w); }
+.cat-card.is-plum  { --tint: var(--tint-plum);  --tint-wash: var(--tint-plum-w); }
+.cat-card.is-amber { --tint: var(--tint-amber); --tint-wash: var(--tint-amber-w); }
+
+/* An outsized, cropped glyph as the card's picture. Cheaper than photography
+   the shop may not have, and it never loads late or crops a face badly. */
+.cat-card > svg {
+    position: absolute; top: -14px; right: -14px;
+    width: 108px; height: 108px;
+    color: var(--tint);
+    opacity: .13;
+    stroke-width: 1.2;
+}
+.cat-card h3 {
+    margin: 0 0 3px;
+    font-size: var(--text-h3);
+    color: var(--tint);
+    letter-spacing: -.02em;
+}
+.cat-card p { margin: 0; font-size: var(--text-small); color: var(--ink-2); }
+.cat-card .go {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: var(--space-4);
+    font-size: var(--text-small); font-weight: 600; color: var(--tint);
+}
+.cat-card .go svg { width: 15px; height: 15px; transition: transform .18s ease; }
+.cat-card:hover .go svg { transform: translateX(3px); }
+
+/* --- how it works ----------------------------------------------------------
+   Numbered, because the order matters: a customer who adds a prescription
+   before trying anything on has done the tedious half first. */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(16px, 2.4vw, 28px); }
+@media (max-width: 820px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+
+.step {
+    position: relative;
+    padding: var(--space-5);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--lift);
+}
+.step-n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--serif); font-size: 15px; font-weight: 600;
+    margin-bottom: var(--space-3);
+}
+.step h3 { margin: 0 0 5px; font-size: var(--text-lead); letter-spacing: -.015em; }
+.step p { margin: 0; font-size: var(--text-small); color: var(--ink-2); line-height: var(--leading-body); }
+.step-icon {
+    position: absolute; top: var(--space-5); right: var(--space-5);
+    width: 22px; height: 22px; color: var(--ink-4);
+}
+
+/* --- deals ---------------------------------------------------------------- */
+.deal-card {
+    position: relative;
+    display: flex; flex-direction: column;
+    padding: var(--space-5);
+    background: linear-gradient(160deg, var(--tint-amber-w), var(--surface) 70%);
+    border: 1px solid #EEDFC6;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+.deal-card h3 { margin: 0 0 6px; font-size: var(--text-lead); letter-spacing: -.015em; }
+.deal-card p { margin: 0 0 var(--space-3); font-size: var(--text-small); color: var(--ink-2); }
+.deal-code {
+    align-self: flex-start;
+    font-family: var(--mono); font-size: var(--text-caption); font-weight: 600;
+    letter-spacing: .08em;
+    padding: 6px 12px; border-radius: 100px;
+    background: var(--ink); color: var(--paper);
+}
+.deal-ends {
+    display: flex; align-items: center; gap: 6px;
+    margin: auto 0 0; padding-top: var(--space-3);
+    font-size: var(--text-caption); color: var(--tint-amber); font-weight: 500;
+}
+.deal-ends svg { width: 14px; height: 14px; flex: none; }
+.deal-ends.is-quiet { color: var(--ink-3); font-weight: 400; }
+
+/* A deal with no code still needs to say so, or it reads as one whose code
+   failed to load. */
+.deal-auto {
+    display: inline-flex; align-items: center; gap: 6px;
+    align-self: flex-start;
+    font-size: var(--text-caption); font-weight: 500; color: var(--good);
+}
+.deal-auto svg { width: 14px; height: 14px; flex: none; }
+
+.deal-terms {
+    list-style: none;
+    margin: var(--space-3) 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 5px;
+}
+.deal-terms li {
+    position: relative; padding-left: 16px;
+    font-size: var(--text-caption); color: var(--ink-3); line-height: 1.5;
+}
+.deal-terms li::before {
+    content: ""; position: absolute; left: 3px; top: .55em;
+    width: 4px; height: 4px; border-radius: 50%; background: var(--ink-4);
+}
+
+/* --- shared shop page furniture -------------------------------------------
+   The same header and empty state on every customer-facing listing, so Deals,
+   the catalogue and the account pages stop each inventing their own. */
+.page-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: var(--space-5); flex-wrap: wrap;
+    margin-bottom: var(--space-6);
+}
+.page-head h1 { margin: 0 0 var(--space-2); }
+.page-head p { margin: 0; max-width: 62ch; color: var(--ink-2); font-size: var(--text-lead); }
+
+.shop-empty {
+    text-align: center;
+    padding: clamp(40px, 7vw, 76px) var(--space-5);
+    background: var(--paper-sunk);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+}
+.shop-empty-art {
+    display: grid; place-items: center;
+    width: 66px; height: 66px; margin: 0 auto var(--space-4);
+    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    color: var(--accent);
+}
+.shop-empty-art svg { width: 30px; height: 30px; }
+.shop-empty h2 { margin: 0 0 var(--space-2); }
+.shop-empty p { margin: 0 auto var(--space-5); max-width: 48ch; color: var(--ink-2); }
+
+/* --- shop by shape ---------------------------------------------------------
+   Shape is the single filter most people can answer without help, and it was
+   buried behind a facet panel in the catalogue. */
+.shape-rail { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.shape-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 100px;
+    background: var(--surface);
+    font-size: var(--text-small); font-weight: 500; color: var(--ink-2);
+    text-decoration: none;
+    transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.shape-chip:hover {
+    border-color: var(--ink); background: var(--ink); color: var(--paper);
+    text-decoration: none;
+}
+
+/* --- full-width closing call --------------------------------------------- */
+.cta-band {
+    margin-top: clamp(48px, 7vw, 88px);
+    padding-block: clamp(40px, 6vw, 68px);
+    background:
+        radial-gradient(70% 130% at 20% 0%, rgba(15, 107, 99, .16), transparent 60%),
+        var(--ink);
+    color: #F0EBE4;
+    text-align: center;
+}
+.cta-band h2 { color: #fff; margin: 0 auto var(--space-3); max-width: 20ch; }
+.cta-band p { margin: 0 auto var(--space-5); max-width: 52ch; color: #C9C1B8; font-size: var(--text-lead); }
+.cta-band .hero-actions { justify-content: center; }
+.cta-band .btn-primary { background: var(--paper); color: var(--ink); }
+.cta-band .btn-primary:hover { background: #fff; color: var(--ink); }
+.cta-band .btn-outline { border-color: rgba(255,255,255,.3); color: #F0EBE4; }
+.cta-band .btn-outline:hover { border-color: #fff; background: rgba(255,255,255,.08); color: #fff; }
+
+/* ===========================================================================
+   Bag and checkout
+   ---------------------------------------------------------------------------
+   These two screens were built almost entirely out of inline `style`
+   attributes — twenty on the bag alone — which is why they were the only
+   pages that could not be restyled from the stylesheet, and why two of them
+   referenced `--ink-50` and `--ink-200`, tokens this design system has never
+   defined. The classes below replace them.
+   =========================================================================== */
+
+.cart-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: clamp(20px, 3vw, 34px);
+    align-items: start;
+}
+@media (max-width: 900px) { .cart-layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- a line in the bag ---------------------------------------------------- */
+.cart-line {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) auto;
+    gap: var(--space-4);
+    align-items: start;
+    padding: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-3);
+}
+@media (max-width: 560px) {
+    .cart-line { grid-template-columns: 84px minmax(0, 1fr); }
+    .cart-line .cart-price { grid-column: 2; text-align: left; }
+}
+
+.cart-thumb {
+    display: grid; place-items: center;
+    background: var(--paper-sunk);
+    border-radius: var(--radius-lg);
+    padding: var(--space-2);
+    aspect-ratio: 4 / 3;
+}
+.cart-thumb img { width: 100%; height: auto; mix-blend-mode: multiply; }
+
+.cart-line h3 { margin: 0 0 3px; font-size: var(--text-lead); letter-spacing: -.012em; }
+.cart-line .cart-meta { margin: 0 0 2px; font-size: var(--text-small); color: var(--ink-2); }
+.cart-line .cart-sku { margin: 0; font-family: var(--mono); font-size: var(--text-caption); color: var(--ink-3); }
+.cart-price { font-weight: 700; font-size: var(--text-lead); white-space: nowrap; text-align: right; }
+
+.cart-line-actions { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; margin-top: var(--space-4); }
+
+/* A stepper reads as one control, so it is drawn as one rather than as two
+   buttons that happen to sit next to a number. */
+.qty {
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--rule-strong);
+    border-radius: 100px;
+    overflow: hidden;
+    background: var(--surface);
+}
+.qty button {
+    width: 34px; height: 34px;
+    border: 0; background: none; cursor: pointer;
+    font-size: 17px; line-height: 1; color: var(--ink-2);
+    display: grid; place-items: center;
+    transition: background-color .14s ease, color .14s ease;
+}
+.qty button:hover:not(:disabled) { background: var(--paper-sunk); color: var(--ink); }
+.qty button:disabled { opacity: .35; cursor: not-allowed; }
+.qty .qty-value {
+    min-width: 2.5ch; text-align: center;
+    font-size: var(--text-small); font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.cart-remove {
+    border: 0; background: none; padding: 0; cursor: pointer;
+    font-family: var(--sans); font-size: var(--text-small); color: var(--ink-3);
+    text-decoration: underline; text-underline-offset: 3px;
+}
+.cart-remove:hover { color: var(--bad); }
+
+/* --- summary ---------------------------------------------------------------
+   Sticky, because the total is the number somebody scrolls back up to check. */
+.cart-aside { position: sticky; top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
+@media (max-width: 900px) { .cart-aside { position: static; } }
+
+.cart-summary {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: var(--lift);
+}
+.cart-summary h2 { margin: 0 0 var(--space-4); font-size: var(--text-h3); }
+.cart-summary .btn-block + .btn-block { margin-top: var(--space-2); }
+.cart-summary .btn-primary { margin-top: var(--space-4); }
+
+.cart-note { margin: var(--space-4) 0 0; font-size: var(--text-caption); color: var(--ink-3); line-height: 1.5; text-align: center; }
+
+/* --- promotion code ------------------------------------------------------- */
+.promo {
+    background: var(--paper-sunk);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+}
+.promo h3 { margin: 0 0 var(--space-2); font-size: var(--text-small); }
+.promo-row { display: flex; gap: var(--space-2); }
+.promo-row .field { flex: 1 1 auto; min-width: 0; }
+.promo-applied {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--space-3); margin-top: var(--space-3);
+    font-size: var(--text-small);
+}
+.promo-applied code {
+    font-family: var(--mono); font-weight: 600; letter-spacing: .06em;
+    background: var(--ink); color: var(--paper);
+    padding: 4px 10px; border-radius: 100px; font-size: var(--text-caption);
+}
+
+/* --- checkout --------------------------------------------------------------
+   Same two-column frame as the bag, so the total does not move between the two
+   screens. */
+.checkout-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: clamp(20px, 3vw, 34px);
+    align-items: start;
+}
+@media (max-width: 900px) { .checkout-layout { grid-template-columns: minmax(0, 1fr); } }
+
+.checkout-section {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    margin-bottom: var(--space-4);
+}
+.checkout-section > h2 {
+    display: flex; align-items: center; gap: var(--space-3);
+    margin: 0 0 var(--space-4); font-size: var(--text-h3);
+}
+.checkout-step {
+    display: grid; place-items: center;
+    width: 28px; height: 28px; flex: none;
+    border-radius: 50%;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--sans); font-size: 13px; font-weight: 700;
+}
+
+/* The order being paid for, listed beside the form rather than left behind on
+   the previous page. */
+.checkout-line {
+    display: flex; gap: var(--space-3); align-items: flex-start;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--text-small);
+}
+.checkout-line:last-of-type { border-bottom: 0; }
+.checkout-line .qty-badge {
+    flex: none; min-width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border-radius: 6px; background: var(--paper-sunk);
+    font-size: var(--text-caption); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.checkout-line .line-name { flex: 1 1 auto; min-width: 0; }
+.checkout-line .line-name span { display: block; color: var(--ink-3); font-size: var(--text-caption); }
+.checkout-line .line-total { white-space: nowrap; font-weight: 600; }
+
+/* Payment methods as one choice each, not a bare radio with a word beside it. */
+.pay-options { display: flex; flex-direction: column; gap: var(--space-2); }
+.pay-option {
+    display: flex; align-items: flex-start; gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.pay-option:hover { border-color: var(--accent); background: var(--accent-wash); }
+.pay-option:has(input:checked) { border-color: var(--ink); background: var(--paper-sunk); }
+.pay-option input { margin-top: 3px; flex: none; }
+.pay-option .name { display: block; font-weight: 600; font-size: var(--text-small); }
+.pay-option .desc { display: block; font-size: var(--text-caption); color: var(--ink-3); line-height: 1.5; margin-top: 2px; }
+
+/* ===========================================================================
+   Sign in, register, password reset
+   ---------------------------------------------------------------------------
+   Seven screens that each opened with the same `style="max-width:420px;
+   margin:40px auto"`, and then diverged in how they spaced their fields. One
+   card, one rhythm, and the mark at the top so a password page still looks
+   like it belongs to this shop rather than to whatever sent the email.
+   =========================================================================== */
+
+.auth {
+    max-width: 440px;
+    margin: clamp(20px, 5vw, 56px) auto;
+}
+
+.auth-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    padding: clamp(24px, 4vw, 36px);
+    box-shadow: var(--lift-2);
+}
+
+.auth-mark {
+    display: grid; place-items: center;
+    width: 46px; height: 46px;
+    margin: 0 auto var(--space-4);
+    border-radius: 14px;
+    background: var(--ink);
+    color: var(--paper);
+}
+.auth-mark svg { width: 24px; height: 24px; }
+
+.auth-card h1 {
+    font-size: var(--text-h2);
+    text-align: center;
+    margin: 0 0 var(--space-2);
+    letter-spacing: -.02em;
+}
+.auth-lede {
+    text-align: center;
+    margin: 0 auto var(--space-5);
+    max-width: 38ch;
+    font-size: var(--text-small);
+    color: var(--ink-3);
+    line-height: var(--leading-body);
+}
+
+/* Fields stack with one rhythm rather than each carrying its own margin-top. */
+.auth-fields { display: flex; flex-direction: column; gap: var(--space-4); }
+.auth-fields > div > .hint { margin-top: var(--space-1); }
+.auth-card .btn-block { margin-top: var(--space-5); }
+
+.auth-foot {
+    margin: var(--space-5) 0 0;
+    text-align: center;
+    font-size: var(--text-small);
+    color: var(--ink-3);
+}
+.auth-foot p { margin: 0 0 var(--space-2); }
+.auth-foot p:last-child { margin-bottom: 0; }
+
+/* An outcome screen — "check your email", "password changed" — is the same
+   card with a status mark instead of a form. */
+.auth-mark.is-ok   { background: var(--good-wash); color: var(--good); }
+.auth-mark.is-warn { background: var(--warn-wash); color: var(--warn); }
+.auth-card > p { text-align: center; color: var(--ink-2); line-height: var(--leading-body); }
+.auth-card > .btn-block { display: flex; }
+
+/* ===========================================================================
+   Account area
+   =========================================================================== */
+/* .account-nav is already defined further up this file — not restated here. */
+
+/* A customer's own tables — orders, addresses — want the same treatment as the
+   back office's, minus the density. */
+.shop-table {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    overflow-x: auto;
+    box-shadow: var(--lift);
+}
+.shop-table table { width: 100%; border-collapse: collapse; font-size: var(--text-small); }
+.shop-table th {
+    text-align: left;
+    background: var(--paper-sunk);
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--text-label);
+    font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+.shop-table td { padding: 13px 16px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.shop-table tbody tr:last-child td { border-bottom: 0; }
+.shop-table tbody tr:hover { background: var(--paper); }
+.shop-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.shop-table code {
+    font-family: var(--mono); font-size: var(--text-caption);
+    background: var(--paper-sunk); padding: 3px 7px; border-radius: 5px;
+}
+
+/* Below 640px each row becomes a card. Same mechanism as the back office:
+   admin-shell.js is not loaded here, so the labels are written in the markup. */
+@media (max-width: 640px) {
+    .shop-table { border: 0; background: none; box-shadow: none; overflow: visible; }
+    .shop-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .shop-table tbody tr {
+        display: block;
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-lg);
+        margin-bottom: var(--space-3);
+        padding: var(--space-2) 0;
+    }
+    .shop-table td {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: var(--space-4); text-align: right;
+        padding: 9px 16px;
+    }
+    .shop-table td::before {
+        content: attr(data-label);
+        font-size: var(--text-label); font-weight: 600; letter-spacing: .07em;
+        text-transform: uppercase; color: var(--ink-3);
+        text-align: left; flex: none;
+    }
+    .shop-table td:empty { display: none; }
+}
+
+/* The full status vocabulary, so StatusStyle.Chip() — which the back office
+   already reads from — produces a valid badge on the customer's side of the
+   same order too. Without these, an order the shop calls "in the lab" renders
+   as an unstyled grey pill here and a purple one in the back office.
+
+   The shop's own chip-paid / chip-pending / chip-bad stay where they are;
+   these are the names the shared map emits. */
+.chip-ok       { background: var(--good-wash); color: var(--good); }
+.chip-warn     { background: var(--warn-wash); color: var(--warn); }
+.chip-danger   { background: var(--bad-wash);  color: var(--bad); }
+.chip-info     { background: var(--accent-wash); color: var(--accent-deep); }
+.chip-progress { background: #E7F0F5; color: #1F5670; }
+.chip-lab      { background: #F0EAF4; color: #5B3A6B; }
+.chip-plain    { background: var(--paper-sunk); color: var(--ink-3); }
+
+/* ===========================================================================
+   A customer's order
+   ---------------------------------------------------------------------------
+   The page listed three status chips side by side — "paid", "unfulfilled",
+   "in lab" — which is exactly how the database thinks about an order and not
+   at all how the person waiting for it does. The track below answers the only
+   question they came to ask: where is it, and what happens next.
+   =========================================================================== */
+
+.order-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: var(--space-2);
+    margin: var(--space-5) 0 var(--space-6);
+    padding: 0;
+    list-style: none;
+}
+@media (max-width: 700px) {
+    .order-track { grid-auto-flow: row; gap: 0; }
+}
+
+.order-step {
+    position: relative;
+    padding-top: 26px;
+    font-size: var(--text-caption);
+    color: var(--ink-3);
+    text-align: center;
+}
+/* The rail sits behind the dots, drawn per step so it never overshoots the
+   first or last one. */
+.order-step::before {
+    content: "";
+    position: absolute; top: 8px; left: 0; right: 0;
+    height: 2px; background: var(--rule);
+}
+.order-step:first-child::before { left: 50%; }
+.order-step:last-child::before { right: 50%; }
+
+.order-step::after {
+    content: "";
+    position: absolute; top: 3px; left: 50%;
+    transform: translateX(-50%);
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--rule-strong);
+}
+.order-step.is-done { color: var(--ink-2); }
+.order-step.is-done::before { background: var(--good); }
+.order-step.is-done::after { background: var(--good); border-color: var(--good); }
+.order-step.is-now { color: var(--ink); font-weight: 650; }
+.order-step.is-now::after {
+    background: var(--accent); border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-wash);
+}
+
+@media (max-width: 700px) {
+    .order-track { border-left: 2px solid var(--rule); margin-left: 6px; padding-left: var(--space-5); }
+    .order-step { padding: 9px 0; text-align: left; }
+    .order-step::before { display: none; }
+    .order-step::after { top: 12px; left: calc(-1 * var(--space-5) - 7px); transform: none; }
+}
+
+/* When an order is cancelled or refunded the track is a lie, so it is replaced
+   by a plain statement of where things stand. */
+.order-halted {
+    display: flex; align-items: center; gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--paper-sunk);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    margin: var(--space-5) 0 var(--space-6);
+}
+.order-halted svg { width: 20px; height: 20px; flex: none; color: var(--ink-3); }
+
+/* --- side panels ---------------------------------------------------------- */
+.info-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+}
+.info-card h3 { margin: 0 0 var(--space-2); font-size: var(--text-small); }
+.info-card address, .info-card p { margin: 0; font-style: normal; font-size: var(--text-small); color: var(--ink-2); line-height: 1.6; }
+
+/* An order line is a bag line that can no longer be changed. */
+.order-line { grid-template-columns: 100px minmax(0, 1fr) auto; }
+.order-line .cart-meta { font-size: var(--text-caption); }
+
+
+/* ===========================================================================
+   Utilities
+   ---------------------------------------------------------------------------
+   The same four gaps the back office uses, on the same scale, so "a bit more
+   space here" is a choice from a set rather than a fresh pixel value typed
+   into a style attribute.
+   =========================================================================== */
+.mt-1 { margin-top: var(--space-2); }
+.mt-2 { margin-top: var(--space-3); }
+.mt-3 { margin-top: var(--space-4); }
+.mt-4 { margin-top: var(--space-5); }
+.mt-5 { margin-top: var(--space-6); }
+
+/* A column of running text. Anything wider than about 70 characters is hard to
+   track back to the start of the next line. */
+.prose { max-width: 70ch; }
+
+/* Buttons inside an empty state are the point of it, so they centre. */
+.shop-empty .row, .shop-empty .hero-actions { justify-content: center; }
+
+/* A chip that is also a control — the promotion live/paused switch. */
+.chip-button {
+    border: 0; cursor: pointer;
+    font: inherit; font-size: var(--text-caption); font-weight: 600;
+}
+
+.text-center { text-align: center; }
+
+/* A caption label that wraps its own control reads as a sentence, not as a
+   small-caps field name. */
+.label-plain { text-transform: none; letter-spacing: 0; margin: 0; font-weight: 400; font-size: var(--text-body); color: var(--ink); }
+
+/* ===========================================================================
+   The customer's account
+   ---------------------------------------------------------------------------
+   This was an h1, three outline buttons and a bare table — a page that told
+   somebody their own email address and then stopped. It is the only screen a
+   returning customer opens on purpose, so it now says who they are, what they
+   have spent, and where the four things they might want to do actually live.
+   =========================================================================== */
+
+.account-hero {
+    display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap;
+    padding: clamp(20px, 3vw, 30px);
+    background:
+        radial-gradient(80% 160% at 0% 0%, rgba(124, 106, 82, .10), transparent 62%),
+        var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--lift);
+    margin-bottom: var(--space-5);
+}
+
+.account-avatar {
+    width: 66px; height: 66px; flex: none;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #2C2724, var(--ink));
+    color: var(--paper);
+    font-family: var(--serif);
+    font-size: 24px; font-weight: 600;
+    letter-spacing: .01em;
+    box-shadow: 0 3px 12px rgba(28, 25, 23, .25);
+}
+
+.account-who { flex: 1 1 240px; min-width: 0; }
+.account-who h1 { margin: 0 0 3px; font-size: var(--text-h2); letter-spacing: -.022em; overflow-wrap: anywhere; }
+.account-who p { margin: 0; font-size: var(--text-small); color: var(--ink-3); }
+
+/* What the account is actually worth to the person holding it. */
+.account-figures {
+    display: flex; gap: clamp(20px, 4vw, 44px); flex-wrap: wrap;
+    padding-left: clamp(0px, 2vw, 24px);
+}
+.account-figure dt {
+    margin: 0 0 4px;
+    font-size: var(--text-label); font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3);
+}
+.account-figure dd {
+    margin: 0;
+    font-family: var(--serif); font-size: 22px; font-weight: 600;
+    letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+
+/* --- the four places to go ------------------------------------------------- */
+.account-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.account-card {
+    display: flex; flex-direction: column;
+    padding: var(--space-5);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.account-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--lift-2);
+    border-color: var(--rule-strong);
+    text-decoration: none;
+}
+.account-card-icon {
+    display: grid; place-items: center;
+    width: 40px; height: 40px;
+    margin-bottom: var(--space-3);
+    border-radius: 12px;
+    background: var(--paper-sunk);
+    color: var(--accent-deep);
+}
+.account-card-icon svg { width: 20px; height: 20px; }
+.account-card h2 { margin: 0 0 4px; font-size: var(--text-lead); letter-spacing: -.015em; }
+.account-card p { margin: 0; font-size: var(--text-caption); color: var(--ink-3); line-height: 1.55; }
+.account-card .go {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: var(--space-4);
+    font-size: var(--text-caption); font-weight: 600; color: var(--ink);
+}
+.account-card .go svg { width: 14px; height: 14px; transition: transform .18s ease; }
+.account-card:hover .go svg { transform: translateX(3px); }
+
+@media (max-width: 560px) {
+    .account-hero { gap: var(--space-4); }
+    .account-avatar { width: 54px; height: 54px; font-size: 20px; }
+    .account-figures { padding-left: 0; width: 100%; }
 }

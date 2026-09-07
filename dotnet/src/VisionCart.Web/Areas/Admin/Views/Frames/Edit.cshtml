@@ -14,15 +14,15 @@
 }
 
 <p class="small"><a asp-action="Index">← Frames</a></p>
-<div class="panel-head">
+<div class="admin-page-head">
     <div>
         <h1>@(isNew ? "New frame" : Model.Frame!.Name)</h1>
         @if (!isNew)
         {
             <p class="frame-meta">
                 <code>@Model.Frame!.Sku</code>
-                <span class="chip">@Humanise.Value(Model.Frame.Status)</span>
-                <span class="chip">@Model.Frame.Variants.Count colourway@(Model.Frame.Variants.Count == 1 ? "" : "s")</span>
+                <span class="@StatusStyle.Chip(Model.Frame.Status)">@Humanise.Value(Model.Frame.Status)</span>
+                <span class="chip chip-plain">@Model.Frame.Variants.Count colourway@(Model.Frame.Variants.Count == 1 ? "" : "s")</span>
                 @if (blocked > 0)
                 {
                     <span class="tryon-state is-blocked">@blocked cannot be tried on</span>
@@ -58,10 +58,13 @@
     <div class="admin-two-col">
         <div>
             <div class="panel">
-                <h2>Basics</h2>
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">1</span>
+                    <div><h2>Basics</h2><p>Name, code, brand and how it is listed.</p></div>
+                </div>
                 <div class="form-grid">
                     <div class="full">
-                        <label for="Name">Frame name</label>
+                        <label for="Name">Frame name<span class="req" title="Required">*</span></label>
                         <input class="field" id="Name" name="Name" value="@d.Name" required autofocus />
                     </div>
                     <div>
@@ -102,7 +105,10 @@
             </div>
 
             <div class="panel">
-                <h2>Style</h2>
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">2</span>
+                    <div><h2>Style</h2><p>What it looks like, and who it suits.</p></div>
+                </div>
                 <div class="form-grid three">
                     <div>
                         <label for="Shape">Shape</label>
@@ -152,8 +158,11 @@
             </div>
 
             <div class="panel">
-                <h2>Fitting features</h2>
-                <p class="hint" style="margin-top:0;">
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">3</span>
+                    <div><h2>Fitting features</h2><p>What a dispenser reaches for when it nearly fits.</p></div>
+                </div>
+                <p class="hint">
                     What a dispenser reaches for when a frame nearly fits. These appear on the
                     product page with an explanation, so only tick what is actually true.
                 </p>
@@ -176,8 +185,11 @@
             </div>
 
             <div class="panel">
-                <h2>Measurements (mm)</h2>
-                <p class="hint" style="margin-top:0;">
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">4</span>
+                    <div><h2>Measurements (mm)</h2><p>The figures the virtual try-on draws from.</p></div>
+                </div>
+                <p class="hint">
                     These are not spec-sheet decoration. The virtual try-on draws this frame at
                     its overall width, seats it on the nose by its lens height, and works out
                     decentration from the lens width and bridge. Wrong figures here produce a
@@ -196,8 +208,11 @@
 
         <div>
             <div class="panel">
-                <h2>Buying</h2>
-                <p class="hint" style="margin-top:0;">
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">5</span>
+                    <div><h2>Buying</h2><p>Where it comes from, and what it costs to stock.</p></div>
+                </div>
+                <p class="hint">
                     Where this frame comes from, so a reorder can start from the product rather
                     than the ledger.
                 </p>
@@ -241,10 +256,13 @@
             </div>
 
             <div class="panel">
-                <h2>Price &amp; rules</h2>
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">6</span>
+                    <div><h2>Price &amp; rules</h2><p>What it sells for, and how it may be bought.</p></div>
+                </div>
                 <div class="form-grid">
                     <div>
-                        <label for="Price">Frame price</label>
+                        <label for="Price">Frame price<span class="req" title="Required">*</span></label>
                         <input class="field" id="Price" name="Price" inputmode="decimal" value="@d.Price" required />
                     </div>
                     <div>
@@ -277,10 +295,13 @@
             </div>
 
             <div class="panel">
-                <h2>Collections</h2>
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">7</span>
+                    <div><h2>Collections</h2><p>Which groupings it appears in.</p></div>
+                </div>
                 @foreach (var category in Model.Categories)
                 {
-                    <label class="checkline" style="margin-bottom:6px;">
+                    <label class="checkline mb-1">
                         <input type="checkbox" name="categoryIds" value="@category.Id"
                                checked="@Model.SelectedCategoryIds.Contains(category.Id)" />
                         <span>@category.Name</span>
@@ -289,15 +310,24 @@
             </div>
 
             <div class="panel">
-                <h2>Search listing</h2>
+                <div class="form-section-head">
+                    <span class="form-section-num" aria-hidden="true">8</span>
+                    <div><h2>Search listing</h2><p>How it reads in a search result.</p></div>
+                </div>
                 <label for="MetaTitle" class="field-label">Page title</label>
                 <input class="field" id="MetaTitle" name="MetaTitle" value="@d.MetaTitle" />
-                <label for="MetaDesc" class="field-label" style="margin-top:8px;">Meta description</label>
+                <label for="MetaDesc" class="field-label mt-1">Meta description</label>
                 <input class="field" id="MetaDesc" name="MetaDesc" value="@d.MetaDesc" />
             </div>
 
-            <button class="btn btn-primary btn-block" type="submit">Save frame</button>
         </div>
+    </div>
+
+    <div class="form-actions">
+        <button class="btn btn-primary" type="submit">Save frame</button>
+        <a class="btn btn-quiet" asp-action="Index">Cancel</a>
+        <span class="spacer"></span>
+        <p>Colourways, stock and try-on artwork are saved separately, below.</p>
     </div>
 </form>
 
@@ -305,20 +335,20 @@
 {
     <div class="panel">
         <h2>Colourways</h2>
-        <p class="hint" style="margin-top:0;">Stock, price and try-on calibration live here.</p>
+        <p class="hint">Stock, price and try-on calibration live here.</p>
 
         @foreach (var variant in Model.Frame!.Variants)
         {
-            <div style="border-top:1px solid var(--ink-100);padding-top:14px;margin-top:14px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <span class="swatch" style="background:@(variant.ColorHex ?? "#ccc");width:20px;height:20px;"></span>
+            <div class="record-item">
+                <div class="record-head">
+                    <div class="row">
+                        <span class="swatch-lg" style="background:@(variant.ColorHex ?? "#ccc")"></span>
                         <div>
                             <strong>@variant.ColorName</strong><br />
                             <code class="muted small">@variant.Sku · @variant.StockQty in stock</code>
                         </div>
                     </div>
-                    <div style="display:flex;gap:8px;align-items:center;">
+                    <div class="row">
                         @if (variant.TryOnImageUrl is not null)
                         {
                             <span class="chip chip-paid">Try-on ready</span>
@@ -331,7 +361,7 @@
                     </div>
                 </div>
 
-                <div data-edit-panel="v-@variant.Id" hidden style="margin-top:12px;">
+                <div class="mt-2" data-edit-panel="v-@variant.Id" hidden>
                     <form method="post" asp-action="SaveVariant" asp-route-id="@Model.Frame.Id"
                           asp-route-variantId="@variant.Id">
                         <div class="form-grid three">
@@ -354,17 +384,17 @@
                             <div><label>Row</label><input class="field" name="ShelfRow" value="@variant.ShelfRow" /></div>
                             <div><label>Bin</label><input class="field" name="Bin" value="@variant.Bin" /></div>
                         </div>
-                        <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Save colourway</button>
+                        <button class="btn btn-primary btn-small mt-1" type="submit">Save colourway</button>
                     </form>
 
-                    <div style="border-top:1px solid var(--ink-100);margin-top:14px;padding-top:12px;">
-                        <h3 style="font-size:14px;margin:0 0 4px;">Virtual try-on</h3>
-                        <p class="hint" style="margin-top:0;">
+                    <div class="record-item">
+                        <h3 class="m-0">Virtual try-on</h3>
+                        <p class="hint">
                             The mirror draws this frame at its recorded width in millimetres, which
                             needs the artwork marked up: where the lenses are, and where the frame
                             front starts and ends. That is done on the picture itself, not here.
                         </p>
-                        <p class="hint" style="margin:0;">
+                        <p class="hint m-0">
                             @if (variant.TryOnImageUrl is null)
                             {
                                 <text>No artwork yet.</text>
@@ -379,14 +409,14 @@
                         }
                         @if (report.Issues.Count > 0)
                         {
-                            <ul class="calibrate-issues" style="margin-top:10px;">
+                            <ul class="calibrate-issues mt-1">
                                 @foreach (var issue in report.Issues)
                                 {
                                     <li class="is-@issue.Severity.ToString().ToLowerInvariant()">@issue.Message</li>
                                 }
                             </ul>
                         }
-                        <p style="margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
+                        <p class="row mt-1">
                             <a class="btn btn-primary btn-small"
                                asp-action="Calibrate" asp-route-id="@Model.Frame.Id" asp-route-variantId="@variant.Id">
                                 Calibrate the artwork
@@ -402,9 +432,9 @@
             </div>
         }
 
-        <div style="border-top:1px solid var(--ink-100);padding-top:14px;margin-top:14px;">
+        <div class="record-item">
             <button class="btn btn-outline btn-small" type="button" data-edit-toggle="v-new">Add a colourway</button>
-            <div data-edit-panel="v-new" hidden style="margin-top:12px;">
+            <div class="mt-2" data-edit-panel="v-new" hidden>
                 <form method="post" asp-action="SaveVariant" asp-route-id="@Model.Frame.Id">
                     <div class="form-grid three">
                         <div><label>Colour name</label><input class="field" name="ColorName" required /></div>
@@ -423,7 +453,7 @@
                         <div><label>Row</label><input class="field" name="ShelfRow" /></div>
                         <div><label>Bin</label><input class="field" name="Bin" /></div>
                     </div>
-                    <button class="btn btn-primary btn-small" style="margin-top:10px;" type="submit">Add colourway</button>
+                    <button class="btn btn-primary btn-small mt-1" type="submit">Add colourway</button>
                 </form>
             </div>
         </div>
