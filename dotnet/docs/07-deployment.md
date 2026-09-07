@@ -235,18 +235,34 @@ you host more than one Core app, that is your answer. `web.config` ships
 pool to itself: in-process is roughly twice as fast, because requests skip a
 loopback hop.
 
-**The control panel may own `web.config`.** myASP.NET's file-manager editor
-sanitises the file on save to a permitted subset: `hostingModel`,
-`environmentVariables` and `stdoutLogEnabled` survive, while whole sections —
-`httpProtocol`, `staticContent`, `security` — and attributes like
-`startupTimeLimit` are silently dropped. Its *Error Logs* toggle rewrites the
-file too, re-asserting `stdoutLogEnabled="true"` and reverting anything else you
-changed. Turn that off before editing, verify every change by reopening the
-file, and expect the hardening in this repository's `web.config` not to survive.
-Losing it costs less than it looks: the module handles every path, static files
-are served only from `wwwroot`, and `appsettings*.json`, `web.config` and the
-DLLs are all unreachable over HTTP regardless. What you lose is the
-`X-Powered-By` header removal.
+**A locked config section takes the whole site down, silently.** Shared hosts
+lock parts of `system.webServer`; myASP.NET locks `<security>`. A locked section
+does not get ignored — IIS refuses to load the file at all, and the site answers
+a bare **500 with `Content-Length: 0`**: no sub-status, no stdout log, no ANCM
+debug log, nothing in the application's own rolling log. Every diagnostic you
+would reach for lives downstream of the thing that failed, so it reads exactly
+like an application that cannot start. Two tells separate them: the handler
+never runs, so `stdoutLogEnabled="true"` produces no file at all (a real startup
+failure produces an empty one), and header rewrites configured in this file —
+`<remove name="X-Powered-By" />` — do not take effect.
+
+When you see that, bisect `web.config` rather than reading startup code. Cut it
+down to `<handlers>` plus `<aspNetCore>`, confirm the site answers, then add
+sections back a round at a time. `httpProtocol`, `staticContent`,
+`urlCompression` and `httpErrors` are accepted on this host; `security` is not,
+which is why it is commented out of this repository's `web.config` with the
+reasoning attached. A different host may draw the line somewhere else.
+
+**`web.config` is the server's file, not the package's.** It carries the
+connection string, `Email__*` and `AllowedHosts` as `<environmentVariables>` —
+none of which exist in source control. `deploy-ftp.ps1` protects it (`$protected`);
+a **manual zip upload does not**. Extracting `publish.zip` over the site replaces
+it with the repository copy, and the site drops dead with a configuration guard
+error or a bare 500. Before extracting by hand, copy the live `web.config`
+somewhere, and put it back afterwards. The panel's Unzip dialog also leaves
+*"Overwrite existing file or folder with the same name"* **unticked by default**,
+which fails the opposite way: new DLLs silently do not replace old ones and you
+get a half-updated site.
 
 **Uploading over a running application fails.** IIS holds the DLLs open, `STOR`
 returns FTP 550, and the transfer stops part-way leaving a half-updated site.
