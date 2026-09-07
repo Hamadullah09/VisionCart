@@ -139,6 +139,25 @@ Create the first account by seeding once, deliberately:
 Step 3 matters: leaving the password in the host's environment panel means
 anyone with control-panel access has the administrator password in plain text.
 
+**Seeding only ever creates.** `EnsureUserAsync` looks the address up first and,
+if an account already holds it, adds the missing role and returns *without
+touching the password*. Point `Seed__AdminEmail` at an address somebody has
+already registered on the storefront and you silently grant that account admin
+while leaving its original password in place — sign-in then fails with "Email or
+password is incorrect" and nothing looks wrong.
+
+The seed log is how you tell the two apart. A created account logs `Created seed
+admin account <email>`; a rejected one logs `Could not create seed user`; a
+skipped one logs **nothing at all**. If the run reports `Database seed complete`
+with no line for your administrator, the address was already taken.
+
+Resetting the password instead does not work either, because `/forgot-password`
+mails a link and the outbox stores `TextBody = ToPlainText(htmlBody)`, whose
+`<[^>]+>` strip removes the `<a href>` the link lives in. With `Email:Driver` set
+to `log` the logged copy therefore has no URL in it, and without an SMTP host
+there is no other copy. Free the address with `docs/sql/staff-accounts.sql` and
+seed again.
+
 ---
 
 ## 5. Upload
