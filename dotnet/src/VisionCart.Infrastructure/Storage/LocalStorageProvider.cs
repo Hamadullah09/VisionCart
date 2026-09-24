@@ -33,8 +33,13 @@ public sealed class LocalStorageProvider(
 
     public async Task<StoredImage> StoreImageAsync(
         Stream content, string originalName, string contentType, string folder,
-        bool keepAlpha = false, CancellationToken ct = default)
+        bool keepAlpha = false, bool removeBackground = false, CancellationToken ct = default)
     {
+        // A cut-out without an alpha channel is just a picture of a frame, so
+        // the two travel together rather than letting a caller ask for one and
+        // silently lose it to WebP.
+        if (removeBackground) keepAlpha = true;
+
         if (!Allowed.Contains(contentType))
             throw new UploadException($"{originalName} is not an image we can accept.");
 
@@ -74,8 +79,15 @@ public sealed class LocalStorageProvider(
         var key = $"{prefix}/{stem}-{unique}.{extension}";
         var thumbKey = $"{prefix}/{stem}-{unique}-thumb.{extension}";
 
-        using var master = Resize(oriented, MasterMaxEdge);
-        using var thumb = Resize(oriented, ThumbMaxEdge);
+        // Background removal runs on the master rather than the original: the
+        // cap bounds the cost of the flood fill, and deriving the thumbnail
+        // from the cut-out keeps the two consistent — a thumbnail still showing
+        // the studio backdrop is how you end up with a library nobody trusts.
+        using var master = removeBackground
+            ? CutOut(Resize(oriented, MasterMaxEdge), originalName)
+            : Resize(oriented, MasterMaxEdge);
+
+        using var thumb = Resize(master, ThumbMaxEdge);
 
         var masterBytes = Encode(master, format);
         var thumbBytes = Encode(thumb, format);
@@ -145,6 +157,65 @@ public sealed class LocalStorageProvider(
     }
 
     private string PublicUrl(string key) => $"/{_options.LocalDirectory}/{key}";
+
+    /// <summary>
+    /// Removes the background, or explains why it would not.
+    ///
+    /// Takes ownership of <paramref name="resized"/> and disposes it, because
+    /// the cut-out is a new bitmap and the caller only ever wants one of the two.
+    ///
+    /// The refusals matter as much as the success. Guessing here produces a
+    /// frame with its temples erased, or a white rectangle over a customer's
+    /// eyes, and either one is discovered by a shopper rather than by staff.
+    /// </summary>
+    private SKBitmap CutOut(SKBitmap resized, string originalName)
+    {
+        try
+        {
+            var result = BackgroundRemover.Remove(resized);
+
+            if (result.Succeeded)
+            {
+                logger.LogInformation(
+                    "Removed the background from {Name}: {Removed:P0} of the image, " +
+                    "{Openings} enclosed opening(s), background sampled as #{Colour}",
+                    originalName, result.RemovedFraction, result.OpeningsCleared,
+                    result.SampledBackground.ToString());
+
+                return result.Bitmap!;
+            }
+
+            throw new UploadException(result.Outcome switch
+            {
+                BackgroundRemovalOutcome.BackgroundNotPlain =>
+                    $"{originalName} does not have a plain background — only " +
+                    $"{result.BorderAgreement:P0} of its edge is one colour. Photograph the " +
+                    "frame against a single plain backdrop, or upload artwork that is already " +
+                    "cut out.",
+
+                BackgroundRemovalOutcome.InsufficientContrast =>
+                    $"{originalName} does not have enough contrast between the frame and its " +
+                    "background to cut out safely — parts of the frame would be erased along " +
+                    "with the backdrop. Shoot a pale frame against a darker backdrop, or a dark " +
+                    "frame against a pale one.",
+
+                BackgroundRemovalOutcome.SubjectTooSimilar =>
+                    $"{originalName} is too close in colour to its background — removing it " +
+                    $"would erase {result.RemovedFraction:P0} of the picture, frame included. " +
+                    "Shoot a pale frame against a darker backdrop, or the other way round.",
+
+                BackgroundRemovalOutcome.NothingToRemove =>
+                    $"{originalName} has no plain background to remove. If it is already cut " +
+                    "out, upload it without background removal.",
+
+                _ => $"{originalName} could not have its background removed.",
+            });
+        }
+        finally
+        {
+            resized.Dispose();
+        }
+    }
 
     /// <summary>Longest-edge resize, preserving aspect ratio. Never upscales.</summary>
     private static SKBitmap Resize(SKBitmap source, int maxEdge)

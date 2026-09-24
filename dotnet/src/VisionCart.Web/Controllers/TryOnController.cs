@@ -106,7 +106,8 @@ public class TryOnController(
         {
             await using var stream = image.OpenReadStream();
             var stored = await storage.StoreImageAsync(
-                stream, image.FileName, image.ContentType, "tryon", keepAlpha: false, ct);
+                stream, image.FileName, image.ContentType, "tryon",
+                keepAlpha: false, removeBackground: false, ct: ct);
 
             var patient = await patients.EnsureForUserAsync(currentUser.UserId!, ct);
 

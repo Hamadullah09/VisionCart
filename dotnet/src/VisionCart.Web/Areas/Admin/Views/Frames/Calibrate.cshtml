@@ -58,11 +58,46 @@
 @if (v.TryOnImageUrl is null)
 {
     <p class="alert alert-warn">
-        This colourway has no try-on artwork yet. Upload a front-on PNG with a transparent
-        background on the <a asp-action="Edit" asp-route-id="@f.Id">frame page</a> first.
+        This colourway has no try-on artwork yet. Upload a front-on photograph below and it
+        will be cut out for you.
     </p>
 }
-else
+
+<section class="panel artwork-upload">
+    <h2 class="calibrate-heading">
+        @(v.TryOnImageUrl is null ? "Upload artwork" : "Replace artwork")
+    </h2>
+
+    <form method="post" enctype="multipart/form-data"
+          asp-action="UploadArtwork" asp-route-id="@f.Id" asp-route-variantId="@v.Id">
+
+        <div class="form-grid">
+            <div>
+                <label for="artwork-file">Photograph or artwork</label>
+                <input class="field" type="file" id="artwork-file" name="file" required
+                       accept="image/jpeg,image/png,image/webp,image/avif" />
+                <p class="hint">JPEG, PNG or WebP, up to 16&#160;MB.</p>
+            </div>
+
+            <label class="checkline is-aligned">
+                <input type="checkbox" name="removeBackground" value="true" checked />
+                <span>Remove the background</span>
+            </label>
+        </div>
+
+        <p class="hint mt-2">
+            Photograph the frame front-on against a single plain backdrop, with clear contrast
+            between the frame and the background. The background and the lens openings are made
+            transparent so the mirror can draw the frame over a customer's face — a JPEG has no
+            transparency of its own, so leaving this off stores an opaque rectangle.
+            Already cut out? Untick it.
+        </p>
+
+        <button class="btn btn-primary mt-2" type="submit">Upload artwork</button>
+    </form>
+</section>
+
+@if (v.TryOnImageUrl is not null)
 {
     <form method="post" class="calibrate" data-calibrate
           asp-action="Calibrate" asp-route-id="@f.Id" asp-route-variantId="@v.Id">

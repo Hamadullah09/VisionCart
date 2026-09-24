@@ -50,14 +50,14 @@ public class MediaController(
     [EnableRateLimiting("upload")]
     [RequestSizeLimit(16 * 1024 * 1024)]
     public async Task<IActionResult> Upload(IFormFile? file, [FromForm] string? tags,
-        [FromForm] bool keepAlpha, CancellationToken ct)
+        [FromForm] bool keepAlpha, [FromForm] bool removeBackground, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
             return BadRequest(new { ok = false, error = "No file was included." });
 
         await using var stream = file.OpenReadStream();
         var result = await media.UploadAsync(stream, file.FileName, file.ContentType,
-            tags, keepAlpha, users.GetUserId(User), ct);
+            tags, keepAlpha, removeBackground, users.GetUserId(User), ct);
 
         return result.Ok
             ? Json(new { ok = true, url = result.Url, id = result.MediaId, filename = result.Filename })

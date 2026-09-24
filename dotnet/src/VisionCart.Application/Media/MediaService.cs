@@ -31,7 +31,8 @@ public interface IMediaService
     Task<IReadOnlyList<string>> TagsAsync(CancellationToken ct = default);
 
     Task<UploadResult> UploadAsync(Stream content, string filename, string contentType,
-        string? tags, bool keepAlpha, string? userId, CancellationToken ct = default);
+        string? tags, bool keepAlpha, bool removeBackground, string? userId,
+        CancellationToken ct = default);
 
     Task<ActionResult> AttachToVariantAsync(string mediaId, string variantId, string role,
         CancellationToken ct = default);
@@ -116,12 +117,12 @@ public sealed class MediaService(
     /// </summary>
     public async Task<UploadResult> UploadAsync(
         Stream content, string filename, string contentType, string? tags, bool keepAlpha,
-        string? userId, CancellationToken ct = default)
+        bool removeBackground, string? userId, CancellationToken ct = default)
     {
         try
         {
             var stored = await storage.StoreImageAsync(content, filename, contentType,
-                "media", keepAlpha, ct);
+                "media", keepAlpha, removeBackground, ct);
 
             var asset = new MediaAsset
             {

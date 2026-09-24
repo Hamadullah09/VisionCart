@@ -397,7 +397,7 @@
                         <p class="hint m-0">
                             @if (variant.TryOnImageUrl is null)
                             {
-                                <text>No artwork yet.</text>
+                                <text>No artwork yet &mdash; upload a photograph on the artwork page and it will be cut out for you.</text>
                             }
                             else
                             {
@@ -419,7 +419,7 @@
                         <p class="row mt-1">
                             <a class="btn btn-primary btn-small"
                                asp-action="Calibrate" asp-route-id="@Model.Frame.Id" asp-route-variantId="@variant.Id">
-                                Calibrate the artwork
+                                @(variant.TryOnImageUrl is null ? "Upload artwork" : "Calibrate the artwork")
                             </a>
                             @if (variant.TryOnImageUrl is not null)
                             {

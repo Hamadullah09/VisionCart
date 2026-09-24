@@ -27,7 +27,15 @@ public sealed class StorageOptions
 public interface IStorageProvider
 {
     string Name { get; }
+    /// <param name="removeBackground">
+    /// Cut the frame out of a plain background before storing, so a photograph
+    /// can be used as try-on artwork. Implies <paramref name="keepAlpha"/>,
+    /// because the result is meaningless without an alpha channel. Throws
+    /// <see cref="UploadException"/> with an explanation if the image does not
+    /// have a plain background to remove.
+    /// </param>
     Task<StoredImage> StoreImageAsync(Stream content, string originalName, string contentType,
-        string folder, bool keepAlpha = false, CancellationToken ct = default);
+        string folder, bool keepAlpha = false, bool removeBackground = false,
+        CancellationToken ct = default);
     Task<bool> DeleteAsync(string storageKey, CancellationToken ct = default);
 }

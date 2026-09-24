@@ -452,7 +452,7 @@ public class DataTransferTests(CheckoutFlowFixture fixture)
         var media = scope.ServiceProvider.GetRequiredService<IMediaService>();
 
         var result = await media.UploadAsync(PngStream(), "zz-test-shot.png", "image/png",
-            "zz-test", keepAlpha: false, userId: null);
+            "zz-test", keepAlpha: false, removeBackground: false, userId: null);
 
         Assert.True(result.Ok, result.Error);
         Assert.NotNull(result.MediaId);
@@ -477,7 +477,7 @@ public class DataTransferTests(CheckoutFlowFixture fixture)
 
         var result = await media.UploadAsync(
             new MemoryStream("not an image"u8.ToArray()),
-            "notes.txt", "text/plain", null, false, null);
+            "notes.txt", "text/plain", null, false, false, null);
 
         // A corrupt file in a 60-photo shoot must be named, not take the batch down.
         Assert.False(result.Ok);
@@ -493,7 +493,7 @@ public class DataTransferTests(CheckoutFlowFixture fixture)
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var uploaded = await media.UploadAsync(PngStream(), "zz-orphan.png", "image/png",
-            "zz-test", false, null);
+            "zz-test", false, false, null);
         Assert.True(uploaded.Ok, uploaded.Error);
 
         var result = await media.DeleteAsync(uploaded.MediaId!);
@@ -520,7 +520,7 @@ public class DataTransferTests(CheckoutFlowFixture fixture)
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var uploaded = await media.UploadAsync(PngStream(), "zz-in-use.png", "image/png",
-            "zz-test", false, null);
+            "zz-test", false, false, null);
 
         var variantId = await db.FrameVariants.Select(v => v.Id).FirstAsync();
         var attached = await media.AttachToVariantAsync(
@@ -547,7 +547,7 @@ public class DataTransferTests(CheckoutFlowFixture fixture)
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var uploaded = await media.UploadAsync(PngStream(), "zz-overlay.png", "image/png",
-            "zz-test", keepAlpha: true, userId: null);
+            "zz-test", keepAlpha: true, removeBackground: false, userId: null);
 
         var variant = await db.FrameVariants.FirstAsync();
         var before = variant.TryOnImageUrl;

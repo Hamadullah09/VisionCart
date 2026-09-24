@@ -1,8 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using VisionCart.Application.Admin;
+using VisionCart.Application.Media;
 using VisionCart.Application.Catalogue;
 using VisionCart.Application.Common;
 // MVC ships its own ActionResult; alias ours so the intent is unambiguous.
@@ -232,6 +235,7 @@ public class VendorsController(ICatalogueAdminService catalogue) : AdminControll
 [Route("admin/frames")]
 public class FramesController(
     ICatalogueAdminService catalogue,
+    IMediaService media,
     IApplicationDbContext db) : AdminControllerBase
 {
     [HttpGet("")]
@@ -371,6 +375,72 @@ public class FramesController(
 
         TempData["AdminError"] = result.Error;
         return RedirectToAction(nameof(Calibrate), new { id, variantId });
+    }
+
+    /// <summary>
+    /// Uploads try-on artwork for one colourway, in one step.
+    ///
+    /// Before this existed the only route was: go to the media library, upload,
+    /// find the image again, attach it with the right role, come back. Four
+    /// screens to put a photograph of a frame onto a frame, and the seeded
+    /// catalogue hid the problem because its artwork arrives pre-cut from the
+    /// asset generator.
+    ///
+    /// A shop photographing its own stock uploads a JPEG, which has no alpha
+    /// channel at all, so <paramref name="removeBackground"/> defaults on in the
+    /// form — an opaque rectangle drawn over a customer's eyes is not a subtle
+    /// failure, but it is one nobody notices until a shopper does.
+    /// </summary>
+    [HttpPost("{id}/variants/{variantId}/artwork")]
+    [EnableRateLimiting("upload")]
+    [RequestSizeLimit(16 * 1024 * 1024)]
+    public async Task<IActionResult> UploadArtwork(
+        string id, string variantId, IFormFile? file,
+        [FromForm] bool removeBackground, CancellationToken ct)
+    {
+        var back = RedirectToAction(nameof(Calibrate), new { id, variantId });
+
+        if (file is null || file.Length == 0)
+        {
+            TempData["AdminError"] = "Choose an image to upload.";
+            return back;
+        }
+
+        var exists = await db.FrameVariants
+            .AnyAsync(v => v.Id == variantId && v.FrameId == id, ct);
+
+        if (!exists) return NotFound();
+
+        await using var stream = file.OpenReadStream();
+
+        // keepAlpha is always true here: this image is destined to be drawn over
+        // a face, so it is stored as PNG whether or not we cut anything out.
+        var upload = await media.UploadAsync(
+            stream, file.FileName, file.ContentType, tags: "try-on",
+            keepAlpha: true, removeBackground: removeBackground,
+            userId: User.FindFirstValue(ClaimTypes.NameIdentifier), ct: ct);
+
+        if (!upload.Ok)
+        {
+            TempData["AdminError"] = upload.Error;
+            return back;
+        }
+
+        var attach = await media.AttachToVariantAsync(
+            upload.MediaId!, variantId, ProductImageRoles.TryOn, ct);
+
+        if (!attach.Ok)
+        {
+            TempData["AdminError"] = attach.Error;
+            return back;
+        }
+
+        TempData["AdminOk"] = removeBackground
+            ? "Artwork uploaded and the background removed. Check the cut-out below, "
+              + "then set the calibration points."
+            : "Artwork uploaded. Set the calibration points below.";
+
+        return back;
     }
 
     private async Task<FrameEditViewModel> BuildEditModelAsync(string? id, CancellationToken ct)

@@ -1,0 +1,189 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using SkiaSharp;
+using VisionCart.Infrastructure.Persistence;
+
+namespace VisionCart.IntegrationTests.Http;
+
+/// <summary>
+/// Uploading try-on artwork for a colourway, over real HTTP.
+///
+/// Before this route existed the only way to get a photograph onto a frame was
+/// the media library plus a separate attach step, and the calibration screen
+/// told staff to do it on the frame page — which had no upload control at all.
+/// </summary>
+[Collection("http")]
+public class HttpArtworkUploadTests(VisionCartApp app)
+{
+    /// <summary>A frame-shaped subject on a plain white backdrop, as a JPEG.</summary>
+    private static byte[] FramePhotograph(SKEncodedImageFormat format = SKEncodedImageFormat.Jpeg)
+    {
+        using var bitmap = new SKBitmap(
+            new SKImageInfo(480, 240, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+            using var rim = new SKPaint { Color = SKColors.Black };
+            using var hole = new SKPaint { Color = SKColors.White };
+
+            canvas.DrawRect(new SKRect(60, 80, 200, 170), rim);
+            canvas.DrawRect(new SKRect(280, 80, 420, 170), rim);
+            canvas.DrawRect(new SKRect(200, 112, 280, 128), rim);
+            canvas.DrawRect(new SKRect(75, 95, 185, 155), hole);
+            canvas.DrawRect(new SKRect(295, 95, 405, 155), hole);
+            canvas.Flush();
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(format, 95);
+        return data.ToArray();
+    }
+
+    /// <summary>
+    /// Builds the multipart body, including the antiforgery token the global
+    /// AutoValidateAntiforgeryToken filter requires — a post without one is
+    /// rejected before it reaches the action, which is asserted separately in
+    /// <see cref="HttpAntiforgeryTests"/>.
+    /// </summary>
+    private async Task<MultipartFormDataContent> BodyAsync(
+        HttpClient client, string page, byte[] bytes, string filename,
+        string contentType, bool removeBackground)
+    {
+        var token = await app.AntiforgeryTokenAsync(client, page);
+
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+
+        return new MultipartFormDataContent
+        {
+            { file, "file", filename },
+            { new StringContent(removeBackground ? "true" : "false"), "removeBackground" },
+            { new StringContent(token), "__RequestVerificationToken" },
+        };
+    }
+
+    private async Task<(string FrameId, string VariantId)> AnyVariantAsync()
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var variant = await db.FrameVariants.AsNoTracking().FirstAsync();
+        return (variant.FrameId, variant.Id);
+    }
+
+    [Fact]
+    public async Task The_calibration_page_offers_an_upload_control()
+    {
+        var (frameId, variantId) = await AnyVariantAsync();
+
+        var html = await app.Admin.GetStringAsync(
+            $"/admin/frames/{frameId}/variants/{variantId}/calibrate");
+
+        Assert.Contains("type=\"file\"", html);
+        Assert.Contains($"/admin/frames/{frameId}/variants/{variantId}/artwork", html);
+        Assert.Contains("removeBackground", html);
+
+        // The form must carry an antiforgery token or every upload is rejected.
+        Assert.Contains("__RequestVerificationToken", html);
+    }
+
+    [Fact]
+    public async Task A_jpeg_photograph_is_cut_out_and_attached_as_try_on_artwork()
+    {
+        var (frameId, variantId) = await AnyVariantAsync();
+
+        var page = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
+        var response = await app.Admin.PostAsync(
+            $"/admin/frames/{frameId}/variants/{variantId}/artwork",
+            await BodyAsync(app.Admin, page, FramePhotograph(), "shopfloor.jpg",
+                "image/jpeg", removeBackground: true));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var variant = await db.FrameVariants.AsNoTracking().FirstAsync(v => v.Id == variantId);
+
+        Assert.NotNull(variant.TryOnImageUrl);
+
+        // A JPEG has no alpha channel, so artwork derived from one is only usable
+        // if it was stored as PNG — WebP here would mean the cut-out was lost.
+        Assert.EndsWith(".png", variant.TryOnImageUrl);
+
+        // And the stored file must actually be transparent where the backdrop was.
+        var served = await app.Admin.GetByteArrayAsync(variant.TryOnImageUrl);
+        using var stored = SKBitmap.Decode(served);
+
+        Assert.Equal(0, stored.GetPixel(2, 2).Alpha);
+
+        // Inside the left lens: the customer has to be able to see through it.
+        // Coordinates are proportional because the master is resized on the way in.
+        var lensX = (int)(stored.Width * 0.27);
+        var lensY = (int)(stored.Height * 0.52);
+        Assert.True(stored.GetPixel(lensX, lensY).Alpha < 128,
+            $"lens interior alpha was {stored.GetPixel(lensX, lensY).Alpha}");
+
+        // The rim itself must survive.
+        var rimX = (int)(stored.Width * 0.14);
+        Assert.True(stored.GetPixel(rimX, lensY).Alpha > 128,
+            $"rim alpha was {stored.GetPixel(rimX, lensY).Alpha}");
+    }
+
+    [Fact]
+    public async Task A_photograph_with_no_usable_background_is_refused_with_a_reason()
+    {
+        var (frameId, variantId) = await AnyVariantAsync();
+
+        // Near-white frame on white: nothing to separate.
+        using var bitmap = new SKBitmap(
+            new SKImageInfo(320, 200, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+            using var faint = new SKPaint { Color = new SKColor(251, 251, 251) };
+            canvas.DrawRect(new SKRect(40, 60, 280, 140), faint);
+            canvas.Flush();
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        var page = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
+        var response = await app.Admin.PostAsync(
+            $"/admin/frames/{frameId}/variants/{variantId}/artwork",
+            await BodyAsync(app.Admin, page, data.ToArray(), "washed-out.png",
+                "image/png", removeBackground: true));
+
+        // Still a redirect — the failure is reported to the operator through
+        // TempData rather than as an HTTP error.
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var followed = await app.Admin.GetStringAsync(response.Headers.Location!.ToString());
+        Assert.Matches(new Regex(
+            "enough contrast|plain background|too close in colour",
+            RegexOptions.IgnoreCase), followed);
+    }
+
+    [Fact]
+    public async Task Uploading_artwork_requires_a_staff_account()
+    {
+        var (frameId, variantId) = await AnyVariantAsync();
+        var url = $"/admin/frames/{frameId}/variants/{variantId}/artwork";
+
+        var anonymous = await app.Anonymous.PostAsync(
+            url, await BodyAsync(app.Anonymous, "/login", FramePhotograph(),
+                "a.jpg", "image/jpeg", true));
+        var customer = await app.Customer.PostAsync(
+            url, await BodyAsync(app.Customer, "/account", FramePhotograph(),
+                "a.jpg", "image/jpeg", true));
+
+        Assert.NotEqual(HttpStatusCode.OK, anonymous.StatusCode);
+        Assert.True(
+            customer.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Redirect,
+            $"a customer got {customer.StatusCode}");
+    }
+}
