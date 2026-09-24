@@ -83,8 +83,10 @@ public sealed class LocalStorageProvider(
         // cap bounds the cost of the flood fill, and deriving the thumbnail
         // from the cut-out keeps the two consistent — a thumbnail still showing
         // the studio backdrop is how you end up with a library nobody trusts.
+        ArtworkGeometry? geometry = null;
+
         using var master = removeBackground
-            ? CutOut(Resize(oriented, MasterMaxEdge), originalName)
+            ? CutOut(Resize(oriented, MasterMaxEdge), originalName, out geometry)
             : Resize(oriented, MasterMaxEdge);
 
         using var thumb = Resize(master, ThumbMaxEdge);
@@ -106,6 +108,7 @@ public sealed class LocalStorageProvider(
             SizeBytes = masterBytes.Length,
             Width = master.Width,
             Height = master.Height,
+            Geometry = geometry,
         };
     }
 
@@ -168,14 +171,36 @@ public sealed class LocalStorageProvider(
     /// frame with its temples erased, or a white rectangle over a customer's
     /// eyes, and either one is discovered by a shopper rather than by staff.
     /// </summary>
-    private SKBitmap CutOut(SKBitmap resized, string originalName)
+    private SKBitmap CutOut(
+        SKBitmap resized, string originalName, out ArtworkGeometry? geometry)
     {
+        geometry = null;
+
         try
         {
             var result = BackgroundRemover.Remove(resized);
 
             if (result.Succeeded)
             {
+                // The lens openings and the frame front were measured in order
+                // to do the cut. Handing them back saves marking the same points
+                // by hand, and more importantly stops the mirror falling back to
+                // proportions that belong to a different kind of picture.
+                if (result.Openings.Count == 2)
+                {
+                    geometry = new ArtworkGeometry
+                    {
+                        LeftLensCenterX = result.Openings[0].CentreX,
+                        LeftLensCenterY = result.Openings[0].CentreY,
+                        RightLensCenterX = result.Openings[1].CentreX,
+                        RightLensCenterY = result.Openings[1].CentreY,
+                        FrontLeftX = result.FrontLeftX,
+                        FrontRightX = result.FrontRightX,
+                        LensTopY = Math.Min(result.Openings[0].TopY, result.Openings[1].TopY),
+                        LensBottomY = Math.Max(result.Openings[0].BottomY, result.Openings[1].BottomY),
+                    };
+                }
+
                 logger.LogInformation(
                     "Removed the background from {Name}: {Removed:P0} of the image, " +
                     "{Openings} enclosed opening(s), background sampled as #{Colour}",

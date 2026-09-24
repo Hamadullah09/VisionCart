@@ -23,6 +23,9 @@ public sealed class UploadResult
     public string? Error { get; init; }
     public string? Url { get; init; }
     public string? MediaId { get; init; }
+
+    /// <summary>Where the frame sits in the picture, when it could be measured.</summary>
+    public ArtworkGeometry? Geometry { get; init; }
 }
 
 public interface IMediaService
@@ -146,6 +149,7 @@ public sealed class MediaService(
             return new UploadResult
             {
                 Filename = filename, Ok = true, Url = stored.Url, MediaId = asset.Id,
+                Geometry = stored.Geometry,
             };
         }
         catch (UploadException ex)

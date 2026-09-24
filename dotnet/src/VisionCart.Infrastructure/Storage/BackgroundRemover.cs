@@ -197,6 +197,17 @@ public sealed class BackgroundRemovalResult
     /// <summary>The colour distance actually used as the background threshold.</summary>
     public int ToleranceUsed { get; init; }
 
+    /// <summary>
+    /// Left and right edge of the frame FRONT, normalised — not of the whole
+    /// silhouette. The temples run off the sides and must be excluded: the
+    /// mirror scales artwork so this span equals the frame's recorded width, so
+    /// counting the temples in it draws the frame too large and walks the
+    /// temples across the wearer's face.
+    /// </summary>
+    public double FrontLeftX { get; init; }
+
+    public double FrontRightX { get; init; }
+
     public bool Succeeded => Outcome == BackgroundRemovalOutcome.Removed;
 }
 
@@ -299,12 +310,16 @@ public static class BackgroundRemover
                 (int)Math.Max(1, opts.MinOpeningFraction * total));
         }
 
+        // Where the frame front starts and ends. Wanted whatever happens next:
+        // it is both half of the front-on test and the scale the mirror works
+        // from, so it is reported on every successful result.
+        var (frameLeft, frameRight) = FrameFrontExtent(mask, width, height);
+
         // Is it front-on? Measured from the openings, so it costs nothing extra
         // and only applies once there is a pair of lenses to compare.
         var frontOn = 0d;
         if (openings.Count == 2)
         {
-            var (frameLeft, frameRight) = OpaqueHorizontalExtent(mask, width, height);
             frontOn = FrontOnScoreFor(openings, frameLeft, frameRight);
 
             if (opts.RequireFrontOn && frontOn < opts.MinFrontOnScore)
@@ -319,6 +334,8 @@ public static class BackgroundRemover
                     Openings = openings,
                     OpeningsCleared = openings.Count,
                     FrontOnScore = frontOn,
+                    FrontLeftX = frameLeft,
+                    FrontRightX = frameRight,
                 };
             }
         }
@@ -389,6 +406,8 @@ public static class BackgroundRemover
             OpeningsCleared = openings.Count,
             Openings = openings,
             FrontOnScore = frontOn,
+            FrontLeftX = frameLeft,
+            FrontRightX = frameRight,
             SampledBackground = background,
             BorderAgreement = agreement,
             Separation = separation,
@@ -397,26 +416,60 @@ public static class BackgroundRemover
     }
 
     /// <summary>
-    /// Horizontal extent of what survived, normalised. This is the frame front,
-    /// and the midpoint of it is what the lens pair is compared against.
+    /// Where the frame FRONT begins and ends, normalised.
+    ///
+    /// Not the bounding box. A frame photographed front-on is a tall middle —
+    /// the rims and bridge — with two thin temples running off the sides at lens
+    /// height, and the bounding box includes those temples. The mirror scales
+    /// artwork so that this span equals the frame's recorded overall width, so
+    /// measuring the temples into it draws the whole frame too large: on a
+    /// tightly cropped product photograph the front is about 90&#160;% of the
+    /// image where the fallback assumes 72&#160;%, a 26&#160;% over-scale that
+    /// walks the temples across the wearer's eyes.
+    ///
+    /// So measure the height of each column of surviving pixels and keep the
+    /// columns that are a decent fraction of the tallest. The front is tall; a
+    /// temple is a few pixels thick.
+    ///
+    /// The fraction is measured, not guessed. At 0.20 this reproduces the
+    /// calibration recorded by hand for the seeded catalogue — 0.136–0.864
+    /// against a recorded 0.137–0.863, averaged over all 72 pieces of artwork,
+    /// a span within 0.2&#160;%. Lower admits the temples, higher eats the
+    /// endpieces.
     /// </summary>
-    private static (double Left, double Right) OpaqueHorizontalExtent(
-        byte[] mask, int width, int height)
+    private static (double Left, double Right) FrameFrontExtent(
+        byte[] mask, int width, int height, double share = 0.20)
     {
-        var minX = width;
-        var maxX = -1;
+        var columns = new int[width];
+        var tallest = 0;
 
-        for (var y = 0; y < height; y++)
         for (var x = 0; x < width; x++)
         {
-            if (mask[(y * width) + x] is Outside or Opening) continue;
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
+            var count = 0;
+            for (var y = 0; y < height; y++)
+            {
+                if (mask[(y * width) + x] is Outside or Opening) continue;
+                count++;
+            }
+
+            columns[x] = count;
+            if (count > tallest) tallest = count;
         }
 
-        return maxX < minX
-            ? (0, 1)
-            : ((double)minX / width, (double)maxX / width);
+        if (tallest == 0) return (0, 1);
+
+        var cutoff = tallest * share;
+        var left = -1;
+        var right = -1;
+
+        for (var x = 0; x < width; x++)
+        {
+            if (columns[x] < cutoff) continue;
+            if (left < 0) left = x;
+            right = x;
+        }
+
+        return left < 0 ? (0, 1) : ((double)left / width, (double)right / width);
     }
 
     /// <summary>

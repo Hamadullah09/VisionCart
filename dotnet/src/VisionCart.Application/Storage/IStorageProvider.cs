@@ -1,5 +1,24 @@
 namespace VisionCart.Application.Storage;
 
+/// <summary>
+/// Where the frame sits inside a piece of try-on artwork, normalised to the
+/// image. Measured while the background was being removed — the lens openings
+/// are found in order to clear them, and the frame front in order to tell a
+/// front-on photograph from a three-quarter one — so it costs nothing extra and
+/// spares whoever uploaded the picture from marking the same points by hand.
+/// </summary>
+public sealed class ArtworkGeometry
+{
+    public required double LeftLensCenterX { get; init; }
+    public required double LeftLensCenterY { get; init; }
+    public required double RightLensCenterX { get; init; }
+    public required double RightLensCenterY { get; init; }
+    public required double FrontLeftX { get; init; }
+    public required double FrontRightX { get; init; }
+    public required double LensTopY { get; init; }
+    public required double LensBottomY { get; init; }
+}
+
 public sealed class StoredImage
 {
     public string Url { get; init; } = string.Empty;
@@ -11,6 +30,9 @@ public sealed class StoredImage
     public int SizeBytes { get; init; }
     public int Width { get; init; }
     public int Height { get; init; }
+
+    /// <summary>Set only when the background was removed and two lenses were found.</summary>
+    public ArtworkGeometry? Geometry { get; init; }
 }
 
 public sealed class UploadException(string message) : Exception(message);

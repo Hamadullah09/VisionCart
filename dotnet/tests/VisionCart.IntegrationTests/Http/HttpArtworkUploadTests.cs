@@ -263,6 +263,80 @@ public class HttpArtworkUploadTests(VisionCartApp app)
         }
     }
 
+    /// <summary>
+    /// The frame must be measured from the picture, not left to the fallback.
+    ///
+    /// DEFAULT_CALIBRATION describes the generated catalogue artwork — a frame
+    /// front across 72% of the image with room for the temples either side. A
+    /// product photograph is cropped tight, so its front is nearer 90%. The
+    /// mirror scales artwork so that the front it believes in matches the face,
+    /// so believing the wrong one draws the frame a quarter too large and puts
+    /// the temples over the wearer's eyes.
+    /// </summary>
+    [Fact]
+    public async Task Uploaded_artwork_is_calibrated_from_the_picture_itself()
+    {
+        var (frameId, _) = await AnyVariantAsync();
+
+        var token = await app.AntiforgeryTokenAsync(app.Admin, $"/admin/frames/{frameId}");
+        var file = new ByteArrayContent(FramePhotograph());
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var colour = $"Cal {Guid.NewGuid():N}"[..12];
+        var body = new MultipartFormDataContent
+        {
+            { file, "artwork", "measured.jpg" },
+            { new StringContent("true"), "removeBackground" },
+            { new StringContent(colour), "ColorName" },
+            { new StringContent("0"), "StockQty" },
+            { new StringContent(token), "__RequestVerificationToken" },
+        };
+
+        var response = await app.Admin.PostAsync($"/admin/frames/{frameId}/variants", body);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var created = await db.FrameVariants.FirstOrDefaultAsync(v => v.ColorName == colour);
+
+        try
+        {
+            Assert.NotNull(created);
+
+            // These four are nullable and are exactly what was being left unset:
+            // null here means the mirror falls back to DEFAULT_CALIBRATION.
+            Assert.NotNull(created!.TryOnFrontLeftX);
+            Assert.NotNull(created.TryOnFrontRightX);
+            Assert.NotNull(created.TryOnLensTopY);
+            Assert.NotNull(created.TryOnLensBottomY);
+
+            // The lens centres straddle the middle, left before right, and are
+            // no longer the 0.29/0.71 the entity defaults to.
+            Assert.True(created.AnchorLeftX < created.AnchorRightX);
+            Assert.InRange((created.AnchorLeftX + created.AnchorRightX) / 2, 0.45, 0.55);
+            Assert.NotEqual(0.29, created.AnchorLeftX, 3);
+
+            // FramePhotograph draws the rims from x=60 to x=420 of 480, so the
+            // true frame front is 0.125..0.875. The measurement has to find that
+            // and not the bounding box, which the temple stub at x=430 would
+            // widen. Accuracy is the claim, so assert against the drawing.
+            Assert.InRange(created.TryOnFrontLeftX!.Value, 0.105, 0.145);
+            Assert.InRange(created.TryOnFrontRightX!.Value, 0.855, 0.895);
+
+            // And the lens openings, drawn at y=95..155 of 240 → 0.396..0.646.
+            Assert.InRange(created.TryOnLensTopY!.Value, 0.37, 0.42);
+            Assert.InRange(created.TryOnLensBottomY!.Value, 0.62, 0.67);
+        }
+        finally
+        {
+            if (created is not null)
+            {
+                db.FrameVariants.Remove(created);
+                await db.SaveChangesAsync();
+            }
+        }
+    }
+
     [Fact]
     public async Task A_frame_photographed_at_an_angle_is_refused_with_a_reason()
     {

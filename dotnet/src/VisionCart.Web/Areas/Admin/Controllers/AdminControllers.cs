@@ -400,6 +400,43 @@ public class FramesController(
         if (!attach.Ok)
             return (false, $"The colourway was saved. The picture was not: {attach.Error}");
 
+        // Calibrate from what the cut-out already measured.
+        //
+        // Without this the mirror falls back to DEFAULT_CALIBRATION, whose
+        // proportions describe the generated catalogue artwork: a frame front
+        // occupying 72% of the image with room for the temples either side. A
+        // product photograph is cropped tight, so its front is nearer 90%, and
+        // the mirror scales the artwork so the front it *assumes* matches the
+        // face — drawing the frame about a quarter too large and walking the
+        // temples across the wearer's eyes.
+        if (upload.Geometry is { } g)
+        {
+            var calibrated = await catalogue.SaveTryOnCalibrationAsync(variantId,
+                new TryOnCalibrationInput
+                {
+                    LeftLensCenterX = g.LeftLensCenterX,
+                    LeftLensCenterY = g.LeftLensCenterY,
+                    RightLensCenterX = g.RightLensCenterX,
+                    RightLensCenterY = g.RightLensCenterY,
+                    FrontLeftX = g.FrontLeftX,
+                    FrontRightX = g.FrontRightX,
+                    LensTopY = g.LensTopY,
+                    LensBottomY = g.LensBottomY,
+                    Opacity = 1.0,
+                }, ct);
+
+            if (calibrated.Ok)
+            {
+                return (true, "Colourway saved, background removed, and the frame measured "
+                              + "from the picture — lens centres, frame front and lens height "
+                              + "are already set. Check them below before it goes live.");
+            }
+
+            return (true, "Colourway saved and the background removed, but the frame could "
+                          + $"not be measured automatically: {calibrated.Error} "
+                          + "Set the calibration points below by hand.");
+        }
+
         return (true, removeBackground
             ? "Colourway saved, background removed, and the picture is now this "
               + "colourway's try-on artwork. Check the calibration below."
