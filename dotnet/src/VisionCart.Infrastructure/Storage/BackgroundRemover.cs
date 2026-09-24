@@ -80,6 +80,25 @@ public sealed class BackgroundRemovalOptions
     /// </summary>
     public double MinOpeningFraction { get; init; } = 0.0015;
 
+    /// <summary>
+    /// Refuse a frame that was not photographed front-on.
+    ///
+    /// The mirror places artwork by mapping the customer's two pupils onto the
+    /// two lens centres. A three-quarter view has the far lens foreshortened and
+    /// the pair sitting off-centre, so that mapping skews the frame across the
+    /// face — it looks broken rather than merely imperfect, and the cut-out is
+    /// blameless, which makes it hard to diagnose from the result.
+    /// </summary>
+    public bool RequireFrontOn { get; init; } = true;
+
+    /// <summary>
+    /// Front-on score below which the photograph is rejected. Measured on real
+    /// product photography: front-on shots scored 0.97 and above, a
+    /// three-quarter view scored 0.36. Anything in between is ambiguous enough
+    /// that refusing is the safer answer.
+    /// </summary>
+    public double MinFrontOnScore { get; init; } = 0.80;
+
     /// <summary>Refuse above this — the subject itself was being erased.</summary>
     public double MaxRemovedFraction { get; init; } = 0.93;
 
@@ -112,6 +131,27 @@ public enum BackgroundRemovalOutcome
     /// Attempting it would keep part of the frame and erase the rest.
     /// </summary>
     InsufficientContrast,
+
+    /// <summary>
+    /// The frame was photographed at an angle rather than front-on. The cut-out
+    /// itself is fine; it simply cannot be used as try-on artwork, because the
+    /// mirror maps two pupils onto two lens centres and a three-quarter view has
+    /// one lens foreshortened.
+    /// </summary>
+    NotFrontOn,
+}
+
+/// <summary>
+/// An enclosed transparent region — in practice a lens opening. Coordinates are
+/// normalised to the image, so they can be used directly as calibration anchors.
+/// </summary>
+public sealed class BackgroundRemovalOpening
+{
+    public required double CentreX { get; init; }
+    public required double CentreY { get; init; }
+    public required double TopY { get; init; }
+    public required double BottomY { get; init; }
+    public required int AreaPixels { get; init; }
 }
 
 public sealed class BackgroundRemovalResult
@@ -126,6 +166,20 @@ public sealed class BackgroundRemovalResult
 
     /// <summary>Enclosed regions cleared — normally 2 for a pair of lenses.</summary>
     public int OpeningsCleared { get; init; }
+
+    /// <summary>
+    /// The openings themselves, left to right, normalised to the image. For a
+    /// front-on pair these are the pupil positions the calibration screen would
+    /// otherwise have to be told by hand.
+    /// </summary>
+    public IReadOnlyList<BackgroundRemovalOpening> Openings { get; init; } = [];
+
+    /// <summary>
+    /// How level and equal the two openings are. 1 is perfectly front-on; a
+    /// three-quarter view falls well below <see cref="BackgroundRemovalOptions.MinFrontOnScore"/>.
+    /// Zero when there were not two openings to compare.
+    /// </summary>
+    public double FrontOnScore { get; init; }
 
     /// <summary>The colour the background was judged to be.</summary>
     public SKColor SampledBackground { get; init; }
@@ -237,12 +291,36 @@ public static class BackgroundRemover
 
         FloodFromBorder(mask, distances, width, height, loose);
 
-        var openings = 0;
+        var openings = new List<BackgroundRemovalOpening>();
         if (opts.ClearOpenings)
         {
             openings = ClearEnclosedOpenings(
                 mask, distances, width, height, loose,
                 (int)Math.Max(1, opts.MinOpeningFraction * total));
+        }
+
+        // Is it front-on? Measured from the openings, so it costs nothing extra
+        // and only applies once there is a pair of lenses to compare.
+        var frontOn = 0d;
+        if (openings.Count == 2)
+        {
+            var (frameLeft, frameRight) = OpaqueHorizontalExtent(mask, width, height);
+            frontOn = FrontOnScoreFor(openings, frameLeft, frameRight);
+
+            if (opts.RequireFrontOn && frontOn < opts.MinFrontOnScore)
+            {
+                return new BackgroundRemovalResult
+                {
+                    Outcome = BackgroundRemovalOutcome.NotFrontOn,
+                    SampledBackground = background,
+                    BorderAgreement = agreement,
+                    Separation = separation,
+                    ToleranceUsed = tolerance,
+                    Openings = openings,
+                    OpeningsCleared = openings.Count,
+                    FrontOnScore = frontOn,
+                };
+            }
         }
 
         var output = new SKBitmap(
@@ -308,12 +386,37 @@ public static class BackgroundRemover
             Outcome = BackgroundRemovalOutcome.Removed,
             Bitmap = output,
             RemovedFraction = removedFraction,
-            OpeningsCleared = openings,
+            OpeningsCleared = openings.Count,
+            Openings = openings,
+            FrontOnScore = frontOn,
             SampledBackground = background,
             BorderAgreement = agreement,
             Separation = separation,
             ToleranceUsed = tolerance,
         };
+    }
+
+    /// <summary>
+    /// Horizontal extent of what survived, normalised. This is the frame front,
+    /// and the midpoint of it is what the lens pair is compared against.
+    /// </summary>
+    private static (double Left, double Right) OpaqueHorizontalExtent(
+        byte[] mask, int width, int height)
+    {
+        var minX = width;
+        var maxX = -1;
+
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            if (mask[(y * width) + x] is Outside or Opening) continue;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+        }
+
+        return maxX < minX
+            ? (0, 1)
+            : ((double)minX / width, (double)maxX / width);
     }
 
     /// <summary>
@@ -492,10 +595,10 @@ public static class BackgroundRemover
     /// Finds background-coloured regions the border flood could not reach, and
     /// clears the ones big enough to be lens openings rather than noise.
     /// </summary>
-    private static int ClearEnclosedOpenings(
+    private static List<BackgroundRemovalOpening> ClearEnclosedOpenings(
         byte[] mask, int[] distances, int width, int height, int loose, int minArea)
     {
-        var cleared = 0;
+        var found = new List<BackgroundRemovalOpening>();
         var component = new List<int>();
         var stack = new Stack<int>();
 
@@ -532,11 +635,68 @@ public static class BackgroundRemover
 
             if (component.Count < minArea) continue;
 
-            foreach (var index in component) mask[index] = Opening;
-            cleared++;
+            long sumX = 0, sumY = 0;
+            int top = height, bottom = -1;
+
+            foreach (var index in component)
+            {
+                mask[index] = Opening;
+                sumX += index % width;
+                var y = index / width;
+                sumY += y;
+                if (y < top) top = y;
+                if (y > bottom) bottom = y;
+            }
+
+            found.Add(new BackgroundRemovalOpening
+            {
+                CentreX = (double)sumX / component.Count / width,
+                CentreY = (double)sumY / component.Count / height,
+                TopY = (double)top / height,
+                BottomY = (double)bottom / height,
+                AreaPixels = component.Count,
+            });
         }
 
-        return cleared;
+        // Left to right, so a caller can treat [0] and [1] as the wearer's right
+        // and left lens without re-sorting.
+        found.Sort((a, b) => a.CentreX.CompareTo(b.CentreX));
+        return found;
+    }
+
+    /// <summary>
+    /// How front-on the photograph is, from the two lens openings: 1 is perfect.
+    ///
+    /// Three independent signals, multiplied so that failing any one of them
+    /// sinks the score:
+    ///   - the openings should be the same size (the far lens foreshortens),
+    ///   - they should be level with each other (roll),
+    ///   - and their midpoint should sit at the middle of the frame front
+    ///     (in a three-quarter view the near temple shows and the far one does not,
+    ///      which shifts the whole opaque shape sideways relative to the lenses).
+    /// </summary>
+    private static double FrontOnScoreFor(
+        IReadOnlyList<BackgroundRemovalOpening> openings, double frameLeft, double frameRight)
+    {
+        if (openings.Count != 2) return 0;
+
+        var a = openings[0];
+        var b = openings[1];
+
+        var areaRatio = (double)Math.Min(a.AreaPixels, b.AreaPixels)
+                        / Math.Max(a.AreaPixels, b.AreaPixels);
+
+        var span = Math.Abs(b.CentreX - a.CentreX);
+        if (span <= 0) return 0;
+        var levelness = Math.Max(0, 1 - (Math.Abs(b.CentreY - a.CentreY) / span * 4));
+
+        var width = frameRight - frameLeft;
+        var centring = width <= 0
+            ? 0
+            : Math.Max(0, 1 - (Math.Abs(((a.CentreX + b.CentreX) / 2)
+                                        - ((frameLeft + frameRight) / 2)) / width * 6));
+
+        return areaRatio * levelness * centring;
     }
 
     /// <summary>

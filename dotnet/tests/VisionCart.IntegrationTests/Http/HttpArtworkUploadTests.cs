@@ -91,46 +91,80 @@ public class HttpArtworkUploadTests(VisionCartApp app)
         Assert.Contains("__RequestVerificationToken", html);
     }
 
+    /// <summary>
+    /// Puts a variant's try-on artwork back where it was.
+    ///
+    /// The harness runs as Development so it can read the seeded staff
+    /// credentials, which means it shares the development database. Attaching
+    /// artwork is a real write to a real catalogue row, so this test undoes
+    /// itself rather than leaving a photograph of a test fixture on a frame
+    /// somebody is looking at.
+    /// </summary>
+    private async Task RestoreArtworkAsync(string variantId, string? url)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var variant = await db.FrameVariants.FirstAsync(v => v.Id == variantId);
+        variant.TryOnImageUrl = url;
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task A_jpeg_photograph_is_cut_out_and_attached_as_try_on_artwork()
     {
         var (frameId, variantId) = await AnyVariantAsync();
 
-        var page = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
-        var response = await app.Admin.PostAsync(
-            $"/admin/frames/{frameId}/variants/{variantId}/artwork",
-            await BodyAsync(app.Admin, page, FramePhotograph(), "shopfloor.jpg",
-                "image/jpeg", removeBackground: true));
+        string? original;
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            original = (await db.FrameVariants.AsNoTracking()
+                .FirstAsync(v => v.Id == variantId)).TryOnImageUrl;
+        }
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        try
+        {
+            var page = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
+            var response = await app.Admin.PostAsync(
+                $"/admin/frames/{frameId}/variants/{variantId}/artwork",
+                await BodyAsync(app.Admin, page, FramePhotograph(), "shopfloor.jpg",
+                    "image/jpeg", removeBackground: true));
 
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var variant = await db.FrameVariants.AsNoTracking().FirstAsync(v => v.Id == variantId);
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
 
-        Assert.NotNull(variant.TryOnImageUrl);
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var variant = await db.FrameVariants.AsNoTracking().FirstAsync(v => v.Id == variantId);
 
-        // A JPEG has no alpha channel, so artwork derived from one is only usable
-        // if it was stored as PNG — WebP here would mean the cut-out was lost.
-        Assert.EndsWith(".png", variant.TryOnImageUrl);
+            Assert.NotNull(variant.TryOnImageUrl);
 
-        // And the stored file must actually be transparent where the backdrop was.
-        var served = await app.Admin.GetByteArrayAsync(variant.TryOnImageUrl);
-        using var stored = SKBitmap.Decode(served);
+            // A JPEG has no alpha channel, so artwork derived from one is only usable
+            // if it was stored as PNG — WebP here would mean the cut-out was lost.
+            Assert.EndsWith(".png", variant.TryOnImageUrl);
 
-        Assert.Equal(0, stored.GetPixel(2, 2).Alpha);
+            // And the stored file must actually be transparent where the backdrop was.
+            var served = await app.Admin.GetByteArrayAsync(variant.TryOnImageUrl);
+            using var stored = SKBitmap.Decode(served);
 
-        // Inside the left lens: the customer has to be able to see through it.
-        // Coordinates are proportional because the master is resized on the way in.
-        var lensX = (int)(stored.Width * 0.27);
-        var lensY = (int)(stored.Height * 0.52);
-        Assert.True(stored.GetPixel(lensX, lensY).Alpha < 128,
-            $"lens interior alpha was {stored.GetPixel(lensX, lensY).Alpha}");
+            Assert.Equal(0, stored.GetPixel(2, 2).Alpha);
 
-        // The rim itself must survive.
-        var rimX = (int)(stored.Width * 0.14);
-        Assert.True(stored.GetPixel(rimX, lensY).Alpha > 128,
-            $"rim alpha was {stored.GetPixel(rimX, lensY).Alpha}");
+            // Inside the left lens: the customer has to be able to see through it.
+            // Coordinates are proportional because the master is resized on the way in.
+            var lensX = (int)(stored.Width * 0.27);
+            var lensY = (int)(stored.Height * 0.52);
+            Assert.True(stored.GetPixel(lensX, lensY).Alpha < 128,
+                $"lens interior alpha was {stored.GetPixel(lensX, lensY).Alpha}");
+
+            // The rim itself must survive.
+            var rimX = (int)(stored.Width * 0.14);
+            Assert.True(stored.GetPixel(rimX, lensY).Alpha > 128,
+                $"rim alpha was {stored.GetPixel(rimX, lensY).Alpha}");
+        }
+        finally
+        {
+            await RestoreArtworkAsync(variantId, original);
+        }
     }
 
     [Fact]
@@ -166,6 +200,43 @@ public class HttpArtworkUploadTests(VisionCartApp app)
         Assert.Matches(new Regex(
             "enough contrast|plain background|too close in colour",
             RegexOptions.IgnoreCase), followed);
+    }
+
+    [Fact]
+    public async Task A_frame_photographed_at_an_angle_is_refused_with_a_reason()
+    {
+        var (frameId, variantId) = await AnyVariantAsync();
+
+        // A three-quarter view: far lens smaller and higher, near temple showing.
+        using var bitmap = new SKBitmap(
+            new SKImageInfo(480, 240, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.White);
+            using var rim = new SKPaint { Color = SKColors.Black };
+            using var hole = new SKPaint { Color = SKColors.White };
+
+            canvas.DrawRect(new SKRect(50, 90, 190, 180), rim);
+            canvas.DrawRect(new SKRect(215, 76, 310, 156), rim);
+            canvas.DrawRect(new SKRect(310, 98, 430, 118), rim);
+            canvas.DrawRect(new SKRect(65, 105, 175, 165), hole);
+            canvas.DrawRect(new SKRect(228, 89, 297, 143), hole);
+            canvas.Flush();
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 95);
+
+        var page = $"/admin/frames/{frameId}/variants/{variantId}/calibrate";
+        var response = await app.Admin.PostAsync(
+            $"/admin/frames/{frameId}/variants/{variantId}/artwork",
+            await BodyAsync(app.Admin, page, data.ToArray(), "angled.jpg",
+                "image/jpeg", removeBackground: true));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        var followed = await app.Admin.GetStringAsync(response.Headers.Location!.ToString());
+        Assert.Matches(new Regex("at an angle|front-on", RegexOptions.IgnoreCase), followed);
     }
 
     [Fact]

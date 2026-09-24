@@ -193,6 +193,13 @@ public sealed class LocalStorageProvider(
                     "frame against a single plain backdrop, or upload artwork that is already " +
                     "cut out.",
 
+                BackgroundRemovalOutcome.NotFrontOn =>
+                    $"{originalName} was photographed at an angle. The background came away " +
+                    "cleanly, but try-on artwork has to be front-on: the mirror lines the two " +
+                    "lenses up with the customer's pupils, and in a three-quarter view one lens " +
+                    "is foreshortened, so the frame sits skewed across the face. Re-shoot the " +
+                    "frame square to the camera.",
+
                 BackgroundRemovalOutcome.InsufficientContrast =>
                     $"{originalName} does not have enough contrast between the frame and its " +
                     "background to cut out safely — parts of the frame would be erased along " +

@@ -236,6 +236,83 @@ public class BackgroundRemoverTests
         Assert.Equal(1.0, result.BorderAgreement, 3);
     }
 
+    /// <summary>
+    /// A three-quarter view: the far lens is foreshortened and sits higher, and
+    /// the visible near temple drags the opaque shape sideways relative to the
+    /// pair. This is what a frame photographed at an angle looks like to the
+    /// measurement, and it must not become try-on artwork.
+    /// </summary>
+    private static SKBitmap Angled()
+    {
+        var bitmap = new SKBitmap(new SKImageInfo(Size, Size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+
+        using var rim = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+        using var hole = new SKPaint { Color = SKColors.White, IsAntialias = false };
+
+        canvas.DrawRect(new SKRect(20, 84, 86, 134), rim);   // near lens, full size
+        canvas.DrawRect(new SKRect(96, 74, 140, 118), rim);  // far lens, smaller and higher
+        canvas.DrawRect(new SKRect(140, 88, 185, 98), rim);  // near temple, visible
+
+        canvas.DrawRect(new SKRect(28, 92, 78, 126), hole);
+        canvas.DrawRect(new SKRect(103, 81, 133, 111), hole);
+
+        canvas.Flush();
+        return bitmap;
+    }
+
+    [Fact]
+    public void A_frame_photographed_at_an_angle_is_refused()
+    {
+        using var source = Angled();
+
+        var result = BackgroundRemover.Remove(source);
+
+        Assert.Equal(BackgroundRemovalOutcome.NotFrontOn, result.Outcome);
+        Assert.Null(result.Bitmap);
+        Assert.True(result.FrontOnScore < 0.80,
+            $"front-on score was {result.FrontOnScore:F3}, which should have failed the guard");
+    }
+
+    [Fact]
+    public void An_angled_frame_can_still_be_cut_when_the_check_is_waived()
+    {
+        // The cut-out itself is fine; it is only unusable as try-on artwork. A
+        // caller that wants the image for a gallery should still be able to ask.
+        using var source = Angled();
+
+        var result = BackgroundRemover.Remove(source,
+            new BackgroundRemovalOptions { RequireFrontOn = false });
+
+        Assert.Equal(BackgroundRemovalOutcome.Removed, result.Outcome);
+        result.Bitmap?.Dispose();
+    }
+
+    [Fact]
+    public void A_front_on_frame_scores_well_and_reports_its_lens_centres()
+    {
+        using var source = Spectacles(SKColors.White, SKColors.Black, SKColors.White);
+
+        var result = BackgroundRemover.Remove(source);
+
+        Assert.True(result.FrontOnScore > 0.80,
+            $"front-on score was {result.FrontOnScore:F3}");
+
+        // The openings are the calibration anchors, left to right.
+        Assert.Equal(2, result.Openings.Count);
+        Assert.True(result.Openings[0].CentreX < result.Openings[1].CentreX);
+
+        // Symmetric about the middle of a symmetric drawing.
+        var midpoint = (result.Openings[0].CentreX + result.Openings[1].CentreX) / 2;
+        Assert.InRange(midpoint, 0.47, 0.53);
+
+        // Level with each other.
+        Assert.InRange(Math.Abs(result.Openings[0].CentreY - result.Openings[1].CentreY), 0, 0.01);
+
+        result.Bitmap?.Dispose();
+    }
+
     [Fact]
     public void An_empty_image_is_handled_without_throwing()
     {
