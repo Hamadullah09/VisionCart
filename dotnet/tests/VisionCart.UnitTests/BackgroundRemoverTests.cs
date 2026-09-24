@@ -579,4 +579,102 @@ public class BackgroundRemoverTests
         Assert.Equal(255, AlphaAt(cut, 100, 105));  // the island survives
         Assert.Equal(0, AlphaAt(cut, 100, 62));     // the ring itself still goes
     }
+
+    /// <summary>A cut-out with its arms left in, as the uploader used to make.</summary>
+    private static SKBitmap ArtworkWithItsArmsStillOn()
+    {
+        using var source = SpectaclesWithSideArms();
+        var cut = BackgroundRemover.Remove(source, new BackgroundRemovalOptions
+        {
+            ClearTempleIntrusions = false,
+            ClearTemples = false,
+        });
+
+        return cut.Bitmap!;
+    }
+
+    [Fact]
+    public void Artwork_already_in_the_catalogue_can_have_its_arms_taken_out()
+    {
+        // Fixing the uploader only helps the next photograph. Nobody re-uploads
+        // a frame that looked right at the time, so the arms stay in the
+        // catalogue and the only symptom is a mirror that draws one across an
+        // eye. The original photograph is gone, but the cut-out still says in
+        // its alpha which pixels were backdrop, and that is all this needs.
+        using var artwork = ArtworkWithItsArmsStillOn();
+
+        var result = BackgroundRemover.Retouch(artwork);
+
+        Assert.Equal(BackgroundRemovalOutcome.Removed, result.Outcome);
+        using var fixedUp = result.Bitmap!;
+
+        Assert.True(result.TempleIntrusionPixels > 0);
+        Assert.True(result.TempleSidePixels > 0);
+
+        Assert.Equal(0, AlphaAt(fixedUp, 55, 104));   // arm behind the left lens
+        Assert.Equal(0, AlphaAt(fixedUp, 145, 104));  // and the right
+        Assert.Equal(0, AlphaAt(fixedUp, 15, 103));   // arm off the left side
+        Assert.Equal(0, AlphaAt(fixedUp, 185, 103));  // and the right
+    }
+
+    [Fact]
+    public void Retouching_leaves_the_frame_itself_exactly_as_it_was()
+    {
+        using var artwork = ArtworkWithItsArmsStillOn();
+
+        var result = BackgroundRemover.Retouch(artwork);
+
+        using var fixedUp = result.Bitmap!;
+        Assert.Equal(255, AlphaAt(fixedUp, 35, 105));   // left rim
+        Assert.Equal(255, AlphaAt(fixedUp, 165, 105));  // right rim
+        Assert.Equal(255, AlphaAt(fixedUp, 100, 102));  // the bridge
+        Assert.Equal(255, AlphaAt(fixedUp, 60, 84));    // top of the left rim
+    }
+
+    [Fact]
+    public void Retouching_the_same_artwork_twice_changes_nothing_the_second_time()
+    {
+        // It is a button somebody can press, so pressing it again must be safe
+        // and must not write a new file for nothing.
+        using var artwork = ArtworkWithItsArmsStillOn();
+
+        var once = BackgroundRemover.Retouch(artwork);
+        using var afterFirst = once.Bitmap!;
+
+        var twice = BackgroundRemover.Retouch(afterFirst);
+        using var afterSecond = twice.Bitmap!;
+
+        Assert.Equal(0, twice.TempleIntrusionPixels);
+        Assert.Equal(0, twice.TempleSidePixels);
+    }
+
+    [Fact]
+    public void Retouching_still_measures_the_frame_front()
+    {
+        // The service leaves the recorded calibration alone on the strength of
+        // this: the canvas is untouched and the arms were never inside the
+        // front, so the span the mirror scales by is the same either way.
+        using var artwork = ArtworkWithItsArmsStillOn();
+        using var source = SpectaclesWithSideArms();
+
+        var upload = BackgroundRemover.Remove(source);
+        var repair = BackgroundRemover.Retouch(artwork);
+
+        Assert.Equal(upload.FrontLeftX, repair.FrontLeftX, 3);
+        Assert.Equal(upload.FrontRightX, repair.FrontRightX, 3);
+        Assert.Equal(2, repair.OpeningsCleared);
+    }
+
+    [Fact]
+    public void Retouching_a_picture_with_no_transparency_does_nothing()
+    {
+        // A photograph that never went through the cut-out has no alpha to read,
+        // and guessing from colour is exactly what this path does not do.
+        using var solid = Spectacles(SKColors.White, SKColors.Black, SKColors.White);
+
+        var result = BackgroundRemover.Retouch(solid);
+
+        Assert.Equal(BackgroundRemovalOutcome.NothingToRemove, result.Outcome);
+        Assert.Null(result.Bitmap);
+    }
 }

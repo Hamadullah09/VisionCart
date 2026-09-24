@@ -379,6 +379,42 @@ public class FramesController(
     /// Uploads a photograph, cuts it out and attaches it as this colourway's
     /// try-on artwork. Returns the message to show, whether it worked or not.
     /// </summary>
+    /// <summary>
+    /// Repairs the try-on artwork already in the catalogue.
+    ///
+    /// The uploader takes the temple arms out now, but only as a picture goes
+    /// in. Anything uploaded before keeps its arms, nobody re-uploads a frame
+    /// that looked right at the time, and the only sign of it is a mirror that
+    /// draws an arm across the customer eye. This is the way to fix those
+    /// without hunting for them one at a time.
+    ///
+    /// Repeatable: artwork with nothing left to take out is left alone.
+    /// </summary>
+    [HttpPost("artwork/retouch")]
+    public async Task<IActionResult> RetouchArtwork(
+        [FromServices] IArtworkRetouchService retouch, CancellationToken ct)
+    {
+        var report = await retouch.RetouchAllAsync(ct);
+
+        var summary = report.Repaired == 0
+            ? $"Nothing to do — all {report.AlreadyClean} uploaded pictures were already clean."
+            : $"Repaired {report.Repaired} piece{(report.Repaired == 1 ? "" : "s")} of try-on "
+              + $"artwork; {report.AlreadyClean} were already clean. The gallery photographs "
+              + "are untouched.";
+
+        if (report.Problems.Count > 0)
+        {
+            TempData["AdminError"] = summary + " Some could not be done: "
+                                     + string.Join(" ", report.Problems.Take(5));
+        }
+        else
+        {
+            TempData["AdminOk"] = summary;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     private async Task<(bool Ok, string Message)> AttachArtworkAsync(
         string variantId, IFormFile artwork, bool removeBackground, CancellationToken ct)
     {

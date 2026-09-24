@@ -527,8 +527,9 @@ export class TryOnStudio {
 
     // 2. The frame, drawn at the size it is actually made in
     const fit = this.solveCurrentFit();
+    const frame = this.selected;
 
-    if (this.overlay && fit) {
+    if (this.overlay && fit && frame) {
       if (!this.scratch) this.scratch = document.createElement("canvas");
       if (this.scratch.width !== this.canvas.width || this.scratch.height !== this.canvas.height) {
         this.scratch.width = this.canvas.width;
@@ -538,11 +539,14 @@ export class TryOnStudio {
       drawFrame(ctx, this.overlay, fit.transform, {
         width: this.overlay.naturalWidth,
         height: this.overlay.naturalHeight,
-        opacity: (this.selected?.opacity ?? 1) * this.trackingOpacity,
+        opacity: (frame.opacity ?? 1) * this.trackingOpacity,
         squeezeX: fit.squeezeX,
         shadow: true,
         silhouette: this.silhouette,
         scratch: this.scratch,
+        front: frame.frontLeftX != null && frame.frontRightX != null
+          ? { leftX: frame.frontLeftX, rightX: frame.frontRightX }
+          : null,
       });
     }
 

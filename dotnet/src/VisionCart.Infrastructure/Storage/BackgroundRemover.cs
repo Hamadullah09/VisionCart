@@ -288,6 +288,110 @@ public static class BackgroundRemover
     private const byte Opening = 3;   // enclosed background — the lenses
     private const byte Intrusion = 4; // opaque, but inside a lens — a temple arm
 
+    /// <summary>
+    /// Redoes the temple work on artwork that has already been cut out.
+    ///
+    /// Fixing the uploader only ever helps the next photograph. Everything
+    /// already in the catalogue keeps whatever the uploader did on the day it
+    /// went in, and nobody re-uploads a frame that looked fine at the time — so
+    /// a shop that took its pictures last month still has arms lying across its
+    /// customers' eyes, and the only visible symptom is that the mirror looks
+    /// wrong.
+    ///
+    /// The original photograph is long gone, so there is no chroma key to run
+    /// again. There does not need to be: the cut-out already says which pixels
+    /// are background, in its alpha. Treat fully transparent as backdrop and
+    /// everything else as frame, and the same three steps that a fresh upload
+    /// goes through — find the lenses, clear the arms behind them, clear the
+    /// arms off the sides — apply unchanged.
+    ///
+    /// Idempotent: run it on artwork that has already been through it and it
+    /// finds nothing to do.
+    /// </summary>
+    public static BackgroundRemovalResult Retouch(
+        SKBitmap cutOut, BackgroundRemovalOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(cutOut);
+        var opts = options ?? new BackgroundRemovalOptions();
+
+        var width = cutOut.Width;
+        var height = cutOut.Height;
+        var total = width * height;
+        if (total == 0) return new BackgroundRemovalResult { Outcome = BackgroundRemovalOutcome.NothingToRemove };
+
+        var pixels = cutOut.Pixels;
+
+        // The cut-out's own alpha stands in for the colour distance: nothing
+        // where it is transparent, everything where it is not. With a tolerance
+        // of zero that makes the existing flood, opening and temple passes read
+        // "transparent" exactly where they would have read "backdrop".
+        var distances = new int[total];
+        var opaque = 0;
+
+        for (var i = 0; i < total; i++)
+        {
+            if (pixels[i].Alpha == 0) continue;
+            distances[i] = int.MaxValue;
+            opaque++;
+        }
+
+        if (opaque == 0 || opaque == total)
+        {
+            return new BackgroundRemovalResult { Outcome = BackgroundRemovalOutcome.NothingToRemove };
+        }
+
+        var mask = new byte[total];
+        FloodFromBorder(mask, distances, width, height, 0);
+
+        var openings = ClearEnclosedOpenings(
+            mask, distances, width, height, 0, 0,
+            (int)Math.Max(1, opts.MinOpeningFraction * total),
+            opts.ClearTempleIntrusions, opts.MaxIntrusionFraction,
+            out var intrusionPixels);
+
+        var (frontLeftColumn, frontRightColumn) = FrameFrontColumns(mask, width, height);
+
+        var templeSidePixels = 0;
+        if (opts.ClearTemples && frontLeftColumn >= 0)
+        {
+            templeSidePixels = ClearTemples(
+                mask, width, height, frontLeftColumn, frontRightColumn,
+                opts.MinFrontSpanFraction);
+        }
+
+        var frameLeft = frontLeftColumn < 0 ? 0d : (double)frontLeftColumn / width;
+        var frameRight = frontLeftColumn < 0 ? 1d : (double)frontRightColumn / width;
+
+        var output = new SKBitmap(
+            new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+
+        var result = new SKColor[total];
+        for (var i = 0; i < total; i++)
+        {
+            var px = pixels[i];
+            result[i] = mask[i] == Intrusion
+                ? new SKColor(px.Red, px.Green, px.Blue, 0)
+                : px;
+        }
+
+        output.Pixels = result;
+
+        return new BackgroundRemovalResult
+        {
+            Outcome = BackgroundRemovalOutcome.Removed,
+            Bitmap = output,
+            Openings = openings,
+            OpeningsCleared = openings.Count,
+            TempleIntrusionPixels = intrusionPixels,
+            TempleSidePixels = templeSidePixels,
+            FrontOnScore = openings.Count == 2
+                ? FrontOnScoreFor(openings, frameLeft, frameRight)
+                : 0,
+            FrontLeftX = frameLeft,
+            FrontRightX = frameRight,
+        };
+    }
+
     public static BackgroundRemovalResult Remove(
         SKBitmap source, BackgroundRemovalOptions? options = null)
     {

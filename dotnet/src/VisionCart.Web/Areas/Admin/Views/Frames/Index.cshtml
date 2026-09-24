@@ -26,6 +26,12 @@
         <p>@Model.Results.Total frame@(Model.Results.Total == 1 ? "" : "s") in the catalogue. Everything a customer can try on and buy starts here.</p>
     </div>
     <div class="row">
+        <form method="post" asp-action="RetouchArtwork" class="inline-form">
+            <button type="submit" class="btn btn-outline"
+                    title="Takes the temple arms out of try-on artwork uploaded before the mirror learned to do it. Gallery photographs are left alone.">
+                @Icons.Svg("glasses") Repair try-on artwork
+            </button>
+        </form>
         <a class="btn btn-outline" asp-controller="Vendors" asp-action="Index">@Icons.Svg("vendors") Vendors</a>
         <a class="btn btn-primary" asp-action="New">@Icons.Svg("plus") New frame</a>
     </div>

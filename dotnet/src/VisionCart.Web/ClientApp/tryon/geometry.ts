@@ -161,6 +161,32 @@ export function templeFadeBounds(
   };
 }
 
+/**
+ * The columns of a piece of artwork that are the frame front.
+ *
+ * Anything it cannot make sense of means paint the lot, because the failure to
+ * protect against is cutting a frame in half rather than leaving an arm on.
+ */
+export function frontBand(
+  front: { leftX: number; rightX: number } | null | undefined,
+  width: number,
+): { x: number; width: number } {
+  const whole = { x: 0, width };
+  if (!front) return whole;
+
+  const { leftX, rightX } = front;
+  if (!Number.isFinite(leftX) || !Number.isFinite(rightX)) return whole;
+  if (!(rightX > leftX)) return whole;
+
+  const left = Math.max(0, Math.floor(leftX * width));
+  // One column past the last, because the recorded edge is a column index and
+  // the band is a count.
+  const right = Math.min(width, Math.ceil(rightX * width) + 1);
+  if (right - left < 1) return whole;
+
+  return { x: left, width: right - left };
+}
+
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   image: CanvasImageSource,
@@ -179,6 +205,20 @@ export function drawFrame(
     shadow?: boolean;
     /** Fade the arms out where they pass behind the head. */
     silhouette?: FaceSilhouette | null;
+    /**
+     * Paint only this span of the artwork, normalised: the frame front.
+     *
+     * Everything outside it is a temple arm, and an arm has nowhere to go on a
+     * flat overlay. Drawn artwork sweeps one back along the side of the head,
+     * which the silhouette pass can then hide; a photograph cannot, because the
+     * camera was in front and the arm is foreshortened into a spike pointing
+     * outward. Either way what the customer is judging is the front.
+     *
+     * Null paints everything. A frame with no recorded front is one whose arms
+     * cannot be located, and a guessed default would cut the rims off a tightly
+     * cropped photograph.
+     */
+    front?: { leftX: number; rightX: number } | null;
     /** Scratch canvas for the occlusion pass; reused between frames. */
     scratch?: HTMLCanvasElement | null;
   },
@@ -186,13 +226,18 @@ export function drawFrame(
   const opacity = opts.opacity ?? 1;
   const squeeze = opts.squeezeX ?? 1;
   const drawnWidth = opts.width * t.scale * squeeze;
+  const band = frontBand(opts.front, opts.width);
 
   const place = (target: CanvasRenderingContext2D, dx = 0, dy = 0): void => {
     target.translate(t.translateX + dx, t.translateY + dy);
     target.rotate(t.rotate);
     target.scale(t.scale * squeeze, t.scale);
     target.translate(-t.anchorX, -t.anchorY);
-    target.drawImage(image, 0, 0, opts.width, opts.height);
+    target.drawImage(
+      image,
+      band.x, 0, band.width, opts.height,
+      band.x, 0, band.width, opts.height,
+    );
   };
 
   // --- the shadow it casts ------------------------------------------------

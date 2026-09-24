@@ -110,6 +110,7 @@ public static class DependencyInjection
         services.AddScoped<IShippingService, ShippingService>();
         services.AddScoped<IPaymentService, PaymentService>();
         services.AddScoped<IStorageProvider, LocalStorageProvider>();
+        services.AddScoped<IArtworkRetouchService, ArtworkRetouchService>();
         services.AddScoped<IEmailService, EmailService>();
 
         // --- Back office -----------------------------------------------------

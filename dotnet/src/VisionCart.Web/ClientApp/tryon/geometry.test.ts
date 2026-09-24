@@ -14,6 +14,9 @@ import {
   NO_ADJUSTMENT,
   IRIS_DIAMETER_MM,
   templeFadeBounds,
+  frontBand,
+  drawFrame,
+  type Transform,
   TEMPLE_FADE,
   autoFit,
   PUPIL_HEIGHT_IN_LENS,
@@ -511,5 +514,78 @@ describe("temple occlusion", () => {
     // arithmetic should not produce nonsense if it ever does not.
     const b = templeFadeBounds({ leftX: 700, rightX: 300 });
     assert.ok(Number.isFinite(b.left.end) && Number.isFinite(b.right.end));
+  });
+});
+
+
+describe("painting only the frame front", () => {
+  // The arms are the problem this solves. A flat overlay has nowhere to put
+  // one: drawn artwork sweeps it back along the head, a photograph shows it
+  // foreshortened into a spike, and at the size the front dictates either lands
+  // across the face. What the customer is judging is the front.
+
+  it("keeps the whole picture when no front is recorded", () => {
+    assert.deepEqual(frontBand(null, 1000), { x: 0, width: 1000 });
+    assert.deepEqual(frontBand(undefined, 640), { x: 0, width: 640 });
+  });
+
+  it("paints the recorded span and nothing either side of it", () => {
+    const band = frontBand({ leftX: 0.132, rightX: 0.868 }, 1000);
+    assert.equal(band.x, 132);
+    assert.ok(band.x + band.width <= 1000);
+    assert.ok(band.width >= 736 && band.width <= 738);
+  });
+
+  it("never runs off either end of the artwork", () => {
+    const band = frontBand({ leftX: -0.5, rightX: 1.9 }, 500);
+    assert.equal(band.x, 0);
+    assert.equal(band.width, 500);
+  });
+
+  it("paints everything rather than nothing when the span makes no sense", () => {
+    // Cutting a frame in half is the failure worth protecting against; leaving
+    // an arm on is not.
+    assert.deepEqual(frontBand({ leftX: 0.8, rightX: 0.2 }, 800), { x: 0, width: 800 });
+    assert.deepEqual(frontBand({ leftX: 0.5, rightX: 0.5 }, 800), { x: 0, width: 800 });
+    assert.deepEqual(frontBand({ leftX: NaN, rightX: 0.9 }, 800), { x: 0, width: 800 });
+  });
+
+  it("hands the band to the canvas as the source rectangle", () => {
+    const calls: number[][] = [];
+    const ctx = {
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      scale() {},
+      drawImage(...args: unknown[]) {
+        calls.push(args.slice(1) as number[]);
+      },
+      globalAlpha: 1,
+      filter: "none",
+    } as unknown as CanvasRenderingContext2D;
+
+    const transform: Transform = {
+      translateX: 0, translateY: 0, rotate: 0, scale: 1, anchorX: 0, anchorY: 0,
+    };
+
+    drawFrame(ctx, {} as CanvasImageSource, transform, {
+      width: 1000,
+      height: 400,
+      front: { leftX: 0.2, rightX: 0.8 },
+    });
+
+    assert.equal(calls.length, 1);
+    const [sx, sy, sw, sh, dx, dy, dw, dh] = calls[0];
+    assert.equal(sx, 200);
+    assert.equal(sy, 0);
+    assert.ok(sw >= 600 && sw <= 602);
+    assert.equal(sh, 400);
+    // Source and destination are the same rectangle: the placement is the
+    // canvas transform, so cropping must not move the frame sideways.
+    assert.equal(dx, sx);
+    assert.equal(dy, sy);
+    assert.equal(dw, sw);
+    assert.equal(dh, sh);
   });
 });
