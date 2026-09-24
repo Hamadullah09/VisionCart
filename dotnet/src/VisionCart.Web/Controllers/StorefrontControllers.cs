@@ -239,6 +239,7 @@ public class OrderController(IApplicationDbContext db, ICurrentUser currentUser)
 }
 
 [Route("error")]
+[IgnoreAntiforgeryToken]
 public class ErrorController : Controller
 {
     /// <summary>
@@ -252,6 +253,13 @@ public class ErrorController : Controller
     /// the real status. An antiforgery rejection on the sign-in form presented
     /// as "HTTP ERROR 405", which says nothing true about what went wrong and
     /// sends you looking at IIS verb configuration for hours.
+    ///
+    /// IgnoreAntiforgeryToken for the same reason, one layer along. The global
+    /// AutoValidateAntiforgeryToken filter applies to every non-GET request,
+    /// this one included — so a POST re-executed here was rejected with 400
+    /// before it could render, and the browser reported a bad request instead of
+    /// the 404 or 429 that actually happened. Nothing here mutates anything;
+    /// there is no state for a forged request to reach.
     /// </summary>
     [Route("{code:int}")]
     public IActionResult Status(int code) => View("Status", new ErrorViewModel
@@ -261,6 +269,7 @@ public class ErrorController : Controller
         {
             403 => "You don't have access to that",
             404 => "We couldn't find that page",
+            413 => "That file is too large",
             429 => "Too many attempts",
             500 => "Something went wrong at our end",
             _ => "Something went wrong",
@@ -269,7 +278,17 @@ public class ErrorController : Controller
         {
             403 => "Your account doesn't have permission to view this page.",
             404 => "The page may have moved, or the link may be out of date.",
-            429 => "Please wait a few minutes and try again.",
+
+            // Worth being specific. Both of these arrive with no body of their
+            // own, so without this page they render as a blank screen — and a
+            // blank screen after pressing Upload reads as a broken application
+            // rather than as a limit doing its job.
+            413 => "Pictures are limited to 16 MB. Resize it, or save it as a "
+                   + "JPEG at a lower quality, and upload it again.",
+            429 => "You have made a lot of requests in a short time — uploading a "
+                   + "batch of pictures will do it. Nothing was lost. Wait a few "
+                   + "minutes and carry on where you left off.",
+
             500 => "We've logged the problem. Please try again in a moment.",
             _ => "Please try again, or get in touch if it keeps happening.",
         },

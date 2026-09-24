@@ -82,7 +82,12 @@ builder.Services.AddRateLimiter(options =>
     // would lock every other customer out of signing in for five minutes.
     PerClient("auth", permitLimit: 8);
     PerClient("checkout", permitLimit: 20);
-    PerClient("upload", permitLimit: 30);
+
+    // Photographing a new range is a sitting of thirty, forty, sixty pictures,
+    // and every colourway saved with a picture spends one of these. Thirty was
+    // enough when uploading meant the media library and a separate attach step;
+    // it is not enough now that adding a colourway is an upload.
+    PerClient("upload", permitLimit: 120);
 
     void PerClient(string policy, int permitLimit) =>
         options.AddPolicy(policy, context => RateLimitPartition.GetFixedWindowLimiter(
@@ -158,6 +163,16 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
 });
 
+// Status pages run in EVERY environment, unlike the exception handler below.
+//
+// They were production-only, and the gap was not academic: a response that
+// carries a status but no body — 429 from the rate limiter, 413 from a request
+// size limit, 400 from a stale antiforgery token — rendered in Development as a
+// completely blank page. Nothing in the browser, nothing in the console, and the
+// developer exception page never fires because none of those are exceptions. An
+// upload that had simply hit its rate limit looked like the application had died.
+app.UseStatusCodePagesWithReExecute("/error/{0}");
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -166,7 +181,6 @@ else
 {
     // Customers never see a stack trace.
     app.UseExceptionHandler("/error/500");
-    app.UseStatusCodePagesWithReExecute("/error/{0}");
     app.UseHsts();
 }
 
@@ -219,8 +233,19 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseRouting();
-app.UseRateLimiter();
 app.UseAuthentication();
+
+// AFTER authentication, deliberately. The partition key below asks whether the
+// caller is signed in, and HttpContext.User is not populated until the
+// authentication middleware has run — so with the limiter in front of it the
+// `user:` branch never executed and every request fell into the `ip:` bucket.
+//
+// The direction of that failure was safe, but the cost was real: one member of
+// staff uploading frame artwork consumed the whole practice's budget, because
+// everyone in the building shares a NAT address. Thirty uploads later the next
+// person got a 429 with an empty body.
+app.UseRateLimiter();
+
 app.UseAuthorization();
 
 // Areas first: the back office lives under /admin and its controllers carry

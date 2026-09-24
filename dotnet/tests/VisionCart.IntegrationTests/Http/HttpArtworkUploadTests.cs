@@ -300,6 +300,53 @@ public class HttpArtworkUploadTests(VisionCartApp app)
         Assert.Matches(new Regex("at an angle|front-on", RegexOptions.IgnoreCase), followed);
     }
 
+    /// <summary>
+    /// The blank-screen bug.
+    ///
+    /// Uploading a batch of pictures exhausts the upload rate limit, and a 429
+    /// carries no body of its own. Status pages used to run in Production only,
+    /// so in Development the browser was handed a status and nothing to render:
+    /// a completely blank page, no console error, and the developer exception
+    /// page silent because a rate limit is not an exception.
+    ///
+    /// Driven through the sign-in limiter rather than the upload one. It is the
+    /// same mechanism and the same empty 429, but it costs eight requests
+    /// instead of a hundred and twenty, and it does not spend the shared staff
+    /// account's upload budget on a test.
+    /// </summary>
+    [Fact]
+    public async Task A_rate_limited_request_explains_itself_instead_of_going_blank()
+    {
+        // An address of this test's own, so the limiter's budget is not shared
+        // with whatever else the suite is doing.
+        const string ip = "203.0.113.42";
+
+        HttpResponseMessage? limited = null;
+
+        for (var attempt = 0; attempt < 14 && limited is null; attempt++)
+        {
+            using var client = app.CreateClient(
+                new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+                {
+                    AllowAutoRedirect = false,
+                });
+
+            var response = await app.SignInAsync(
+                client, "nobody@example.com", "WrongPassword!1", ip);
+
+            if (response.StatusCode == HttpStatusCode.TooManyRequests) limited = response;
+        }
+
+        Assert.NotNull(limited);
+
+        var body = await limited!.Content.ReadAsStringAsync();
+
+        // The point of the test: something to read, not an empty response.
+        Assert.NotEmpty(body);
+        Assert.Matches(new Regex("too many|wait a few minutes", RegexOptions.IgnoreCase), body);
+        Assert.Contains("Nothing was lost", body);
+    }
+
     [Fact]
     public async Task Uploading_artwork_requires_a_staff_account()
     {
