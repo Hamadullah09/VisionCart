@@ -53,18 +53,29 @@ if (-not $SkipTests) {
 
 # --- 2. Client assets ---------------------------------------------------------
 Write-Host "`n[2/4] Building client assets..." -ForegroundColor Yellow
-$clientApp = Join-Path $web "ClientApp"
-
-if (Test-Path (Join-Path $clientApp "package.json")) {
-    Push-Location $clientApp
-    try {
-        if (-not (Test-Path "node_modules")) { npm ci }
-        npm run build
-        if ($LASTEXITCODE -ne 0) { throw "The client asset build failed." }
-    } finally { Pop-Location }
-} else {
-    Write-Host "  No ClientApp build configured; using the committed bundle." -ForegroundColor DarkGray
+# package.json sits in the web project, beside wwwroot -- not in ClientApp,
+# which holds only the TypeScript. This looked in ClientApp and, finding
+# nothing, announced that it was falling back to the committed bundle and
+# carried on. That is the worst of both worlds: a release build that quietly
+# ships whatever JavaScript happened to be committed, with a reassuring line in
+# the log saying so. A missing build script is now an error, because on this
+# project the client bundle is half the application.
+$manifest = Join-Path $web "package.json"
+if (-not (Test-Path $manifest)) {
+    throw "No package.json at $manifest. The client bundle cannot be built, and " +
+          "shipping the committed one unverified is how a stale mirror reaches production."
 }
+
+Push-Location $web
+try {
+    if (-not (Test-Path "node_modules")) { npm ci }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "The client asset build failed." }
+} finally { Pop-Location }
+
+$bundle = Join-Path $web "wwwroot" | Join-Path -ChildPath "js" | Join-Path -ChildPath "tryon.js"
+if (-not (Test-Path $bundle)) { throw "The client build produced no $bundle." }
+Write-Host ("  tryon.js {0:N0} bytes" -f (Get-Item $bundle).Length) -ForegroundColor DarkGray
 
 # --- 3. Publish ---------------------------------------------------------------
 Write-Host "`n[3/4] Publishing..." -ForegroundColor Yellow
