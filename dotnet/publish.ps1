@@ -124,9 +124,18 @@ foreach ($pattern in $forbidden) {
 }
 
 # The uploads folder must exist and must be writable by the application pool,
-# or the first image upload fails with a permissions error.
-$uploads = Join-Path $target "wwwroot\uploads"
-if (-not (Test-Path $uploads)) { New-Item -ItemType Directory -Path $uploads | Out-Null }
+# or the first image upload fails with a permissions error. It must also be
+# EMPTY.
+#
+# This only created it, and `dotnet publish` copies the whole of wwwroot --
+# so whatever the developer happened to have uploaded locally rode along into
+# the package and on to the live server. The repository already treats that
+# folder as local-only (.gitignore), which is exactly the signal that it must
+# not ship: on this machine it was 123 files of test photography, about to be
+# dropped into a running shop's media library.
+$uploads = Join-Path $target "wwwroot" | Join-Path -ChildPath "uploads"
+if (Test-Path $uploads) { Remove-Item $uploads -Recurse -Force }
+New-Item -ItemType Directory -Path $uploads | Out-Null
 $logs = Join-Path $target "logs"
 if (-not (Test-Path $logs)) { New-Item -ItemType Directory -Path $logs | Out-Null }
 
