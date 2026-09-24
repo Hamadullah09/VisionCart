@@ -17,6 +17,14 @@ public sealed class ArtworkGeometry
     public required double FrontRightX { get; init; }
     public required double LensTopY { get; init; }
     public required double LensBottomY { get; init; }
+
+    /// <summary>
+    /// The cut-out's own dimensions. Recorded alongside the anchors because the
+    /// readiness check reads them, and artwork replaced without them left the
+    /// previous picture's size on the colourway.
+    /// </summary>
+    public required int ImageWidth { get; init; }
+    public required int ImageHeight { get; init; }
 }
 
 public sealed class StoredImage

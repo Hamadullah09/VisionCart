@@ -422,6 +422,12 @@ public class FramesController(
                     FrontRightX = g.FrontRightX,
                     LensTopY = g.LensTopY,
                     LensBottomY = g.LensBottomY,
+
+                    // Without these the colourway keeps the previous picture's
+                    // dimensions, and the readiness check reads them.
+                    ImageWidth = g.ImageWidth,
+                    ImageHeight = g.ImageHeight,
+
                     Opacity = 1.0,
                 }, ct);
 
@@ -519,34 +525,13 @@ public class FramesController(
 
         if (!exists) return NotFound();
 
-        await using var stream = file.OpenReadStream();
+        // The same routine the colourway form uses, deliberately. While these
+        // were two pieces of code only one of them calibrated, so artwork
+        // replaced here kept the previous picture's anchors — worse than having
+        // none, because it looks configured.
+        var (attached, message) = await AttachArtworkAsync(variantId, file, removeBackground, ct);
 
-        // keepAlpha is always true here: this image is destined to be drawn over
-        // a face, so it is stored as PNG whether or not we cut anything out.
-        var upload = await media.UploadAsync(
-            stream, file.FileName, file.ContentType, tags: "try-on",
-            keepAlpha: true, removeBackground: removeBackground,
-            userId: User.FindFirstValue(ClaimTypes.NameIdentifier), ct: ct);
-
-        if (!upload.Ok)
-        {
-            TempData["AdminError"] = upload.Error;
-            return back;
-        }
-
-        var attach = await media.AttachToVariantAsync(
-            upload.MediaId!, variantId, ProductImageRoles.TryOn, ct);
-
-        if (!attach.Ok)
-        {
-            TempData["AdminError"] = attach.Error;
-            return back;
-        }
-
-        TempData["AdminOk"] = removeBackground
-            ? "Artwork uploaded and the background removed. Check the cut-out below, "
-              + "then set the calibration points."
-            : "Artwork uploaded. Set the calibration points below.";
+        TempData[attached ? "AdminOk" : "AdminError"] = message;
 
         return back;
     }

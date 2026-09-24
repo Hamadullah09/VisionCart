@@ -198,6 +198,8 @@ public sealed class LocalStorageProvider(
                         FrontRightX = result.FrontRightX,
                         LensTopY = Math.Min(result.Openings[0].TopY, result.Openings[1].TopY),
                         LensBottomY = Math.Max(result.Openings[0].BottomY, result.Openings[1].BottomY),
+                        ImageWidth = result.Bitmap!.Width,
+                        ImageHeight = result.Bitmap!.Height,
                     };
                 }
 
