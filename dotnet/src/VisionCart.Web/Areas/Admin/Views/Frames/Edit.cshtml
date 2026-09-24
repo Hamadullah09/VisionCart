@@ -362,8 +362,38 @@
                 </div>
 
                 <div class="mt-2" data-edit-panel="v-@variant.Id" hidden>
-                    <form method="post" asp-action="SaveVariant" asp-route-id="@Model.Frame.Id"
+                    <form method="post" enctype="multipart/form-data"
+                          asp-action="SaveVariant" asp-route-id="@Model.Frame.Id"
                           asp-route-variantId="@variant.Id">
+
+                        <div class="artwork-field">
+                            <label for="art-@variant.Id">
+                                @(variant.TryOnImageUrl is null
+                                    ? "Picture of this colourway"
+                                    : "Replace the picture")
+                            </label>
+                            <input class="field" type="file" id="art-@variant.Id" name="artwork"
+                                   accept="image/jpeg,image/png,image/webp,image/avif" />
+                            <label class="checkline is-aligned mt-1">
+                                <input type="checkbox" name="removeBackground" value="true" checked />
+                                <span>Remove the background and make it ready for try-on</span>
+                            </label>
+                            <p class="hint">
+                                @if (variant.TryOnImageUrl is null)
+                                {
+                                    <text>
+                                        This colourway has no try-on artwork yet. Upload a front-on
+                                        photograph against a plain backdrop and it will be cut out
+                                        for you.
+                                    </text>
+                                }
+                                else
+                                {
+                                    <text>Leave this empty to keep the picture it already has.</text>
+                                }
+                            </p>
+                        </div>
+
                         <div class="form-grid three">
                             <div><label>Colour name</label><input class="field" name="ColorName" value="@variant.ColorName" required /></div>
                             <div><label>Swatch hex</label><input class="field" name="ColorHex" value="@variant.ColorHex" /></div>
@@ -435,7 +465,28 @@
         <div class="record-item">
             <button class="btn btn-outline btn-small" type="button" data-edit-toggle="v-new">Add a colourway</button>
             <div class="mt-2" data-edit-panel="v-new" hidden>
-                <form method="post" asp-action="SaveVariant" asp-route-id="@Model.Frame.Id">
+                <form method="post" enctype="multipart/form-data"
+                      asp-action="SaveVariant" asp-route-id="@Model.Frame.Id">
+
+                    <div class="artwork-field">
+                        <label for="new-artwork">Picture of this colourway</label>
+                        <input class="field" type="file" id="new-artwork" name="artwork"
+                               accept="image/jpeg,image/png,image/webp,image/avif" />
+                        <label class="checkline is-aligned mt-1">
+                            <input type="checkbox" name="removeBackground" value="true" checked />
+                            <span>Remove the background and make it ready for try-on</span>
+                        </label>
+                        <p class="hint">
+                            Front-on, against a single plain backdrop, with clear contrast between
+                            the frame and the background. The backdrop and the lens openings are
+                            made transparent and the picture is saved as PNG, so the mirror can
+                            draw it over a customer's face. A photograph shot at an angle, or one
+                            where the frame is too close in tone to the backdrop, is rejected
+                            rather than turned into artwork that looks wrong on a face.
+                            Already cut out? Untick the box.
+                        </p>
+                    </div>
+
                     <div class="form-grid three">
                         <div><label>Colour name</label><input class="field" name="ColorName" required /></div>
                         <div><label>Swatch hex</label><input class="field" name="ColorHex" placeholder="#1b1b1f" /></div>

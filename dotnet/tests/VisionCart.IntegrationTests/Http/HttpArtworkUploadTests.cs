@@ -203,6 +203,67 @@ public class HttpArtworkUploadTests(VisionCartApp app)
     }
 
     [Fact]
+    public async Task The_frame_page_asks_for_a_picture_when_a_colourway_is_added()
+    {
+        // The point of the whole change: adding a colourway asks for its
+        // photograph there and then, rather than sending staff to the media
+        // library and back.
+        var (frameId, _) = await AnyVariantAsync();
+
+        var html = await app.Admin.GetStringAsync($"/admin/frames/{frameId}");
+
+        Assert.Contains("name=\"artwork\"", html);
+        Assert.Contains("name=\"removeBackground\"", html);
+        Assert.Contains("enctype=\"multipart/form-data\"", html);
+        Assert.Contains($"/admin/frames/{frameId}/variants", html);
+    }
+
+    [Fact]
+    public async Task Adding_a_colourway_with_a_photograph_cuts_it_out_and_attaches_it()
+    {
+        var (frameId, _) = await AnyVariantAsync();
+
+        var token = await app.AntiforgeryTokenAsync(app.Admin, $"/admin/frames/{frameId}");
+
+        var file = new ByteArrayContent(FramePhotograph());
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+
+        var colour = $"QA Test {Guid.NewGuid():N}"[..14];
+        var body = new MultipartFormDataContent
+        {
+            { file, "artwork", "colourway.jpg" },
+            { new StringContent("true"), "removeBackground" },
+            { new StringContent(colour), "ColorName" },
+            { new StringContent("0"), "StockQty" },
+            { new StringContent(token), "__RequestVerificationToken" },
+        };
+
+        var response = await app.Admin.PostAsync($"/admin/frames/{frameId}/variants", body);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var created = await db.FrameVariants.FirstOrDefaultAsync(v => v.ColorName == colour);
+
+        try
+        {
+            Assert.NotNull(created);
+
+            // Saved in one step: colourway created AND artwork cut out and attached.
+            Assert.NotNull(created!.TryOnImageUrl);
+            Assert.EndsWith(".png", created.TryOnImageUrl);
+        }
+        finally
+        {
+            if (created is not null)
+            {
+                db.FrameVariants.Remove(created);
+                await db.SaveChangesAsync();
+            }
+        }
+    }
+
+    [Fact]
     public async Task A_frame_photographed_at_an_angle_is_refused_with_a_reason()
     {
         var (frameId, variantId) = await AnyVariantAsync();

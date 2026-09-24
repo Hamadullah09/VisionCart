@@ -1363,6 +1363,24 @@ body.admin .field-xs { width: 84px; min-width: 0; }
    drew the same three things — a divided list item, a boxed quotation and a
    row of controls. These are those three. */
 
+/* The picture a colourway is tried on in.
+   Set apart from the stock and pricing fields around it, because it is the one
+   field on the form that decides whether the frame can be tried on at all. */
+.artwork-field {
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--surface-sunk);
+}
+.artwork-field > label:first-child {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+.artwork-field input[type="file"] { padding: 7px 9px; cursor: pointer; }
+.artwork-field .hint { margin-top: 8px; max-width: 72ch; }
+
 /* One entry in a divided list: a lab ticket line, a prescription, a payment. */
 .record-item { border-top: 1px solid var(--rule); padding-top: 15px; margin-top: 15px; }
 .record-item:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }

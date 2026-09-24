@@ -326,14 +326,85 @@ public class FramesController(
     public async Task<IActionResult> Archive(string id, CancellationToken ct) =>
         Back(await catalogue.ArchiveFrameAsync(id, ct), nameof(Index));
 
+    /// <summary>
+    /// Saves a colourway and, if a photograph came with it, turns that into
+    /// try-on artwork in the same step.
+    ///
+    /// The two used to be separate errands — save the colourway here, then go to
+    /// the media library, upload, come back, attach — which is why colourways
+    /// existed in the catalogue with no artwork and therefore no try-on.
+    ///
+    /// The colourway is saved first and kept even if the photograph is rejected.
+    /// Losing a form's worth of typed stock figures because a picture was shot at
+    /// the wrong angle would be its own bug.
+    /// </summary>
     [HttpPost("{id}/variants")]
+    [EnableRateLimiting("upload")]
+    [RequestSizeLimit(16 * 1024 * 1024)]
     public async Task<IActionResult> SaveVariant(string id, string? variantId,
-        [FromForm] VariantDetails details, CancellationToken ct)
+        [FromForm] VariantDetails details, IFormFile? artwork,
+        [FromForm] bool removeBackground, CancellationToken ct)
     {
         var result = await catalogue.SaveVariantAsync(id, variantId, details, ct);
-        if (result.Ok) TempData["AdminOk"] = "Colourway saved.";
-        else TempData["AdminError"] = result.Error;
+
+        if (!result.Ok)
+        {
+            TempData["AdminError"] = result.Error;
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        if (artwork is null || artwork.Length == 0)
+        {
+            TempData["AdminOk"] = "Colourway saved.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        var savedVariantId = variantId ?? result.Value;
+        if (string.IsNullOrEmpty(savedVariantId))
+        {
+            TempData["AdminError"] =
+                "The colourway was saved, but the artwork could not be attached to it. "
+                + "Open the colourway and upload the picture again.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        var (attached, message) =
+            await AttachArtworkAsync(savedVariantId, artwork, removeBackground, ct);
+
+        TempData[attached ? "AdminOk" : "AdminError"] = message;
         return RedirectToAction(nameof(Edit), new { id });
+    }
+
+    /// <summary>
+    /// Uploads a photograph, cuts it out and attaches it as this colourway's
+    /// try-on artwork. Returns the message to show, whether it worked or not.
+    /// </summary>
+    private async Task<(bool Ok, string Message)> AttachArtworkAsync(
+        string variantId, IFormFile artwork, bool removeBackground, CancellationToken ct)
+    {
+        await using var stream = artwork.OpenReadStream();
+
+        // keepAlpha is always true: this image is destined to be drawn over a
+        // face, so it is stored as PNG whether or not anything is cut out.
+        var upload = await media.UploadAsync(
+            stream, artwork.FileName, artwork.ContentType, tags: "try-on",
+            keepAlpha: true, removeBackground: removeBackground,
+            userId: User.FindFirstValue(ClaimTypes.NameIdentifier), ct: ct);
+
+        if (!upload.Ok)
+            return (false, $"The colourway was saved. The picture was not: {upload.Error}");
+
+        var attach = await media.AttachToVariantAsync(
+            upload.MediaId!, variantId, ProductImageRoles.TryOn, ct);
+
+        if (!attach.Ok)
+            return (false, $"The colourway was saved. The picture was not: {attach.Error}");
+
+        return (true, removeBackground
+            ? "Colourway saved, background removed, and the picture is now this "
+              + "colourway's try-on artwork. Check the calibration below."
+            : "Colourway saved, and the picture is now its try-on artwork. "
+              + "Check the calibration below.");
     }
 
     /// <summary>
