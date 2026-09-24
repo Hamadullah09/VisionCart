@@ -45,6 +45,30 @@ public class BackgroundRemoverTests
 
     private static byte AlphaAt(SKBitmap bitmap, int x, int y) => bitmap.GetPixel(x, y).Alpha;
 
+    /// <summary>
+    /// The same frame with an arm showing through each lens. This is what a
+    /// camera sees: the pair is photographed open, so the temples recede from
+    /// the hinges and the glass shows them running down and inward.
+    /// </summary>
+    private static SKBitmap SpectaclesWithArmsBehindTheLenses(
+        SKColor background, SKColor frame, SKColor lens)
+    {
+        var bitmap = Spectacles(background, frame, lens);
+        using var canvas = new SKCanvas(bitmap);
+        using var arm = new SKPaint
+        {
+            Color = frame,
+            IsAntialias = false,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 5,
+        };
+
+        canvas.DrawLine(41, 91, 70, 118, arm);    // across the left lens
+        canvas.DrawLine(159, 91, 130, 118, arm);  // and the right
+        canvas.Flush();
+        return bitmap;
+    }
+
     [Fact]
     public void A_frame_on_a_plain_white_background_is_cut_out()
     {
@@ -337,5 +361,147 @@ public class BackgroundRemoverTests
         using var cut = result.Bitmap!;
         Assert.Equal(0, AlphaAt(cut, 2, 2));
         Assert.Equal(255, AlphaAt(cut, 35, 105));
+    }
+
+    [Fact]
+    public void An_arm_showing_through_a_lens_is_cleared_off_the_eye()
+    {
+        // The defect this guards: the arm is the frame own colour, so the
+        // chroma key keeps it, and the mirror then paints it across the
+        // wearer eye, which is the one place a temple never is.
+        using var source = SpectaclesWithArmsBehindTheLenses(
+            SKColors.White, SKColors.Black, SKColors.White);
+
+        var result = BackgroundRemover.Remove(source);
+
+        Assert.Equal(BackgroundRemovalOutcome.Removed, result.Outcome);
+        using var cut = result.Bitmap!;
+
+        Assert.True(result.TempleIntrusionPixels > 0);
+        Assert.Equal(0, AlphaAt(cut, 55, 104));   // mid-arm, left lens
+        Assert.Equal(0, AlphaAt(cut, 145, 104));  // mid-arm, right lens
+    }
+
+    [Fact]
+    public void Clearing_an_arm_does_not_touch_the_frame_itself()
+    {
+        using var source = SpectaclesWithArmsBehindTheLenses(
+            SKColors.White, SKColors.Black, SKColors.White);
+
+        var result = BackgroundRemover.Remove(source);
+
+        using var cut = result.Bitmap!;
+        Assert.Equal(255, AlphaAt(cut, 35, 105));   // left rim
+        Assert.Equal(255, AlphaAt(cut, 165, 105));  // right rim
+        Assert.Equal(255, AlphaAt(cut, 100, 102));  // the bridge
+        Assert.Equal(255, AlphaAt(cut, 60, 84));    // top of the left rim
+    }
+
+    [Fact]
+    public void An_arm_running_off_the_side_is_left_where_it_is()
+    {
+        // Only what is inside a lens is an intrusion. The temples proper run
+        // past the endpieces, outside every opening, and belong to the picture.
+        using var source = SpectaclesWithArmsBehindTheLenses(
+            SKColors.White, SKColors.Black, SKColors.White);
+        using (var canvas = new SKCanvas(source))
+        {
+            using var arm = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+            canvas.DrawRect(new SKRect(8, 100, 30, 106), arm);
+            canvas.DrawRect(new SKRect(170, 100, 192, 106), arm);
+            canvas.Flush();
+        }
+
+        var result = BackgroundRemover.Remove(source);
+
+        using var cut = result.Bitmap!;
+        Assert.Equal(255, AlphaAt(cut, 15, 103));
+        Assert.Equal(255, AlphaAt(cut, 185, 103));
+    }
+
+    [Fact]
+    public void A_lens_is_measured_whole_even_when_an_arm_crosses_it()
+    {
+        // Why this matters beyond the picture: the opening centre is the pupil
+        // anchor the mirror places the frame by. An arm eating the outer half of
+        // the lens drags that centre inward, so the frame is fitted to a lens
+        // centre that is not the lens.
+        using var plain = Spectacles(SKColors.White, SKColors.Black, SKColors.White);
+        using var armed = SpectaclesWithArmsBehindTheLenses(
+            SKColors.White, SKColors.Black, SKColors.White);
+
+        var truth = BackgroundRemover.Remove(plain);
+        var cleared = BackgroundRemover.Remove(armed);
+        var kept = BackgroundRemover.Remove(armed,
+            new BackgroundRemovalOptions { ClearTempleIntrusions = false });
+
+        var withClearing = Math.Abs(cleared.Openings[0].CentreX - truth.Openings[0].CentreX);
+        var without = Math.Abs(kept.Openings[0].CentreX - truth.Openings[0].CentreX);
+
+        Assert.True(withClearing < without,
+            $"clearing the arm should recover the lens centre: {withClearing:F4} vs {without:F4}");
+        Assert.Equal(truth.Openings[0].CentreX, cleared.Openings[0].CentreX, 2);
+        Assert.Equal(truth.Openings[0].CentreY, cleared.Openings[0].CentreY, 2);
+    }
+
+    [Fact]
+    public void Clearing_an_arm_does_not_move_the_frame_front()
+    {
+        // The front extent is the scale the mirror works from. An arm behind a
+        // lens is well inside it either way, so removing one must not shift it.
+        using var plain = Spectacles(SKColors.White, SKColors.Black, SKColors.White);
+        using var armed = SpectaclesWithArmsBehindTheLenses(
+            SKColors.White, SKColors.Black, SKColors.White);
+
+        var truth = BackgroundRemover.Remove(plain);
+        var cleared = BackgroundRemover.Remove(armed);
+
+        Assert.Equal(truth.FrontLeftX, cleared.FrontLeftX, 3);
+        Assert.Equal(truth.FrontRightX, cleared.FrontRightX, 3);
+    }
+
+    [Fact]
+    public void The_arm_clear_out_can_be_turned_off()
+    {
+        using var source = SpectaclesWithArmsBehindTheLenses(
+            SKColors.White, SKColors.Black, SKColors.White);
+
+        var result = BackgroundRemover.Remove(source,
+            new BackgroundRemovalOptions { ClearTempleIntrusions = false });
+
+        using var cut = result.Bitmap!;
+        Assert.Equal(0, result.TempleIntrusionPixels);
+        Assert.Equal(255, AlphaAt(cut, 55, 104));
+    }
+
+    [Fact]
+    public void An_opening_that_wraps_round_the_frame_is_left_alone()
+    {
+        // The guard. The fill assumes the opening is a lens: a shape with
+        // nothing of the frame inside it. Give it a ring instead, with frame in
+        // the middle, and filling between the ring own pixels would swallow the
+        // lot. It must recognise that and do nothing rather than half of it.
+        using var source = new SKBitmap(
+            new SKImageInfo(Size, Size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        using (var canvas = new SKCanvas(source))
+        {
+            canvas.Clear(SKColors.White);
+            using var frame = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+            using var gap = new SKPaint { Color = SKColors.White, IsAntialias = false };
+
+            canvas.DrawRect(new SKRect(30, 40, 170, 170), frame);
+            canvas.DrawCircle(100, 105, 50, gap);    // the ring outside
+            canvas.DrawCircle(100, 105, 35, frame);  // frame island in the middle
+            canvas.Flush();
+        }
+
+        var result = BackgroundRemover.Remove(source);
+
+        Assert.Equal(BackgroundRemovalOutcome.Removed, result.Outcome);
+        using var cut = result.Bitmap!;
+
+        Assert.Equal(0, result.TempleIntrusionPixels);
+        Assert.Equal(255, AlphaAt(cut, 100, 105));  // the island survives
+        Assert.Equal(0, AlphaAt(cut, 100, 62));     // the ring itself still goes
     }
 }

@@ -81,6 +81,33 @@ public sealed class BackgroundRemovalOptions
     public double MinOpeningFraction { get; init; } = 0.0015;
 
     /// <summary>
+    /// Clear the temple arms that show through the lenses.
+    ///
+    /// A pair of glasses is photographed open, so the arms recede behind the
+    /// lenses and the camera sees them through the glass. The cut-out keeps
+    /// them, because nothing about their colour says "backdrop" — and they land
+    /// across the wearer's eyes in the mirror, which is precisely where a real
+    /// temple never goes. Removing them leaves the frame front, which is what
+    /// try-on artwork is.
+    /// </summary>
+    public bool ClearTempleIntrusions { get; init; } = true;
+
+    /// <summary>
+    /// Abandon the clear-out for a lens if it would take more than this share of
+    /// that lens's opening.
+    ///
+    /// A safety net, not a tuned figure. The fill only spreads between pixels of
+    /// one opening, so on any lens-shaped aperture it can reach the arm and
+    /// nothing else; the cap is here for the aperture that is not lens-shaped —
+    /// one wrapping round a piece of the frame, where the fill would bridge the
+    /// gap and eat it. Measured on the frames to hand it takes 6.4&#160;% and
+    /// 7.1&#160;% of the lens on one, 10.1&#160;% and 10.7&#160;% on the other,
+    /// so a third of the opening is far beyond any real arm and still well short
+    /// of the runaway it guards against.
+    /// </summary>
+    public double MaxIntrusionFraction { get; init; } = 0.35;
+
+    /// <summary>
     /// Refuse a frame that was not photographed front-on.
     ///
     /// The mirror places artwork by mapping the customer's two pupils onto the
@@ -161,11 +188,21 @@ public sealed class BackgroundRemovalResult
     /// <summary>The cut-out. Null unless <see cref="Outcome"/> is Removed.</summary>
     public SKBitmap? Bitmap { get; init; }
 
-    /// <summary>Fraction of pixels made fully or partly transparent.</summary>
+    /// <summary>
+    /// Fraction of pixels the backdrop removal made fully or partly
+    /// transparent. Temple arms cleared from inside the lenses are not in this
+    /// figure; they are counted by <see cref="TempleIntrusionPixels"/>.
+    /// </summary>
     public double RemovedFraction { get; init; }
 
     /// <summary>Enclosed regions cleared — normally 2 for a pair of lenses.</summary>
     public int OpeningsCleared { get; init; }
+
+    /// <summary>
+    /// Pixels of temple arm cleared from inside the lenses. Zero on artwork that
+    /// never had any, and on a photograph where the clear-out was abandoned.
+    /// </summary>
+    public int TempleIntrusionPixels { get; init; }
 
     /// <summary>
     /// The openings themselves, left to right, normalised to the image. For a
@@ -218,6 +255,7 @@ public static class BackgroundRemover
     private const byte Outside = 1;   // background reachable from the border
     private const byte Kept = 2;      // the frame
     private const byte Opening = 3;   // enclosed background — the lenses
+    private const byte Intrusion = 4; // opaque, but inside a lens — a temple arm
 
     public static BackgroundRemovalResult Remove(
         SKBitmap source, BackgroundRemovalOptions? options = null)
@@ -303,11 +341,14 @@ public static class BackgroundRemover
         FloodFromBorder(mask, distances, width, height, loose);
 
         var openings = new List<BackgroundRemovalOpening>();
+        var intrusionPixels = 0;
         if (opts.ClearOpenings)
         {
             openings = ClearEnclosedOpenings(
-                mask, distances, width, height, loose,
-                (int)Math.Max(1, opts.MinOpeningFraction * total));
+                mask, distances, width, height, loose, tolerance,
+                (int)Math.Max(1, opts.MinOpeningFraction * total),
+                opts.ClearTempleIntrusions, opts.MaxIntrusionFraction,
+                out intrusionPixels);
         }
 
         // Where the frame front starts and ends. Wanted whatever happens next:
@@ -333,6 +374,7 @@ public static class BackgroundRemover
                     ToleranceUsed = tolerance,
                     Openings = openings,
                     OpeningsCleared = openings.Count,
+                    TempleIntrusionPixels = intrusionPixels,
                     FrontOnScore = frontOn,
                     FrontLeftX = frameLeft,
                     FrontRightX = frameRight,
@@ -349,6 +391,22 @@ public static class BackgroundRemover
         for (var i = 0; i < total; i++)
         {
             var px = pixels[i];
+
+            if (mask[i] == Intrusion)
+            {
+                // A temple arm behind the lens. It is the frame's own colour, so
+                // its transparency cannot be derived from the colour distance
+                // the way every other pixel's is: it goes because of where it
+                // is, and it goes completely.
+                //
+                // Deliberately not counted as removed. The two fractions below
+                // ask whether the chroma key went wrong, and an arm taken out on
+                // purpose is not evidence either way — counting it tipped a
+                // legitimate 92&#160;%-backdrop photograph over the ceiling and
+                // had the cut refused as having eaten its subject.
+                result[i] = new SKColor(px.Red, px.Green, px.Blue, 0);
+                continue;
+            }
 
             if (mask[i] is not (Outside or Opening))
             {
@@ -405,6 +463,7 @@ public static class BackgroundRemover
             RemovedFraction = removedFraction,
             OpeningsCleared = openings.Count,
             Openings = openings,
+            TempleIntrusionPixels = intrusionPixels,
             FrontOnScore = frontOn,
             FrontLeftX = frameLeft,
             FrontRightX = frameRight,
@@ -448,7 +507,7 @@ public static class BackgroundRemover
             var count = 0;
             for (var y = 0; y < height; y++)
             {
-                if (mask[(y * width) + x] is Outside or Opening) continue;
+                if (mask[(y * width) + x] is Outside or Opening or Intrusion) continue;
                 count++;
             }
 
@@ -646,11 +705,16 @@ public static class BackgroundRemover
 
     /// <summary>
     /// Finds background-coloured regions the border flood could not reach, and
-    /// clears the ones big enough to be lens openings rather than noise.
+    /// clears the ones big enough to be lens openings rather than noise. Each
+    /// one then has the temple arm behind it taken out, so what is left of the
+    /// opening is the whole lens.
     /// </summary>
     private static List<BackgroundRemovalOpening> ClearEnclosedOpenings(
-        byte[] mask, int[] distances, int width, int height, int loose, int minArea)
+        byte[] mask, int[] distances, int width, int height, int loose, int tolerance,
+        int minArea, bool clearIntrusions, double maxIntrusionFraction,
+        out int intrusionPixels)
     {
+        intrusionPixels = 0;
         var found = new List<BackgroundRemovalOpening>();
         var component = new List<int>();
         var stack = new Stack<int>();
@@ -688,12 +752,28 @@ public static class BackgroundRemover
 
             if (component.Count < minArea) continue;
 
+            foreach (var index in component) mask[index] = Opening;
+
+            // Take the arm out before measuring, so the centre reported is the
+            // middle of the lens rather than of the crescent the arm left over.
+            if (clearIntrusions)
+            {
+                var reclaimed = ApertureIntrusions(
+                    mask, distances, width, height, tolerance, component, maxIntrusionFraction);
+
+                if (reclaimed is not null)
+                {
+                    foreach (var index in reclaimed) mask[index] = Intrusion;
+                    component.AddRange(reclaimed);
+                    intrusionPixels += reclaimed.Count;
+                }
+            }
+
             long sumX = 0, sumY = 0;
             int top = height, bottom = -1;
 
             foreach (var index in component)
             {
-                mask[index] = Opening;
                 sumX += index % width;
                 var y = index / width;
                 sumY += y;
@@ -715,6 +795,121 @@ public static class BackgroundRemover
         // and left lens without re-sorting.
         found.Sort((a, b) => a.CentreX.CompareTo(b.CentreX));
         return found;
+    }
+
+    /// <summary>
+    /// The frame's own pixels sitting inside a lens opening: the temple arm the
+    /// camera saw through the glass.
+    ///
+    /// Glasses are photographed open, so each arm recedes from its hinge and
+    /// shows through the lens as a wedge running down and inward. The chroma key
+    /// keeps it — correctly, since it is the frame — but the mirror then paints
+    /// it across the wearer's eye, which is the one place a temple never is.
+    ///
+    /// Finding it needs no notion of what an arm looks like, only of where the
+    /// lens is. Take the pixels of this opening that end up fully transparent:
+    /// they are the glass. Anything that is not glass but lies between two bits
+    /// of glass, along a row or down a column, is inside the lens. Repeat until
+    /// nothing more is caught, because each pixel taken lengthens the runs that
+    /// the next pass measures, and a diagonal wedge is only unpicked a step at a
+    /// time. The rim is never between two bits of its own glass, so it is never
+    /// touched.
+    ///
+    /// Returns null if the fill should be abandoned: either it escaped into the
+    /// outside background, which means the opening was not enclosed after all,
+    /// or it exceeded <paramref name="maxFraction"/> of the opening. Both say
+    /// the shape being filled is not a lens, and half-clearing a frame is worse
+    /// than leaving it alone.
+    /// </summary>
+    private static List<int>? ApertureIntrusions(
+        byte[] mask, int[] distances, int width, int height, int tolerance,
+        List<int> opening, double maxFraction)
+    {
+        var rowFirst = new int[height];
+        var rowLast = new int[height];
+        var columnFirst = new int[width];
+        var columnLast = new int[width];
+        Array.Fill(rowFirst, -1);
+        Array.Fill(columnFirst, -1);
+
+        void Extend(int index)
+        {
+            var x = index % width;
+            var y = index / width;
+
+            if (rowFirst[y] < 0) { rowFirst[y] = x; rowLast[y] = x; }
+            else if (x < rowFirst[y]) rowFirst[y] = x;
+            else if (x > rowLast[y]) rowLast[y] = x;
+
+            if (columnFirst[x] < 0) { columnFirst[x] = y; columnLast[x] = y; }
+            else if (y < columnFirst[x]) columnFirst[x] = y;
+            else if (y > columnLast[x]) columnLast[x] = y;
+        }
+
+        var glass = 0;
+        foreach (var index in opening)
+        {
+            if (distances[index] > tolerance) continue; // only partly transparent
+            glass++;
+            Extend(index);
+        }
+
+        if (glass == 0) return null;
+
+        var budget = (int)(maxFraction * glass);
+        var taken = new HashSet<int>();
+        var order = new List<int>();
+
+        // Claims one pixel. False means give up on this opening entirely.
+        bool Take(int index)
+        {
+            if (mask[index] == Outside) return false;
+            if (!taken.Add(index)) return true;
+            if (order.Count >= budget) return false;
+
+            order.Add(index);
+            Extend(index);
+            return true;
+        }
+
+        bool IsGlass(int index) => mask[index] == Opening && distances[index] <= tolerance;
+
+        // Eight passes is well past the point where a real arm stops yielding;
+        // the loop exits on its own as soon as a pass claims nothing.
+        for (var pass = 0; pass < 8; pass++)
+        {
+            var claimed = order.Count;
+
+            for (var y = 0; y < height; y++)
+            {
+                if (rowFirst[y] < 0) continue;
+                var last = rowLast[y];
+
+                for (var x = rowFirst[y] + 1; x < last; x++)
+                {
+                    var index = (y * width) + x;
+                    if (IsGlass(index) || taken.Contains(index)) continue;
+                    if (!Take(index)) return null;
+                }
+            }
+
+            for (var x = 0; x < width; x++)
+            {
+                if (columnFirst[x] < 0) continue;
+                var last = columnLast[x];
+
+                for (var y = columnFirst[x] + 1; y < last; y++)
+                {
+                    var index = (y * width) + x;
+                    if (IsGlass(index) || taken.Contains(index)) continue;
+                    if (!Take(index)) return null;
+                }
+            }
+
+            if (order.Count == claimed) break;
+        }
+
+        return order;
     }
 
     /// <summary>
