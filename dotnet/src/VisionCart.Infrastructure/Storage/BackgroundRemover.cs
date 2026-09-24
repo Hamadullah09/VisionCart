@@ -108,6 +108,32 @@ public sealed class BackgroundRemovalOptions
     public double MaxIntrusionFraction { get; init; } = 0.35;
 
     /// <summary>
+    /// Clear the temple arms that run off the sides of the frame front.
+    ///
+    /// A drawn piece of artwork can sweep its arms back along the side of the
+    /// head, where they belong. A photograph cannot: the camera is in front, so
+    /// the arms are foreshortened into short spikes at lens height, and the
+    /// mirror has nowhere to put them except across the wearer's temples. What
+    /// is left without them is the frame front, which is the part being tried
+    /// on.
+    /// </summary>
+    public bool ClearTemples { get; init; } = true;
+
+    /// <summary>
+    /// Leave the temples alone unless the frame front is at least this much of
+    /// the picture's full width.
+    ///
+    /// The guard on the measurement rather than on the result. Everything
+    /// outside the front is about to be erased, so a front measured too narrow
+    /// would take the frame with it. On the artwork to hand the front is 73&#160;%
+    /// of the opaque width at its narrowest — the generated catalogue, whose
+    /// arms are drawn full length — and 83&#160;% and 98&#160;% on photographs.
+    /// Two fifths is far below anything real and still catches a measurement
+    /// that has collapsed.
+    /// </summary>
+    public double MinFrontSpanFraction { get; init; } = 0.4;
+
+    /// <summary>
     /// Refuse a frame that was not photographed front-on.
     ///
     /// The mirror places artwork by mapping the customer's two pupils onto the
@@ -203,6 +229,11 @@ public sealed class BackgroundRemovalResult
     /// never had any, and on a photograph where the clear-out was abandoned.
     /// </summary>
     public int TempleIntrusionPixels { get; init; }
+
+    /// <summary>
+    /// Pixels of temple arm cleared from outside the frame front.
+    /// </summary>
+    public int TempleSidePixels { get; init; }
 
     /// <summary>
     /// The openings themselves, left to right, normalised to the image. For a
@@ -354,7 +385,21 @@ public static class BackgroundRemover
         // Where the frame front starts and ends. Wanted whatever happens next:
         // it is both half of the front-on test and the scale the mirror works
         // from, so it is reported on every successful result.
-        var (frameLeft, frameRight) = FrameFrontExtent(mask, width, height);
+        var (frontLeftColumn, frontRightColumn) = FrameFrontColumns(mask, width, height);
+
+        // The arms off the sides go now, while the front is still measured from
+        // a picture that has them: take them away first and the columns they
+        // occupied would no longer be there to be excluded.
+        var templeSidePixels = 0;
+        if (opts.ClearTemples && frontLeftColumn >= 0)
+        {
+            templeSidePixels = ClearTemples(
+                mask, width, height, frontLeftColumn, frontRightColumn,
+                opts.MinFrontSpanFraction);
+        }
+
+        var frameLeft = frontLeftColumn < 0 ? 0d : (double)frontLeftColumn / width;
+        var frameRight = frontLeftColumn < 0 ? 1d : (double)frontRightColumn / width;
 
         // Is it front-on? Measured from the openings, so it costs nothing extra
         // and only applies once there is a pair of lenses to compare.
@@ -375,6 +420,7 @@ public static class BackgroundRemover
                     Openings = openings,
                     OpeningsCleared = openings.Count,
                     TempleIntrusionPixels = intrusionPixels,
+                    TempleSidePixels = templeSidePixels,
                     FrontOnScore = frontOn,
                     FrontLeftX = frameLeft,
                     FrontRightX = frameRight,
@@ -464,6 +510,7 @@ public static class BackgroundRemover
             OpeningsCleared = openings.Count,
             Openings = openings,
             TempleIntrusionPixels = intrusionPixels,
+            TempleSidePixels = templeSidePixels,
             FrontOnScore = frontOn,
             FrontLeftX = frameLeft,
             FrontRightX = frameRight,
@@ -496,7 +543,7 @@ public static class BackgroundRemover
     /// a span within 0.2&#160;%. Lower admits the temples, higher eats the
     /// endpieces.
     /// </summary>
-    private static (double Left, double Right) FrameFrontExtent(
+    private static (int Left, int Right) FrameFrontColumns(
         byte[] mask, int width, int height, double share = 0.20)
     {
         var columns = new int[width];
@@ -515,7 +562,7 @@ public static class BackgroundRemover
             if (count > tallest) tallest = count;
         }
 
-        if (tallest == 0) return (0, 1);
+        if (tallest == 0) return (-1, -1);
 
         var cutoff = tallest * share;
         var left = -1;
@@ -528,7 +575,68 @@ public static class BackgroundRemover
             right = x;
         }
 
-        return left < 0 ? (0, 1) : ((double)left / width, (double)right / width);
+        return (left, right);
+    }
+
+    /// <summary>
+    /// Clears whatever lies outside the frame front: the temple arms.
+    ///
+    /// The mirror has one honest place to put an arm photographed head-on, and
+    /// that is nowhere. It is a few foreshortened pixels beside the endpiece,
+    /// pointing at the camera rather than back towards the ear, so drawn at the
+    /// size the front dictates it becomes a spike across the wearer's temple.
+    /// Drawn artwork can sweep an arm along the side of the head; a photograph
+    /// of one cannot be turned into that, so it goes.
+    ///
+    /// Refuses if the front came out narrower than
+    /// <paramref name="minSpanFraction"/> of everything opaque. Everything
+    /// outside the front is about to be erased, which makes a front measured too
+    /// narrow the one failure that would take the frame with it.
+    /// </summary>
+    private static int ClearTemples(
+        byte[] mask, int width, int height, int frontLeft, int frontRight,
+        double minSpanFraction)
+    {
+        var first = -1;
+        var last = -1;
+
+        for (var x = 0; x < width; x++)
+        {
+            var occupied = false;
+            for (var y = 0; y < height; y++)
+            {
+                if (mask[(y * width) + x] is Outside or Opening or Intrusion) continue;
+                occupied = true;
+                break;
+            }
+
+            if (!occupied) continue;
+            if (first < 0) first = x;
+            last = x;
+        }
+
+        if (first < 0) return 0;
+        if (frontRight - frontLeft + 1 < minSpanFraction * (last - first + 1)) return 0;
+
+        var cleared = 0;
+
+        for (var y = 0; y < height; y++)
+        {
+            var row = y * width;
+
+            for (var x = 0; x < width; x++)
+            {
+                if (x >= frontLeft && x <= frontRight) continue;
+
+                var index = row + x;
+                if (mask[index] is Outside or Opening or Intrusion) continue;
+
+                mask[index] = Intrusion;
+                cleared++;
+            }
+        }
+
+        return cleared;
     }
 
     /// <summary>

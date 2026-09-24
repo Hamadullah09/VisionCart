@@ -397,26 +397,101 @@ public class BackgroundRemoverTests
         Assert.Equal(255, AlphaAt(cut, 60, 84));    // top of the left rim
     }
 
-    [Fact]
-    public void An_arm_running_off_the_side_is_left_where_it_is()
+    /// <summary>The same frame with the temples proper running off the sides.</summary>
+    private static SKBitmap SpectaclesWithSideArms()
     {
-        // Only what is inside a lens is an intrusion. The temples proper run
-        // past the endpieces, outside every opening, and belong to the picture.
-        using var source = SpectaclesWithArmsBehindTheLenses(
+        var bitmap = SpectaclesWithArmsBehindTheLenses(
             SKColors.White, SKColors.Black, SKColors.White);
+
+        using var canvas = new SKCanvas(bitmap);
+        using var arm = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+        canvas.DrawRect(new SKRect(8, 100, 30, 106), arm);
+        canvas.DrawRect(new SKRect(170, 100, 192, 106), arm);
+        canvas.Flush();
+        return bitmap;
+    }
+
+    [Fact]
+    public void The_arms_off_the_sides_go_as_well()
+    {
+        // A photographed arm points at the camera, not back towards the ear, so
+        // there is no size at which the mirror can draw it along the side of the
+        // head. Drawn at the size the front dictates it is a spike across the
+        // wearer's temple, and the frame front is what is being tried on.
+        using var source = SpectaclesWithSideArms();
+
+        var result = BackgroundRemover.Remove(source);
+
+        using var cut = result.Bitmap!;
+        Assert.True(result.TempleSidePixels > 0);
+        Assert.Equal(0, AlphaAt(cut, 15, 103));
+        Assert.Equal(0, AlphaAt(cut, 185, 103));
+
+        // The front itself is all still there.
+        Assert.Equal(255, AlphaAt(cut, 35, 105));
+        Assert.Equal(255, AlphaAt(cut, 165, 105));
+        Assert.Equal(255, AlphaAt(cut, 100, 102));
+    }
+
+    [Fact]
+    public void The_arms_off_the_sides_can_be_kept()
+    {
+        using var source = SpectaclesWithSideArms();
+
+        var result = BackgroundRemover.Remove(source,
+            new BackgroundRemovalOptions { ClearTemples = false });
+
+        using var cut = result.Bitmap!;
+        Assert.Equal(0, result.TempleSidePixels);
+        Assert.Equal(255, AlphaAt(cut, 15, 103));
+        Assert.Equal(255, AlphaAt(cut, 185, 103));
+    }
+
+    [Fact]
+    public void Taking_the_arms_off_does_not_move_the_frame_front()
+    {
+        // The front is measured before they go. Measure it after and the columns
+        // they occupied are no longer there to be excluded, which would let the
+        // span drift with the arms rather than stay fixed to the endpieces.
+        using var source = SpectaclesWithSideArms();
+
+        var result = BackgroundRemover.Remove(source);
+
+        Assert.Equal(30d / Size, result.FrontLeftX, 3);
+        Assert.Equal(169d / Size, result.FrontRightX, 3);
+    }
+
+    [Fact]
+    public void A_frame_whose_front_will_not_measure_keeps_its_arms()
+    {
+        // The guard. Everything outside the front is about to be erased, so a
+        // front that came out too narrow is the one failure that would take the
+        // frame with it. Here the rims are small and the arms enormous, and the
+        // measurement is refused rather than acted on.
+        using var source = new SKBitmap(
+            new SKImageInfo(Size, Size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
         using (var canvas = new SKCanvas(source))
         {
-            using var arm = new SKPaint { Color = SKColors.Black, IsAntialias = false };
-            canvas.DrawRect(new SKRect(8, 100, 30, 106), arm);
-            canvas.DrawRect(new SKRect(170, 100, 192, 106), arm);
+            canvas.Clear(SKColors.White);
+            using var frame = new SKPaint { Color = SKColors.Black, IsAntialias = false };
+            using var hole = new SKPaint { Color = SKColors.White, IsAntialias = false };
+
+            canvas.DrawRect(new SKRect(70, 40, 95, 170), frame);
+            canvas.DrawRect(new SKRect(105, 40, 130, 170), frame);
+            canvas.DrawRect(new SKRect(95, 98, 105, 106), frame);
+            canvas.DrawRect(new SKRect(75, 50, 90, 160), hole);
+            canvas.DrawRect(new SKRect(110, 50, 125, 160), hole);
+            canvas.DrawRect(new SKRect(5, 100, 70, 106), frame);
+            canvas.DrawRect(new SKRect(130, 100, 195, 106), frame);
             canvas.Flush();
         }
 
         var result = BackgroundRemover.Remove(source);
 
         using var cut = result.Bitmap!;
-        Assert.Equal(255, AlphaAt(cut, 15, 103));
-        Assert.Equal(255, AlphaAt(cut, 185, 103));
+        Assert.Equal(0, result.TempleSidePixels);
+        Assert.Equal(255, AlphaAt(cut, 20, 103));
+        Assert.Equal(255, AlphaAt(cut, 180, 103));
     }
 
     [Fact]
